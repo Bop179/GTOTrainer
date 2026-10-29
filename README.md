@@ -33,7 +33,7 @@ Open `index.html` in a browser. You don't need to install anything, run a server
 | 9-max | 100bb | up to vs 6-bet |
 | Heads-up | 50, 100bb | up to vs 5-bet |
 
-When a hand reaches a spot that has no data, it ends with "No solver data past this point".
+When a hand reaches a spot that has no data, it ends with "No solver data past this point". Planned additions are in [ROADMAP.md](ROADMAP.md).
 
 ## Data sources
 
