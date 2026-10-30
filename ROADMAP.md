@@ -6,21 +6,22 @@
 
 | | 100bb | 200bb |
 |---|---|---|
-| **6-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet, solver sizes. Limped pots missing. |
-| **8-max** | Built from 9-max GTO Nexus (UTG folded), up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet, solver sizes. Limped pots missing. |
-| **9-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard 8-max data once UTG folds, up to vs 6-bet, solver sizes. UTG's spots: GTO Academy, open and vs open only. |
+| **6-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. |
+| **8-max** | Built from 9-max GTO Nexus (UTG folded), up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. |
+| **9-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard 8-max data once UTG folds, up to vs 6-bet plus limped pots, solver sizes. UTG's spots: GTO Academy, open and vs open only. |
 
 GTO Wizard limits a free account to 100 new spots a day, so the view counts below set how many days each item takes.
 
 ## To do, in priority order
 
-### 1. Limped pots: SB vs BB at 200bb
+### 1. ✅ Limped pots: SB vs BB at 200bb (done 2026-10-30)
 
-At 6-max and 8-max 200bb, the SB limps about 40% of its hands. Right now a SB limp ends the hand, and in live-table mode a villain's limp redeals, so the BB never gets to practise facing a limp. GTO Nexus never limps at 100bb, so 100bb isn't affected.
+At 6-max and 8-max 200bb the SB limps about 40% of its hands. The limp line now plays out: the BB checks or raises, and the hand goes on through the re-raises to the all-in. The 8 → 9 mapping carries it to 9-max 200bb.
 
-- [ ] Pull the limp line from GTO Wizard for 6-max 200bb and 8-max 200bb. That's about 3–5 spots per format: BB vs limp, SB vs the BB's raise, BB vs the SB's re-raise, and any spot after that. The limp is `C` in `preflop_actions`, e.g. `F-F-F-F-F-F-C` for the 8-max BB.
-- [ ] Add spot types for the limp line to the trainer. That touches `situation()`, `LINES`/`sizing()`, `chainOf()`/`simNext()` (including the limp → redeal in live-table mode), `SPOT_TYPES`, `spotName()` and the keyboard keys.
-- [ ] Facing a limp, the BB's options are check or raise, not fold. GTO Wizard draws check in the same green as call, so label it Check in that spot.
+- [x] Pulled the line from GTO Wizard: 6 spots at 6-max (raise 3.5, re-raise 18, 4-bet 45, 5-bet 99, then all-in) and 5 at 8-max (3.5, 22, 55, then all-in). 11 views.
+- [x] New spot types `FACINGLIMP` and `LIMP_FACING2B` to `LIMP_FACING6B`, a "Limped pot" chip in Settings, and live-table hands where the SB limps.
+- [x] Facing a limp, the BB's passive option is labelled Check.
+- Caveat: as elsewhere, an all-in in the middle of the line is treated like the raise at that spot, because only the main raise line was pulled.
 
 ### 2. ✅ 9-max 200bb: vs 3-bet and beyond from the 8-max data (done 2026-10-30)
 

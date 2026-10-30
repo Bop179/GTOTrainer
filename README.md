@@ -8,8 +8,8 @@ Open `index.html` in a browser. You don't need to install anything, run a server
 
 ## Using it
 
-- **⚙ Settings:** pick the format, stack depth, spot types (Open, vs Open, vs 3-bet, vs 4-bet+) and your positions. Leave the spot types on **Live table** and hands play out like a real table: the other seats act from the same ranges, and the hand continues until it ends or the data runs out.
-- **Keys:** `F` fold, `C` call/limp, `R` raise, `A` all-in, `Space` for the next step or hand, `M` to mute.
+- **⚙ Settings:** pick the format, stack depth, spot types (Open, vs Open, vs 3-bet, vs 4-bet+, Limped pot) and your positions. Leave the spot types on **Live table** and hands play out like a real table: the other seats act from the same ranges, and the hand continues until it ends or the data runs out.
+- **Keys:** `F` fold, `C` call/check/limp, `R` raise, `A` all-in, `Space` for the next step or hand, `M` to mute.
 - **Grading:**
   - ✓ Correct: within 5 points of the solver's most-played action, or played at least 50% of the time.
   - ≈ Acceptable: a mixed action played at least 15% of the time.
@@ -23,16 +23,17 @@ Open `index.html` in a browser. You don't need to install anything, run a server
 |---|---|---|
 | 6-max | 20bb | open, vs open, vs 3-bet, vs 4-bet |
 | 6-max | 50bb | up to vs 5-bet |
-| 6-max | 100bb, 200bb | up to vs 6-bet |
+| 6-max | 100bb | up to vs 6-bet |
+| 6-max | 200bb | up to vs 6-bet, plus SB-vs-BB limped pots |
 | 6-max MTT | 20bb | open, vs open, vs 3-bet |
 | 6-max MTT | 40bb | up to vs 5-bet |
 | 8-max | 40, 50, 75bb | open, vs open |
 | 8-max | 100bb | up to vs 6-bet |
 | 8-max | 150bb | up to vs 4-bet |
-| 8-max | 200bb | up to vs 6-bet |
+| 8-max | 200bb | up to vs 6-bet, plus SB-vs-BB limped pots |
 | 9-max | 40, 50, 75bb | open, vs open |
 | 9-max | 150bb | up to vs 4-bet (spots involving UTG: open and vs open only) |
-| 9-max | 200bb | up to vs 6-bet (spots involving UTG: open and vs open only) |
+| 9-max | 200bb | up to vs 6-bet, plus SB-vs-BB limped pots (spots involving UTG: open and vs open only) |
 | 9-max | 100bb | up to vs 6-bet |
 | Heads-up | 50, 100bb | up to vs 5-bet |
 

@@ -170,7 +170,10 @@ ORDER["6max_mtt"] = ORDER["6max"];
 const ACTS = ["Allin", "Raise", "Call", "Fold"]; // index matches data.js columns
 const COLOR = { Allin: "var(--allin)", Raise: "var(--raise)", Call: "var(--call)", Fold: "var(--fold)" };
 const KEYS = { Fold: "f", Call: "c", Raise: "r", Allin: "a" };
-const RAISE_NAME = { RFI: "Open", FACINGRFI: "3-bet", FACING3B: "4-bet", FACING4B: "5-bet", FACING5B: "6-bet", FACING6B: "7-bet" };
+const RAISE_NAME = { RFI: "Open", FACINGRFI: "3-bet", FACING3B: "4-bet", FACING4B: "5-bet", FACING5B: "6-bet", FACING6B: "7-bet",
+  // limped pots (SB limps, BB to act): the BB's raise is the 2-bet, the SB's re-raise the 3-bet, and so on
+  FACINGLIMP: "Raise", LIMP_FACING2B: "3-bet", LIMP_FACING3B: "4-bet", LIMP_FACING4B: "5-bet", LIMP_FACING5B: "6-bet", LIMP_FACING6B: "7-bet" };
+const isLimp = node => node.includes("LIMP");
 
 // ---------- sound (Web Audio synth, no files) ----------
 let audio, master, muted = false, pack = "classic", volume = .8;
@@ -339,9 +342,15 @@ function situation(s) {
     FACING4B: `${v} opens, you 3-bet from ${h}, ${v} 4-bets.`,
     FACING5B: `You open from ${h}, ${v} 3-bets, you 4-bet, ${v} 5-bets.`,
     FACING6B: `${v} opens, you 3-bet from ${h}, ${v} 4-bets, you 5-bet, ${v} 6-bets.`,
+    FACINGLIMP: `Folds to ${v}, who limps. You're in ${h}.`,
+    LIMP_FACING2B: `You limp from ${h}, ${v} raises.`,
+    LIMP_FACING3B: `${v} limps, you raise from ${h}, ${v} re-raises.`,
+    LIMP_FACING4B: `You limp from ${h}, ${v} raises, you re-raise, ${v} 4-bets.`,
+    LIMP_FACING5B: `${v} limps, you raise from ${h}, ${v} re-raises, you 4-bet, ${v} 5-bets.`,
+    LIMP_FACING6B: `You limp from ${h}, ${v} raises, you re-raise, ${v} 4-bets, you 5-bet, ${v} 6-bets.`,
   }[s.node];
 }
-const label = (a, node) => a === "Raise" ? RAISE_NAME[node] : a === "Call" && node === "RFI" ? "Limp" : a === "Allin" ? "All-in" : a;
+const label = (a, node) => a === "Raise" ? RAISE_NAME[node] : a === "Call" && node === "RFI" ? "Limp" : a === "Call" && node === "FACINGLIMP" ? "Check" : a === "Allin" ? "All-in" : a;
 // ---------- bet sizing ----------
 // ponytail: standard sizes assumed where the range files carry none (all but the GTO Wizard spots: 6-max 200bb, 8-max 150/200bb): open 2.5bb (2bb ≤40bb, SB 3bb),
 // 3-bet 3x in position / 4x out of position, 4-bet+ 2.3x, shove once a raise passes 55% of the stack.
@@ -350,11 +359,12 @@ function inPosition(a, b, game) {
   const r = p => p === "SB" ? -2 : p === "BB" ? -1 : ORDER[game].indexOf(p);
   return r(a) > r(b);
 }
-const LINES = { RFI: [], FACINGRFI: ["v"], FACING3B: ["h", "v"], FACING4B: ["v", "h", "v"], FACING5B: ["h", "v", "h", "v"], FACING6B: ["v", "h", "v", "h", "v"] };
+const LINES = { RFI: [], FACINGRFI: ["v"], FACING3B: ["h", "v"], FACING4B: ["v", "h", "v"], FACING5B: ["h", "v", "h", "v"], FACING6B: ["v", "h", "v", "h", "v"],
+  FACINGLIMP: [], LIMP_FACING2B: ["v"], LIMP_FACING3B: ["h", "v"], LIMP_FACING4B: ["v", "h", "v"], LIMP_FACING5B: ["h", "v", "h", "v"], LIMP_FACING6B: ["v", "h", "v", "h", "v"] };
 const bb = x => +x.toFixed(1) + "bb";
 function sizing(s) {
-  const S = parseInt(s.stack), inv = { SB: .5, BB: 1 }, ante = s.game.endsWith("mtt") ? 1 : 0; // MTT: 1bb BB ante
-  let last = 1, n = 0;
+  const S = parseInt(s.stack), limp = isLimp(s.node), inv = { SB: limp ? 1 : .5, BB: 1 }, ante = s.game.endsWith("mtt") ? 1 : 0; // MTT: 1bb BB ante
+  let last = 1, n = 0, at = limp ? "FACINGLIMP" : "RFI"; // at: the node each raise in the line is made from
   const raiseTo = (p, other) => {
     if (SIZES[s.key]) return Math.min(SIZES[s.key][n], S); // solver's own sizes (GTO Wizard spots)
     let to = n === 0 ? (p === "SB" && s.game !== "HU" ? 3 : S <= 40 ? 2 : 2.5)
@@ -362,11 +372,11 @@ function sizing(s) {
     to = Math.round(to * 2) / 2;
     return to > S * .55 ? S : to;
   };
-  const acts = {}; // last action per seat, for the table view
+  const acts = limp ? { SB: "Limp" } : {}; // last action per seat, for the table view
   for (const x of LINES[s.node]) {
     const p = x === "h" ? s.hero : s.villain, other = x === "h" ? s.villain : s.hero;
     last = inv[p] = raiseTo(p, other);
-    acts[p] = last >= S ? "All-in" : Object.values(RAISE_NAME)[n]; n++;
+    acts[p] = last >= S ? "All-in" : RAISE_NAME[at]; n++; at = NEXT[at];
   }
   const heroIn = inv[s.hero] || 0;
   return {
@@ -380,7 +390,7 @@ function actionText(a, s, z) {
   const L = label(a, s.node);
   if (a === "Fold") return L;
   if (a === "Allin") return `All-in ${bb(z.S)}`;
-  if (a === "Call") return `${L} ${bb(z.toCall)}`;
+  if (a === "Call") return z.toCall ? `${L} ${bb(z.toCall)}` : L;
   return z.raise >= z.S ? `${L} (all-in ${bb(z.S)})` : `${L} to ${bb(z.raise)}`;
 }
 function mixOf(row) { // normalize (some source rows don't sum to exactly 100)
@@ -394,7 +404,8 @@ $("mute").textContent = muted ? "🔇" : "🔊";
 
 // ---------- settings: chips you click to highlight. Spots and positions take several; none highlighted = all ----------
 const GAMES = { "6max": "6-max", "8max": "8-max", "9max": "9-max", HU: "Heads-up", "6max_mtt": "6-max MTT" };
-const SPOT_TYPES = { RFI: "Open", FACINGRFI: "vs Open", FACING3B: "vs 3-bet", "FACING4B|FACING5B|FACING6B": "vs 4-bet+" };
+const SPOT_TYPES = { RFI: "Open", FACINGRFI: "vs Open", FACING3B: "vs 3-bet", "FACING4B|FACING5B|FACING6B": "vs 4-bet+",
+  "FACINGLIMP|LIMP_FACING2B|LIMP_FACING3B|LIMP_FACING4B|LIMP_FACING5B|LIMP_FACING6B": "Limped pot" };
 const stacksOf = game => [...new Set(ALL.filter(s => s.game === game).map(s => s.stack))].sort((a, b) => parseInt(a) - parseInt(b));
 let cfg = { game: "6max", stack: "100bb", nodes: [], pos: [] };
 try { cfg = { ...cfg, ...JSON.parse(localStorage.getItem("gto-cfg")) }; } catch {}
@@ -443,8 +454,9 @@ function leakType(picked, best) {
   if (best === "Call") return "Raising when you should call";
   return "Shoving vs raising mix-ups";
 }
-const spotName = s => `${s.game.replace("_mtt", " MTT")} ${s.stack} · ` + (s.node === "RFI" ? `${s.hero} open`
-  : `${s.hero} vs ${s.villain} ${RAISE_NAME[{ FACINGRFI: "RFI", FACING3B: "FACINGRFI", FACING4B: "FACING3B", FACING5B: "FACING4B", FACING6B: "FACING5B" }[s.node]].toLowerCase()}`);
+// what the hero is facing: the villain's raise made one node earlier, or the SB's limp
+const faced = node => node === "FACINGLIMP" ? "limp" : RAISE_NAME[Object.keys(NEXT).find(k => NEXT[k] === node)].toLowerCase();
+const spotName = s => `${s.game.replace("_mtt", " MTT")} ${s.stack} · ` + (s.node === "RFI" ? `${s.hero} open` : `${s.hero} vs ${s.villain} ${faced(s.node)}`);
 function renderLeaks() {
   const log = prog.log, bad = log.filter(e => e[2] === "bad"), tally = (arr, f) => arr.reduce((m, e) => (m[f(e)] = (m[f(e)] || 0) + 1, m), {});
   const types = Object.entries(tally(bad, e => leakType(e[3], e[4]))).sort((a, b) => b[1] - a[1]);
@@ -484,10 +496,11 @@ function newHand() {
 
 // ---------- other players: each one plays its own solver strategy with a random hand that reaches its node ----------
 // ponytail: villain hands ignore card removal against yours, and since the data has no multiway nodes, a caller
-// before someone else's raise counts as a fold, and a limp or flat call ends the hand.
+// before someone else's raise counts as a fold, and a flat call ends the hand. Only the SB's limp to the BB plays on.
 const pick = w => { let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0; while ((r -= w[i]) > 0 && i < w.length - 1) i++; return i; };
 const sampleAct = key => { const rows = SPOTS[key], m = mixOf(rows[pick(rows.map((r, k) => COMBOS(HANDS[k]) * r[4]))]); return ACTS[pick(ACTS.map(a => m[a]))]; };
-const NEXT = { RFI: "FACINGRFI", FACINGRFI: "FACING3B", FACING3B: "FACING4B", FACING4B: "FACING5B", FACING5B: "FACING6B" };
+const NEXT = { RFI: "FACINGRFI", FACINGRFI: "FACING3B", FACING3B: "FACING4B", FACING4B: "FACING5B", FACING5B: "FACING6B",
+  FACINGLIMP: "LIMP_FACING2B", LIMP_FACING2B: "LIMP_FACING3B", LIMP_FACING3B: "LIMP_FACING4B", LIMP_FACING4B: "LIMP_FACING5B", LIMP_FACING5B: "LIMP_FACING6B" };
 const nodeKey = (s, decider, aggressor, node) => [s.game, s.stack, ...(node === "RFI" ? [decider] : [aggressor, decider]), node].join("/");
 // Live table: players before you act first, so you either open or face whoever opened
 function liveStart(g, pos) {
@@ -499,7 +512,7 @@ function liveStart(g, pos) {
       const k = [game, stack, p, "RFI"].join("/");
       const a = SPOTS[k] ? sampleAct(k) : "Fold";
       if (a === "Fold") continue;
-      key = a === "Call" ? null : [game, stack, p, hero, "FACINGRFI"].join("/"); // limped pots aren't in the data: redeal
+      key = [game, stack, p, hero, a === "Call" ? "FACINGLIMP" : "FACINGRFI"].join("/"); // a limp the data has no spot for redeals
       break;
     }
     if (SPOTS[key]) return parse(key); // the BB getting a walk also redeals
@@ -507,28 +520,30 @@ function liveStart(g, pos) {
 }
 // What the others do after your action: the next spot you face, or how the hand ends
 function simNext(c, a, pot) {
-  const s = c.spot, node = NEXT[s.node];
+  const s = c.spot, limp = s.node === "RFI" && a === "Call", node = limp ? "FACINGLIMP" : NEXT[s.node];
   if (a === "Fold") return null;
-  if (a === "Call") return { text: s.node === "RFI" ? "You limp. Limped pots aren't in the solver data, so the hand ends here." : "You call: on to the flop, where this preflop trainer stops." };
+  if (limp && !SPOTS[nodeKey(s, "BB", s.hero, node)]) return { text: "You limp. The solver data has no limped pot here, so the hand ends." };
+  if (a === "Call" && !limp) return { text: `You ${s.node === "FACINGLIMP" ? "check" : "call"}: on to the flop, where this preflop trainer stops.` };
   // a villain with no spot to respond from would otherwise "fold"
   if (!node || s.villain && !SPOTS[nodeKey(s, s.villain, s.hero, node)]) return { text: "No solver data past this point, so the hand ends here." };
   const shove = a === "Allin" || c.z.raise >= c.z.S;
   let caller;
-  for (const p of s.node === "RFI" ? ORDER[s.game].slice(ORDER[s.game].indexOf(s.hero) + 1) : [s.villain]) {
+  for (const p of limp ? ["BB"] : s.node === "RFI" ? ORDER[s.game].slice(ORDER[s.game].indexOf(s.hero) + 1) : [s.villain]) {
     const key = nodeKey(s, p, s.hero, node), b = SPOTS[key] ? sampleAct(key) : "Fold";
     if (b === "Fold") continue;
     if (shove) return { text: `${p} calls your all-in. Cards on their backs!` };
     if (b === "Call") { caller ??= p; continue; }
-    const next = nodeKey(s, s.hero, p, NEXT[node]), what = b === "Allin" ? "shoves all-in" : RAISE_NAME[node] + "s";
+    const next = nodeKey(s, s.hero, p, NEXT[node]), what = b === "Allin" ? "shoves all-in" : RAISE_NAME[node].toLowerCase() + "s";
     if (!SPOTS[next]?.[c.i][4]) return { text: `${p} ${what}. ${SPOTS[next] ? "The solver never gets here with your hand" : "No solver data past this point"}, so the hand ends.` };
     return { text: `${p} ${what}!`, spot: parse(next) };
   }
-  return { text: caller ? `${caller} calls: on to the flop, where this preflop trainer stops.` : `Everyone folds. You take the ${bb(pot)} pot.` };
+  return { text: caller ? `${caller} ${limp ? "checks" : "calls"}: on to the flop, where this preflop trainer stops.` : `Everyone folds. You take the ${bb(pot)} pot.` };
 }
 
 // Earlier decisions that lead to a spot, oldest first: e.g. "HJ opens, you 3-bet from SB, HJ 4-bets"
 // is preceded by "HJ opens, you're in SB". Stops where the data has no such spot or the hand never gets there.
-const PREV = { FACING3B: "RFI", FACING4B: "FACINGRFI", FACING5B: "FACING3B", FACING6B: "FACING4B" };
+const PREV = { FACING3B: "RFI", FACING4B: "FACINGRFI", FACING5B: "FACING3B", FACING6B: "FACING4B",
+  LIMP_FACING2B: "RFI", LIMP_FACING3B: "FACINGLIMP", LIMP_FACING4B: "LIMP_FACING2B", LIMP_FACING5B: "LIMP_FACING3B", LIMP_FACING6B: "LIMP_FACING4B" };
 function chainOf(spot, i) {
   const steps = [spot];
   for (let s = spot; PREV[s.node]; ) {
@@ -612,7 +627,9 @@ function answer(a) {
     `<div style="background:${COLOR[x]};width:${mix[x]}%">${mix[x] >= 12 ? label(x, c.spot.node) + " " : ""}${Math.round(mix[x])}%</div>`).join("");
   $("why").innerHTML = explain(c, mix, a, grade).map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
   // scripted steps continue down the line whatever you picked; after them the other players respond live
-  let more = c.k + 1 < c.steps.length, note = more && a !== "Raise" ? `The hand continues as if you ${label("Raise", c.spot.node).toLowerCase()}.` : "";
+  // the scripted line raises at every step, except the SB's limp that starts a limped pot
+  let more = c.k + 1 < c.steps.length, want = more && c.spot.node === "RFI" && isLimp(c.steps[c.k + 1].node) ? "Call" : "Raise";
+  let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
   if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } }
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${note}</b></p>`);
@@ -648,10 +665,10 @@ function explain(c, mix, picked, grade) {
     if (best === "Fold") out.push(`${hand} isn't strong or playable enough to open here; it's below the cutoff for ${spot.hero}.`);
     if (best === "Call") out.push(`Limping lets the SB see a cheap flop with hands that play OK but don't want to face a 3-bet.`);
   } else {
-    const vs = `${spot.villain}'s ${RAISE_NAME[{ FACINGRFI: "RFI", FACING3B: "FACINGRFI", FACING4B: "FACING3B", FACING5B: "FACING4B", FACING6B: "FACING5B" }[node]].toLowerCase()}`;
+    const vs = `${spot.villain}'s ${faced(node)}`;
     out.push(`Against ${vs}, your strategy here is: ${ACTS.filter(a => pct(a)).map(a => `${L(a)} ${pct(a)}%`).join(", ")}.`);
     const z = c.z, odds = Math.round(z.toCall / (z.pot + z.toCall) * 100);
-    out.push(`Pot odds: calling ${bb(z.toCall)} to win a ${bb(z.pot)} pot means you need about ${odds}% equity, before accounting for position and how much of that equity you actually realize${z.toCall >= z.heroBehind ? " (this call puts you all-in, so there's nothing left to realize: raw equity is what counts)" : ""}.`);
+    if (z.toCall) out.push(`Pot odds: calling ${bb(z.toCall)} to win a ${bb(z.pot)} pot means you need about ${odds}% equity, before accounting for position and how much of that equity you actually realize${z.toCall >= z.heroBehind ? " (this call puts you all-in, so there's nothing left to realize: raw equity is what counts)" : ""}.`);
     if (aggressive(best)) {
       const raisers = rows.map((row, i) => [row, i]).filter(([row]) => row[4] && row[0] + row[1] >= 50).map(([, i]) => chen(HANDS[i])).sort((x, y) => x - y);
       const value = me >= (raisers[Math.floor(raisers.length / 2)] ?? 0);
@@ -663,7 +680,9 @@ function explain(c, mix, picked, grade) {
       }
       if (best === "Allin" && parseInt(spot.stack) <= 40) out.push(`At ${spot.stack} effective, shoving denies villain's equity and avoids awkward post-flop spots with a high stack-to-pot ratio.`);
     } else if (best === "Call") {
-      out.push(spot.hero === "BB" && node === "FACINGRFI"
+      out.push(node === "FACINGLIMP"
+        ? `Checking sees the flop for free, and you'll have position on the SB. ${hand} doesn't gain enough from a raise to build a bigger pot.`
+        : spot.hero === "BB" && node === "FACINGRFI"
         ? `In the BB you already have 1bb invested, so you're getting a good price. ${hand} has enough equity to defend, but raising would mostly fold out worse hands and get called by better ones.`
         : `${hand} is too good to fold but not the right hand to raise: calling keeps villain's weaker hands and bluffs in, while a raise would mostly get called by better.`);
       if (hand.length === 2 && RANKS.indexOf(hand[0]) > 7) out.push(`Small pairs mostly play for set value: they want to see a flop cheaply and hit a set about 12% of the time.`);
