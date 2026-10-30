@@ -8,7 +8,7 @@
 |---|---|---|
 | **6-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet, solver sizes. Limped pots missing. |
 | **8-max** | Built from 9-max GTO Nexus (UTG folded), up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 4-bet, solver sizes. vs 5-bet/6-bet pull scheduled for 2026-10-30. Limped pots missing. |
-| **9-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Academy, open and vs open only. Bet sizes assumed. |
+| **9-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard 8-max data once UTG folds, up to vs 4-bet, solver sizes. UTG's spots: GTO Academy, open and vs open only. |
 
 GTO Wizard limits a free account to 100 new spots a day, so the view counts below set how many days each item takes.
 
@@ -22,13 +22,13 @@ At 6-max and 8-max 200bb, the SB limps about 40% of its hands. Right now a SB li
 - [ ] Add spot types for the limp line to the trainer. That touches `situation()`, `LINES`/`sizing()`, `chainOf()`/`simNext()` (including the limp → redeal in live-table mode), `SPOT_TYPES`, `spotName()` and the keyboard keys.
 - [ ] Facing a limp, the BB's options are check or raise, not fold. GTO Wizard draws check in the same green as call, so label it Check in that spot.
 
-### 2. 9-max 200bb: vs 3-bet and beyond from the 8-max data (no views needed)
+### 2. ✅ 9-max 200bb: vs 3-bet and beyond from the 8-max data (done 2026-10-30)
 
 9-max with UTG folded plays essentially the same as 8-max. The trainer already uses this to build 8-max from 9-max, so do the reverse at 200bb:
 
-- [ ] Map `8max/200bb/*` onto 9-max seats: UTG → UTG1, UTG1 → UTG2, the rest unchanged. Copy `SIZES` too.
-- [ ] Let the mapped charts replace GTO Academy's for every spot that doesn't involve UTG, so a hand stays on one source and one set of bet sizes. Keep GTO Academy for UTG's opens and for spots facing a UTG open.
-- [ ] Do the mapping at load time in `index.html`, next to the existing 9 → 8 loop. That way new 8-max nodes, including the limp line from item 1, carry over automatically.
+- [x] Map `8max/200bb/*` onto 9-max seats: UTG → UTG1, UTG1 → UTG2, the rest unchanged. Copy `SIZES` too.
+- [x] Let the mapped charts replace GTO Academy's for every spot that doesn't involve UTG, so a hand stays on one source and one set of bet sizes. Keep GTO Academy for UTG's opens and for spots facing a UTG open.
+- [x] Do the mapping at load time in `index.html`, next to the existing 9 → 8 loop. That way new 8-max nodes, including the limp line from item 1, carry over automatically.
 - Caveat: this ignores the card removal of UTG's folded hand, the same small approximation 8-max already makes.
 
 ### 3. Real 8-max 100bb from GTO Wizard
