@@ -28,9 +28,11 @@ Open `index.html` in a browser. You don't need to install anything, run a server
 | 6-max MTT | 40bb | up to vs 5-bet |
 | 8-max | 40, 50, 75bb | open, vs open |
 | 8-max | 100bb | up to vs 6-bet |
-| 8-max | 150, 200bb | up to vs 4-bet |
+| 8-max | 150bb | up to vs 4-bet |
+| 8-max | 200bb | up to vs 6-bet |
 | 9-max | 40, 50, 75bb | open, vs open |
-| 9-max | 150, 200bb | up to vs 4-bet (spots involving UTG: open and vs open only) |
+| 9-max | 150bb | up to vs 4-bet (spots involving UTG: open and vs open only) |
+| 9-max | 200bb | up to vs 6-bet (spots involving UTG: open and vs open only) |
 | 9-max | 100bb | up to vs 6-bet |
 | Heads-up | 50, 100bb | up to vs 5-bet |
 

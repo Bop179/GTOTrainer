@@ -2,13 +2,13 @@
 
 **Focus: 100bb and 200bb cash at 6-max, 8-max and 9-max.** Everything else is out of scope for now (see the end of this file).
 
-## Where things stand (2026-10-29)
+## Where things stand (2026-10-30)
 
 | | 100bb | 200bb |
 |---|---|---|
 | **6-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet, solver sizes. Limped pots missing. |
-| **8-max** | Built from 9-max GTO Nexus (UTG folded), up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 4-bet, solver sizes. vs 5-bet/6-bet pull scheduled for 2026-10-30. Limped pots missing. |
-| **9-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard 8-max data once UTG folds, up to vs 4-bet, solver sizes. UTG's spots: GTO Academy, open and vs open only. |
+| **8-max** | Built from 9-max GTO Nexus (UTG folded), up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet, solver sizes. Limped pots missing. |
+| **9-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard 8-max data once UTG folds, up to vs 6-bet, solver sizes. UTG's spots: GTO Academy, open and vs open only. |
 
 GTO Wizard limits a free account to 100 new spots a day, so the view counts below set how many days each item takes.
 
