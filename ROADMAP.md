@@ -35,6 +35,8 @@ At 6-max and 8-max 200bb the SB limps about 40% of its hands. The limp line now 
 ### 3. Real 8-max 100bb from GTO Wizard
 
 - [ ] Pull 8-max 100bb from GTO Wizard. A full tree to vs 6-bet is about 147 spots, so two days. It replaces the 9-max-derived ranges (the derivation loop's `??=` already lets real data win) and brings solver bet sizes.
+  - Started 2026-10-30: 25 spots read (every open, and vs open for UTG, UTG1 and LJ openers). They're kept out of the repo until the tree is complete, so a hand doesn't mix the two sources.
+  - GTO Wizard's SB limps 44.8% at 8-max 100bb (GTO Nexus never does), so this also needs the limp line, about 5 more spots.
 
 ### 4. Solver bet sizes at 100bb
 
