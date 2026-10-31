@@ -59,6 +59,5 @@ This is the biggest item by far. Do it last.
 
 You can do these later, but they don't come before the items above:
 
-- Other stacks: 20, 40, 50, 75, 125, 150, 175, 250 and 300bb. This includes the 5-bet/6-bet spots and limped pots at 8-max 150bb.
-- Heads-up, MTT and other game variants.
+- Heads-up.
 - Postflop.
