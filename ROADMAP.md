@@ -2,13 +2,13 @@
 
 **Focus: 100bb and 200bb cash at 6-max, 8-max and 9-max.** Everything else is out of scope for now (see the end of this file).
 
-## Where things stand (2026-10-30)
+## Where things stand (2026-11-01)
 
 | | 100bb | 200bb |
 |---|---|---|
 | **6-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. |
 | **8-max** | Built from 9-max GTO Nexus (UTG folded), up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. |
-| **9-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard 8-max data once UTG folds, up to vs 6-bet plus limped pots, solver sizes. UTG's spots: GTO Academy, open and vs open only. |
+| **9-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard 8-max data, up to vs 6-bet plus limped pots, solver sizes. UTG's lines are estimated from 8-max UTG (about one seat too loose). |
 
 GTO Wizard limits a free account to 100 new spots a day, so the view counts below set how many days each item takes.
 
@@ -28,7 +28,7 @@ At 6-max and 8-max 200bb the SB limps about 40% of its hands. The limp line now 
 9-max with UTG folded plays essentially the same as 8-max. The trainer already uses this to build 8-max from 9-max, so do the reverse at 200bb:
 
 - [x] Map `8max/200bb/*` onto 9-max seats: UTG → UTG1, UTG1 → UTG2, the rest unchanged. Copy `SIZES` too.
-- [x] Let the mapped charts replace GTO Academy's for every spot that doesn't involve UTG, so a hand stays on one source and one set of bet sizes. Keep GTO Academy for UTG's opens and for spots facing a UTG open.
+- [x] Let the mapped charts replace GTO Academy's for every spot that doesn't involve UTG, so a hand stays on one source and one set of bet sizes. (2026-11-01) UTG's own lines now use 8-max UTG's too, with UTG1 and UTG2 both playing 8-max UTG1, and GTO Academy is gone: its charts were tighter than GTO Wizard's at every seat and folded A5s from UTG at 200bb.
 - [x] Do the mapping at load time in `index.html`, next to the existing 9 → 8 loop. That way new 8-max nodes, including the limp line from item 1, carry over automatically.
 - Caveat: this ignores the card removal of UTG's folded hand, the same small approximation 8-max already makes.
 

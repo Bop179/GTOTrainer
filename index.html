@@ -138,7 +138,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
     <div class="situation" id="situation"></div>
     <div class="felt" id="felt"></div>
     <div class="actions" id="actions"></div>
-    <div class="note">Range data: GTO Nexus, GTO Wizard for 6-max 200bb and 8-max 150/200bb (also used for 9-max at those stacks once UTG folds), and GTO Academy for the rest of 8/9-max away from 100bb. Bet sizes are standard assumptions, except where GTO Wizard's data is used, which carries its own sizes.</div>
+    <div class="note">Range data: GTO Nexus, and GTO Wizard for 6-max 200bb and 8-max 150/200bb (also used for 9-max at those stacks, with 9-max UTG estimated from 8-max UTG). Bet sizes are standard assumptions, except where GTO Wizard's data is used, which carries its own sizes.</div>
   </section>
   <section class="feedback" id="feedback">
     <div class="analysis">
@@ -160,7 +160,6 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 </dialog>
 <script src="data.js"></script>
 <script src="data200.js"></script>
-<script src="data9.js"></script>
 <script src="data8.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -324,13 +323,15 @@ for (const key of Object.keys(SPOTS)) {
   const p = key.split("/"), to8 = { UTG1: "UTG", UTG2: "UTG1" };
   if (p[0] === "9max" && !p.includes("UTG")) SPOTS[["8max", ...p.slice(1).map(x => to8[x] || x)].join("/")] ??= SPOTS[key]; // ??=: keep real 8-max data (data8.js)
 }
-// ...and the other way: real 8-max solves (the GTO Wizard spots, which carry SIZES) stand in for 9-max once UTG folds,
-// replacing GTO Academy's open/vs-open charts there so a whole line comes from one solve. UTG's own spots keep GTO Academy.
+// ...and the other way: real 8-max solves (the GTO Wizard spots, which carry SIZES) stand in for 9-max once UTG folds.
+// 9-max UTG's own lines have no solve we trust, so they borrow 8-max UTG's, with UTG1 and UTG2 both playing 8-max UTG1.
+// ponytail: 9-max UTG plays one seat too loose this way (8-max UTG opens ~13%; GTO Nexus 9-max 100bb UTG ~11%). Swap in GTO Wizard 9-max if it's ever pulled.
+const to9 = m => key => { const p = key.split("/"); return ["9max", ...p.slice(1).map(x => m[x] || x)].join("/"); };
 for (const key of Object.keys(SPOTS)) {
-  const p = key.split("/"), to9 = { UTG: "UTG1", UTG1: "UTG2" };
-  if (p[0] !== "8max" || !SIZES[key]) continue;
-  const k9 = ["9max", ...p.slice(1).map(x => to9[x] || x)].join("/");
-  SPOTS[k9] = SPOTS[key]; SIZES[k9] = SIZES[key];
+  if (!key.startsWith("8max/") || !SIZES[key]) continue;
+  const maps = [to9({ UTG: "UTG1", UTG1: "UTG2" })];
+  if (key.split("/").includes("UTG")) maps.push(to9({}), to9({ UTG1: "UTG2" }));
+  for (const k9 of new Set(maps.map(f => f(key)))) { SPOTS[k9] = SPOTS[key]; SIZES[k9] = SIZES[key]; }
 }
 const ALL = Object.keys(SPOTS).map(parse);
 function situation(s) {
