@@ -46,15 +46,16 @@ Only 9-max 100bb UTG lines still use assumed sizes (GTO Nexus files don't includ
 - [x] It replaces GTO Nexus's 6-max 100bb ranges entirely, including Nexus's 7 vs 6-bet spots that GTO Wizard has no node for. The SB now limps at 6-max 100bb too.
 - [x] 9-max (done 2026-11-01, with item 3): item 2's mapping now runs at 100bb too, so 9-max non-UTG spots use GTO Wizard's ranges and sizes. UTG's lines keep GTO Nexus's real 9-max solve, with assumed sizes. GTO Wizard's 9-max is Premium only.
 
-### 5. Multiway spots
+### 5. Multiway spots (6-max done 2026-11-02; 8-max and 9-max to do)
 
-None of these are in the trainer yet: squeezes (facing an open plus a call), cold 4-bets (facing an open and a 3-bet), overcalls, and BB vs open + call. GTO Wizard's cash solves include them because they're solved with cold calls.
+Squeezes (facing an open plus a call), overcalls, BB vs open + call, and cold 4-bets (facing an open and a 3-bet). GTO Wizard's cash solves include them because they're solved with cold calls.
 
-- [ ] Design a key format for spots with more than one villain. Today it's `game/stack/villain/hero/NODE`.
-- [ ] Pull the spots: dozens per format and stack, so several days each.
-- [ ] Teach the trainer's table view, sizing and hand chaining about extra players.
-
-This is the biggest item by far. Do it last.
+- [x] Key format: `game/stack/OPENER+OTHER/hero/NODE`, with `FACINGRFI_CALL` (OTHER called the open) and `FACING3B_COLD` (OTHER 3-bet it). The trainer splits the villain field on `+`.
+- [x] Pulled 6-max 100bb and 200bb: 20 squeeze/overcall and 20 cold 4-bet spots each (80 views), every opener, caller/3-bettor and hero seat. Totals match GTO Wizard's within 0.05pp. GTO Wizard gives no cold-call option facing an open and a 3-bet, so those spots are 4-bet or fold.
+- [x] Trainer: two new spot types ("vs Open + call", "vs Open + 3-bet", shown only where the data has them), the table replays the open and the call or 3-bet, and solver sizes carry through.
+- [x] Live table: players between the opener and you now act from their own spots, so you face an open plus a call or 3-bet when they do. A line that brings in a third player, or one with no data (8/9-max), redeals. After you call or 3-bet an open, and after a call or 3-bet of your open, the players behind act from the multiway spots; a squeeze or cold 4-bet there ends the hand ("No solver data past this point").
+- [ ] 8-max 100bb and 200bb: the same two stages, 56 spots each, so 112 per stack and about 2.5 days of quota for both stacks. Walker stages 7/8 in `gw_walker.js` already enumerate them. The 8 → 9 mapping in `index.html` maps seat names part by part, so it needs to split `OPENER+OTHER` too before 9-max picks these up.
+- Not covered: replies to your squeeze or cold 4-bet, more than two players in front of you, and squeezes of your open (GTO Wizard has these nodes, but they're many more views each).
 
 ## Out of scope for now
 
