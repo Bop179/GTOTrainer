@@ -9,6 +9,7 @@ Open `index.html` in a browser. You don't need to install anything, run a server
 ## Using it
 
 - **⚙ Settings:** pick the format, stack depth, spot types (Open, vs Open, vs 3-bet, vs 4-bet+, Limped pot) and your positions. Leave the spot types on **Live table** and hands play out like a real table: the other seats act from the same ranges, and the hand continues until it ends or the data runs out.
+- **Action replay:** before each decision the table plays out what happened since your last action, one seat at a time: folders throw their cards in, bets slide out from the seat. The buttons unlock when it's your turn.
 - **Keys:** `F` fold, `C` call/check/limp, `R` raise, `A` all-in, `Space` for the next step or hand, `M` to mute.
 - **Grading:**
   - ✓ Correct: within 5 points of the solver's most-played action, or played at least 50% of the time.

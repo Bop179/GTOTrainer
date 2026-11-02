@@ -74,9 +74,13 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
 .card span { font-size: 20px; }
 .card.red { color: #c8281e; }
 .still .card, .still .backs i { animation: none; }
-.hero.folded .card { animation: muck .35s ease-in forwards; }
+.hero.folded .card, .seat.toss .backs i { animation: toss .5s ease-in forwards; }
+.bet.fly { animation: fly .45s cubic-bezier(.2, .8, .3, 1); }
+.hero.turn .plate { box-shadow: 0 0 0 2px var(--ok), 0 0 14px var(--ok); }
+@property --r { syntax: "<number>"; inherits: false; initial-value: 1; } /* lets a bet slide from the seat (--r 1) to its spot */
 @keyframes deal { from { transform: translateY(-30px) rotate(-8deg); opacity: 0; } }
-@keyframes muck { to { transform: translateY(-90px) scale(.5); opacity: 0; } }
+@keyframes toss { to { transform: translate(calc(var(--c) * -1 * min(22vw, 230px)), calc(var(--s) * -1 * min(14vw, 130px))) rotate(180deg) scale(.6); opacity: 0; } }
+@keyframes fly { from { --r: .95; opacity: 0; } }
 @media (max-width: 600px) {
   .felt { --rx: 37%; --ry: 42%; aspect-ratio: 4 / 5; margin: 12px 0 64px; }
   .felt::before { inset: 3% 8%; }
@@ -380,14 +384,15 @@ function sizing(s) {
     return to > S * .55 ? S : to;
   };
   const acts = limp ? { SB: "Limp" } : {}; // last action per seat, for the table view
+  const line = limp ? [["SB", 1, "Limp"]] : []; // [seat, amount to, tag] for each bet in order, for the replay
   for (const x of LINES[s.node]) {
     const p = x === "h" ? s.hero : s.villain, other = x === "h" ? s.villain : s.hero;
     last = inv[p] = raiseTo(p, other);
-    acts[p] = last >= S ? "All-in" : RAISE_NAME[at]; n++; at = NEXT[at];
+    acts[p] = last >= S ? "All-in" : RAISE_NAME[at]; line.push([p, last, acts[p]]); n++; at = NEXT[at];
   }
   const heroIn = inv[s.hero] || 0;
   return {
-    inv, acts, heroIn,
+    inv, acts, heroIn, line,
     pot: ante + Object.values(inv).reduce((a, b) => a + b, 0),
     toCall: Math.min(last, S) - heroIn, raise: raiseTo(s.hero, s.villain), S,
     heroBehind: S - heroIn, villainBehind: s.villain ? S - inv[s.villain] : null,
@@ -484,7 +489,7 @@ function newHand() {
   // drilling a leak overrides the filters: only that spot, only that hand type
   const pool = st.drill ? ALL.filter(s => spotName(s) === st.drill.spot) : ALL.filter(fits);
   $("feedback").classList.remove("show");
-  if (!pool.length) { $("situation").textContent = "No spots match these filters."; $("felt").innerHTML = $("actions").innerHTML = ""; return; }
+  if (!pool.length) { replayTimers.forEach(clearTimeout); $("situation").textContent = "No spots match these filters."; $("felt").innerHTML = $("actions").innerHTML = ""; return; }
   const rid = !st.drill && !st.cur?.rid && dueReview(fits); // never two reviews in a row, so new hands keep flowing
   let spot, i = 0;
   if (rid) { spot = parse(rid.split("|")[0]); i = HANDS.indexOf(rid.split("|")[1]); }
@@ -567,41 +572,79 @@ function showStep(deal) {
   $("spot").textContent = `${spot.game.replace("_mtt", " MTT")} · ${spot.stack} · You are ${spot.hero}`
     + (c.steps.length > 1 ? ` · Decision ${c.k + 1}` : "") + (c.rid ? " · 🔁 Review: you missed this before" : "");
   $("situation").textContent = situation(spot);
-  drawTable(spot, z, c.cards, deal);
+  c.E = drawTable(spot, z, c.cards, deal, deal ? 0 : c.shown || 0); // a later decision only replays what happened since your last action
   if (deal) dealSounds(2 * ORDER[spot.game].length);
   $("actions").innerHTML = ["Fold", "Call", "Raise", "Allin"].filter(a => c.avail.includes(a))
-    .map(a => `<button data-a="${a}" style="background:${COLOR[a]}">${actionText(a, spot, z)}<kbd>${KEYS[a].toUpperCase()}</kbd></button>`).join("");
+    .map(a => `<button data-a="${a}" style="background:${COLOR[a]}"${c.busy ? " disabled" : ""}>${actionText(a, spot, z)}<kbd>${KEYS[a].toUpperCase()}</kbd></button>`).join("");
 }
 function next() {
   const c = st.cur;
   if (c?.steps && c.k + 1 < c.steps.length) { c.k++; showStep(); play("chip"); } else newHand();
 }
 
-// You sit at the bottom; seats run clockwise in action order. Anyone who acted before you (or everyone else,
-// once the pot has been raised twice) has folded; players after you are still to act and keep their cards.
-function drawTable(spot, z, heroCards, deal) {
-  const order = ORDER[spot.game], N = order.length, h = order.indexOf(spot.hero);
-  const deep = spot.node !== "RFI" && spot.node !== "FACINGRFI", btn = spot.game === "HU" ? "SB" : "BTN";
+// Everything that happens before your decision, in table order: folds, and each bet in the line (opens, raises, the SB's limp).
+// Players other than you and the villain fold when the action first reaches them.
+function events(spot, z) {
+  const order = ORDER[spot.game], N = order.length, targets = [...z.line, [spot.hero]], out = [], gone = new Set();
+  for (let i = 0, t = 0; i < N * 8; i++) {
+    const p = order[i % N], [q, to, tag] = targets[t];
+    if (p === q) { if (t === targets.length - 1) break; out.push({ p, to, tag }); t++; }
+    else if (!gone.has(p) && p !== spot.hero && p !== spot.villain) { gone.add(p); out.push({ p, tag: "Fold" }); }
+  }
+  return out;
+}
+let replayTimers = [];
+// You sit at the bottom; seats run clockwise in action order. The table starts as it was after the first `from` events
+// (blinds only, on a new hand) and plays the rest one at a time: folds toss their cards in, bets slide out from the seat.
+// Returns the events, so the next decision in the hand only replays what's new.
+function drawTable(spot, z, heroCards, deal, from = 0) {
+  const order = ORDER[spot.game], N = order.length, h = order.indexOf(spot.hero), btn = spot.game === "HU" ? "SB" : "BTN";
   const at = (k, r) => { const t = Math.PI / 2 + k * 2 * Math.PI / N; return `--c:${Math.cos(t).toFixed(3)};--s:${Math.sin(t).toFixed(3)};--r:${r}`; };
+  const E = events(spot, z), inv = { SB: .5, BB: 1 }, tag = {}, gone = new Set(), ante = z.pot - Object.values(z.inv).reduce((x, y) => x + y, 0);
+  for (const e of E.slice(0, from)) { if (e.tag === "Fold") gone.add(e.p); else inv[e.p] = e.to; tag[e.p] = e.tag; }
+  const pot = () => ante + Object.values(inv).reduce((x, y) => x + y, 0);
+  replayTimers.forEach(clearTimeout); replayTimers = [];
   $("felt").classList.toggle("still", !deal); // later decisions in the same hand don't re-deal
   $("felt").innerHTML = order.map((p, i) => {
-    const k = (i - h + N) % N, me = p === spot.hero, folded = !me && p !== spot.villain && (deep || i < h);
-    const put = z.inv[p] || 0, tag = z.acts[p] || (folded ? "Fold" : "");
+    const k = (i - h + N) % N, me = p === spot.hero, folded = !me && gone.has(p), put = inv[p] || 0, t = tag[p] || "";
     const d = (i - order.indexOf(btn) - 1 + N) % N, delay = j => deal ? ` style="animation-delay:${(SHUFFLE_MS + (j * N + d) * CARD_MS) / 1000}s"` : "";
     const cards = me ? `<div class="cards">${heroCards.map(([rk, [s, red]], j) => `<div class="card${red ? " red" : ""}"${delay(j)}>${rk === "T" ? "10" : rk}<span>${s}</span></div>`).join("")}</div>`
       : folded ? "" : `<div class="backs"><i${delay(0)}></i><i${delay(1)}></i></div>`;
-    return `<div class="seat${me ? " hero" : ""}${folded ? " folded" : ""}" style="${at(k, 1)}">${cards}
+    return `<div class="seat${me ? " hero" : ""}${folded ? " folded" : ""}" data-p="${p}" style="${at(k, 1)}">${cards}
         <div class="plate"><b>${me ? "You · " : ""}${p}</b><span>${bb(z.S - put)}</span></div>
-        <em class="tag"${me ? ' id="heroTag"' : ""}${tag ? (tag === "All-in" ? ' style="background:var(--allin)"' : "") : " hidden"}>${tag}</em></div>
-      <div class="bet"${me ? ' id="heroBet"' : ""} style="${at(k, .6)}"${put ? "" : " hidden"}>${bb(put)}</div>`
+        <em class="tag"${me ? ' id="heroTag"' : ""}${t ? (t === "All-in" ? ' style="background:var(--allin)"' : "") : " hidden"}>${t}</em></div>
+      <div class="bet" data-p="${p}"${me ? ' id="heroBet"' : ""} style="${at(k, me ? .36 : .6)}"${put ? "" : " hidden"}>${bb(put)}</div>`
       + (p === btn ? `<div class="dealer" style="${at(k + .3, .78)}">D</div>` : "");
-  }).join("") + `<div class="pot" id="pot">Pot <b>${bb(z.pot)}</b></div>`;
+  }).join("") + `<div class="pot" id="pot">Pot <b>${bb(pot())}</b></div>`;
+  const felt = $("felt"), el = (sel, p) => felt.querySelector(`${sel}[data-p="${p}"]`);
+  const show = (e) => {
+    const seat = el(".seat", e.p), t = seat.querySelector(".tag");
+    Object.assign(t, { hidden: false, textContent: e.tag }).style.background = e.tag === "All-in" ? "var(--allin)" : "";
+    if (e.tag === "Fold") { seat.classList.add("toss", "folded"); play("deal"); toss(seat, ".backs i"); replayTimers.push(setTimeout(() => seat.querySelector(".backs")?.remove(), 650)); return; }
+    inv[e.p] = e.to; play("chip");
+    fly(Object.assign(el(".bet", e.p), { hidden: false, textContent: bb(e.to) }));
+    seat.querySelector(".plate span").textContent = bb(z.S - e.to);
+    $("pot").innerHTML = `Pot <b>${bb(pot())}</b>`;
+  };
+  // after the deal lands, one action at a time; bets get a little longer than folds
+  let when = deal ? SHUFFLE_MS + 2 * N * CARD_MS + 300 : 350;
+  for (const e of E.slice(from)) { replayTimers.push(setTimeout(() => show(e), when)); when += e.tag === "Fold" ? 320 : 650; }
+  st.cur.busy = E.length > from;
+  replayTimers.push(setTimeout(() => {
+    st.cur.busy = false; el(".seat", spot.hero).classList.add("turn");
+    document.querySelectorAll("#actions button").forEach(b => b.disabled = false);
+  }, E.length > from ? when - 150 : 0));
+  return E;
 }
+// the deal leaves a start delay on each card; clear it so the throw starts now, second card just behind the first
+const toss = (seat, sel) => seat.querySelectorAll(sel).forEach((x, j) => x.style.animationDelay = j * .07 + "s");
+const fly = b => { b.classList.remove("fly"); void b.offsetWidth; b.classList.add("fly"); }; // restart the slide-in
 
 function answer(a) {
   const c = st.cur;
-  if (!c || c.answered || !c.avail.includes(a)) return;
-  c.answered = true;
+  if (!c || c.answered || c.busy || !c.avail.includes(a)) return;
+  c.answered = true; c.shown = c.E.length + 1; // the next decision replays from after your action
+  document.querySelector(".seat.hero").classList.remove("turn");
   const mix = mixOf(c.rows[c.i]), f = mix[a], best = Math.max(...Object.values(mix));
   const grade = f >= best - 5 || f >= 50 ? "great" : f >= 15 ? "ok" : "bad";
   st.hands++; if (grade !== "bad") st.right++;
@@ -620,9 +663,9 @@ function answer(a) {
   // show your action on the table: fold mucks your cards, anything else moves chips in
   const z = c.z, put = { Fold: z.heroIn, Call: z.heroIn + z.toCall, Raise: z.raise, Allin: z.S }[a];
   Object.assign($("heroTag"), { hidden: false, textContent: a === "Raise" && z.raise >= z.S ? "All-in" : label(a, c.spot.node) }).style.background = COLOR[a];
-  if (a === "Fold") document.querySelector(".seat.hero").classList.add("folded");
+  if (a === "Fold") { const me = document.querySelector(".seat.hero"); toss(me, ".card"); me.classList.add("folded"); }
   else {
-    Object.assign($("heroBet"), { hidden: false, textContent: bb(put) });
+    fly(Object.assign($("heroBet"), { hidden: false, textContent: bb(put) }));
     document.querySelector(".hero .plate span").textContent = bb(z.S - put);
     $("pot").innerHTML = `Pot <b>${bb(z.pot - z.heroIn + put)}</b>`;
   }
