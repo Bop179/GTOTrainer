@@ -300,7 +300,8 @@ function describe(h) {
   if (a === "A") return suited ? "a suited ace" : "an offsuit ace";
   if ("KQJT".includes(b)) return suited ? "a suited broadway hand" : "an offsuit broadway hand";
   if (suited && gap <= 1) return "a suited connector";
-  if (suited) return "a suited gapper";
+  if (suited && gap <= 3) return "a suited gapper"; // both cards still fit in one straight
+  if (suited) return `a suited ${({ K: "king", Q: "queen", J: "jack" })[a] ?? "non-connected"} hand`;
   return gap <= 1 ? "an offsuit connector" : "a weak offsuit hand";
 }
 const SUITS = [["♠", 0], ["♥", 1], ["♦", 1], ["♣", 0]];
