@@ -42,7 +42,8 @@ At 6-max and 8-max 200bb the SB limps about 40% of its hands. The limp line now 
 
 6-max 100bb (and 9-max 100bb UTG lines) still use assumed sizes, because the GTO Nexus files don't include sizes.
 
-- [ ] 6-max: pull 6-max 100bb from GTO Wizard (about 150 spots, two days) and replace the GTO Nexus ranges, so the ranges and sizes come from the same solve. First check which rake settings the free tier offers at 100bb; the free 200bb solve is cEV.
+- [ ] 6-max: pull 6-max 100bb from GTO Wizard (about 85 spots, two days) and replace the GTO Nexus ranges, so the ranges and sizes come from the same solve. First check which rake settings the free tier offers at 100bb; the free 200bb solve is cEV.
+  - Started 2026-11-01: 55 spots read (opens, vs open, vs 3-bet, vs 4-bet, and the limp line 3.5 / 14 / 29.5 / all-in). The free tier has the same cEV solve as 200bb. Left: vs 5-bet (15) and vs 6-bet where the 5-bet isn't all-in. Kept out of the repo until complete.
 - [x] 9-max (done 2026-11-01, with item 3): item 2's mapping now runs at 100bb too, so 9-max non-UTG spots use GTO Wizard's ranges and sizes. UTG's lines keep GTO Nexus's real 9-max solve, with assumed sizes. GTO Wizard's 9-max is Premium only.
 
 ### 5. Multiway spots
