@@ -337,13 +337,14 @@ for (const key of Object.keys(SPOTS)) {
 // Where 9-max UTG's own lines have no real 9-max data (200bb), they borrow 8-max UTG's, with UTG1 and UTG2 both playing 8-max UTG1.
 // At 100bb GTO Nexus has real 9-max UTG lines, so those stay.
 // ponytail: 9-max UTG plays one seat too loose this way (8-max UTG opens ~13%; GTO Nexus 9-max 100bb UTG ~11%). Swap in GTO Wizard 9-max if it's ever pulled.
-const to9 = m => key => { const p = key.split("/"); return ["9max", ...p.slice(1).map(x => m[x] || x)].join("/"); };
+// seats map one by one, including both halves of a multiway "OPENER+OTHER"
+const to9 = m => key => { const p = key.split("/"); return ["9max", ...p.slice(1).map(x => x.split("+").map(y => m[y] || y).join("+"))].join("/"); };
 for (const key of Object.keys(SPOTS)) { const p = key.split("/"); if (p[0] === "9max" && !p.includes("UTG") && SIZES[`8max/${p[1]}/UTG/RFI`]) delete SPOTS[key]; }
 for (const key of Object.keys(SPOTS)) {
   if (!key.startsWith("8max/") || !SIZES[key]) continue;
   const k9 = to9({ UTG: "UTG1", UTG1: "UTG2" })(key);
   SPOTS[k9] = SPOTS[key]; SIZES[k9] = SIZES[key];
-  if (!key.split("/").includes("UTG") || SPOTS[to9({})(key)]) continue;
+  if (!key.split(/[/+]/).includes("UTG") || SPOTS[to9({})(key)]) continue;
   for (const u of new Set([to9({})(key), to9({ UTG1: "UTG2" })(key)])) { SPOTS[u] = SPOTS[key]; SIZES[u] = SIZES[key]; }
 }
 const ALL = Object.keys(SPOTS).map(parse);
