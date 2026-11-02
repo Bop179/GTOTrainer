@@ -299,10 +299,10 @@ function describe(h) {
   if (a === "A" && suited && "5432".includes(b)) return "a suited wheel ace";
   if (a === "A") return suited ? "a suited ace" : "an offsuit ace";
   if ("KQJT".includes(b)) return suited ? "a suited broadway hand" : "an offsuit broadway hand";
-  if (suited && gap <= 1) return "a suited connector";
-  if (suited && gap <= 3) return "a suited gapper"; // both cards still fit in one straight
+  if (suited && gap === 0) return "a suited connector";
+  if (suited && gap <= 3) return `a suited ${["one", "two", "three"][gap - 1]}-gapper`; // both cards still fit in one straight
   if (suited) return `a suited ${({ K: "king", Q: "queen", J: "jack" })[a] ?? "non-connected"} hand`;
-  return gap <= 1 ? "an offsuit connector" : "a weak offsuit hand";
+  return gap === 0 ? "an offsuit connector" : gap === 1 ? "an offsuit one-gapper" : "a weak offsuit hand";
 }
 const SUITS = [["♠", 0], ["♥", 1], ["♦", 1], ["♣", 0]];
 function dealCards(h) {
@@ -692,7 +692,7 @@ function explain(c, mix, picked, grade) {
         ? `In the BB you already have 1bb invested, so you're getting a good price. ${hand} has enough equity to defend, but raising would mostly fold out worse hands and get called by better ones.`
         : `${hand} is too good to fold but not the right hand to raise: calling keeps villain's weaker hands and bluffs in, while a raise would mostly get called by better.`);
       if (hand.length === 2 && RANKS.indexOf(hand[0]) > 7) out.push(`Small pairs mostly play for set value: they want to see a flop cheaply and hit a set about 12% of the time.`);
-      else if (/s$/.test(hand) && describe(hand).includes("connector")) out.push(`Suited connectors play well after the flop thanks to straight and flush draws.`);
+      else if (/s$/.test(hand) && /connector|one-gapper/.test(describe(hand))) out.push(`Suited connectors and one-gappers play well after the flop thanks to straight and flush draws.`);
     } else if (best === "Fold") {
       out.push(`${hand} doesn't have enough equity or playability against ${vs} range. Continuing loses chips over time, so letting it go is cheapest.`);
     }
