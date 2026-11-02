@@ -138,7 +138,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
     <div class="situation" id="situation"></div>
     <div class="felt" id="felt"></div>
     <div class="actions" id="actions"></div>
-    <div class="note">Range data: GTO Nexus, and GTO Wizard for 6-max 200bb and 8-max 100/150/200bb (also used for 9-max at those stacks once UTG folds; at 150/200bb 9-max UTG is estimated from 8-max UTG). Bet sizes are standard assumptions, except where GTO Wizard's data is used, which carries its own sizes.</div>
+    <div class="note">Range data: GTO Nexus, and GTO Wizard for 6-max 100/200bb and 8-max 100/150/200bb (also used for 9-max at those stacks once UTG folds; at 150/200bb 9-max UTG is estimated from 8-max UTG). Bet sizes are standard assumptions, except where GTO Wizard's data is used, which carries its own sizes.</div>
   </section>
   <section class="feedback" id="feedback">
     <div class="analysis">
@@ -161,6 +161,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 <script src="data.js"></script>
 <script src="data200.js"></script>
 <script src="data8.js"></script>
+<script src="data6.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const RANKS = "AKQJT98765432";
@@ -358,7 +359,7 @@ function situation(s) {
 }
 const label = (a, node) => a === "Raise" ? RAISE_NAME[node] : a === "Call" && node === "RFI" ? "Limp" : a === "Call" && node === "FACINGLIMP" ? "Check" : a === "Allin" ? "All-in" : a;
 // ---------- bet sizing ----------
-// ponytail: standard sizes assumed where the range files carry none (all but the GTO Wizard spots: 6-max 200bb, 8/9-max 100-200bb except 9-max 100bb UTG): open 2.5bb (2bb ≤40bb, SB 3bb),
+// ponytail: standard sizes assumed where the range files carry none (all but the GTO Wizard spots: 6-max 100/200bb, 8/9-max 100-200bb except 9-max 100bb UTG): open 2.5bb (2bb ≤40bb, SB 3bb),
 // 3-bet 3x in position / 4x out of position, 4-bet+ 2.3x, shove once a raise passes 55% of the stack.
 function inPosition(a, b, game) {
   if (game === "HU") return a === "SB"; // HU: the SB is the button

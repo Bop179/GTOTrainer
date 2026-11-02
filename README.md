@@ -23,7 +23,7 @@ Open `index.html` in a browser. You don't need to install anything, run a server
 |---|---|---|
 | 6-max | 20bb | open, vs open, vs 3-bet, vs 4-bet |
 | 6-max | 50bb | up to vs 5-bet |
-| 6-max | 100bb | up to vs 6-bet |
+| 6-max | 100bb | up to vs 5-bet, plus SB-vs-BB limped pots |
 | 6-max | 200bb | up to vs 6-bet, plus SB-vs-BB limped pots |
 | 6-max MTT | 20bb | open, vs open, vs 3-bet |
 | 6-max MTT | 40bb | up to vs 5-bet |
@@ -41,8 +41,9 @@ When a hand reaches a spot that has no data, it ends with "No solver data past t
 
 | File | Source | Covers |
 |---|---|---|
-| `data.js` | GTO Nexus's bundled preflop ranges, built by `build.py` | 6-max 20/50/100bb, 6-max MTT, 9-max 100bb, heads-up |
+| `data.js` | GTO Nexus's bundled preflop ranges, built by `build.py` | 6-max 20/50bb, 6-max MTT, 9-max 100bb, heads-up |
 | `data200.js` | GTO Wizard, 6-max cash 200bb | 6-max 200bb, with GTO Wizard's bet sizes |
+| `data6.js` | GTO Wizard, 6-max cash 100bb (cEV, 2.5x opens) | 6-max 100bb, with GTO Wizard's bet sizes; replaces GTO Nexus's 6-max 100bb |
 | `data8.js` | GTO Wizard, 8-max cash 100bb, 150bb and 200bb (cEV, 2.5x opens) | 8-max 100/150/200bb, and 9-max at those stacks, with GTO Wizard's bet sizes |
 
 - **9-max** at 100, 150 and 200bb uses the GTO Wizard 8-max data once UTG folds, with UTG1 and UTG2 standing in for 8-max's UTG and UTG1. This ignores the small card-removal effect of UTG's folded hand. At 100bb, UTG's own lines (its open, hands facing its open, and the re-raises after) stay on GTO Nexus's real 9-max solve, with assumed bet sizes. At 150 and 200bb there's no 9-max solve, so UTG's lines are estimated from 8-max UTG's, with UTG1 and UTG2 both playing 8-max UTG1. That makes 9-max UTG about one seat too loose there (it opens 13%; GTO Nexus has 9-max UTG at 11% at 100bb).
