@@ -672,7 +672,7 @@ function explain(c, mix, picked, grade) {
     if (best === "Call") out.push(`Limping lets the SB see a cheap flop with hands that play OK but don't want to face a 3-bet.`);
   } else {
     const vs = `${spot.villain}'s ${faced(node)}`;
-    out.push(`Against ${vs}, your strategy here is: ${ACTS.filter(a => pct(a)).map(a => `${L(a)} ${pct(a)}%`).join(", ")}.`);
+    out.push(`Against ${vs}, your whole range here plays ${ACTS.filter(a => pct(a)).map(a => `${L(a)} ${pct(a)}%`).join(", ")}.`);
     const z = c.z, odds = Math.round(z.toCall / (z.pot + z.toCall) * 100);
     if (z.toCall) out.push(`Pot odds: calling ${bb(z.toCall)} to win a ${bb(z.pot)} pot means you need about ${odds}% equity, before accounting for position and how much of that equity you actually realize${z.toCall >= z.heroBehind ? " (this call puts you all-in, so there's nothing left to realize: raw equity is what counts)" : ""}.`);
     if (aggressive(best)) {
