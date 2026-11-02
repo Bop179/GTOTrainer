@@ -61,8 +61,9 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
 .backs { display: flex; height: 30px; margin-bottom: -8px; }
 .backs i { width: 22px; height: 30px; border-radius: 3px; border: 2px solid #eee; background: repeating-linear-gradient(45deg, #b8322a 0 3px, #8f231d 3px 6px); box-shadow: 0 2px 6px #0008; transform: rotate(-6deg); animation: deal .25s ease-out both; }
 .backs i + i { margin-left: -8px; transform: rotate(6deg); }
-.tag { font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-top: 3px; background: var(--raise); white-space: nowrap; }
-.tag[hidden], .bet[hidden] { display: none; }
+.tag { font-style: normal; font-size: 11px; line-height: 15px; min-height: 17px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-top: 3px; background: var(--raise); white-space: nowrap; }
+.bet[hidden] { display: none; }
+.tag[hidden] { display: block; visibility: hidden; } /* keeps its space, so the name doesn't shift when a tag appears */
 .folded .tag { background: #0008; color: var(--muted); }
 .bet { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; background: #0009; border-radius: 999px; padding: 1px 8px 1px 2px; }
 .bet::before, .pot::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--ok); border: 2px dashed #fff; }
@@ -609,7 +610,7 @@ function drawTable(spot, z, heroCards, deal, from = 0) {
     const k = (i - h + N) % N, me = p === spot.hero, folded = !me && gone.has(p), put = inv[p] || 0, t = tag[p] || "";
     const d = (i - order.indexOf(btn) - 1 + N) % N, delay = j => deal ? ` style="animation-delay:${(SHUFFLE_MS + (j * N + d) * CARD_MS) / 1000}s"` : "";
     const cards = me ? `<div class="cards">${heroCards.map(([rk, [s, red]], j) => `<div class="card${red ? " red" : ""}"${delay(j)}>${rk === "T" ? "10" : rk}<span>${s}</span></div>`).join("")}</div>`
-      : folded ? "" : `<div class="backs"><i${delay(0)}></i><i${delay(1)}></i></div>`;
+      : `<div class="backs">${folded ? "" : `<i${delay(0)}></i><i${delay(1)}></i>`}</div>`; // folded seats keep the space so name tags never move
     return `<div class="seat${me ? " hero" : ""}${folded ? " folded" : ""}" data-p="${p}" style="${at(k, 1)}">${cards}
         <div class="plate"><b>${me ? "You · " : ""}${p}</b><span>${bb(z.S - put)}</span></div>
         <em class="tag"${me ? ' id="heroTag"' : ""}${t ? (t === "All-in" ? ' style="background:var(--allin)"' : "") : " hidden"}>${t}</em></div>
@@ -620,7 +621,7 @@ function drawTable(spot, z, heroCards, deal, from = 0) {
   const show = (e) => {
     const seat = el(".seat", e.p), t = seat.querySelector(".tag");
     Object.assign(t, { hidden: false, textContent: e.tag }).style.background = e.tag === "All-in" ? "var(--allin)" : "";
-    if (e.tag === "Fold") { seat.classList.add("toss", "folded"); play("deal"); toss(seat, ".backs i"); replayTimers.push(setTimeout(() => seat.querySelector(".backs")?.remove(), 650)); return; }
+    if (e.tag === "Fold") { seat.classList.add("toss", "folded"); play("deal"); toss(seat, ".backs i"); replayTimers.push(setTimeout(() => seat.querySelectorAll(".backs i").forEach(i => i.remove()), 650)); return; }
     inv[e.p] = e.to; play("chip");
     fly(Object.assign(el(".bet", e.p), { hidden: false, textContent: bb(e.to) }));
     seat.querySelector(".plate span").textContent = bb(z.S - e.to);
