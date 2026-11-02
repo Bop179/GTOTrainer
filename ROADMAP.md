@@ -2,13 +2,13 @@
 
 **Focus: 100bb and 200bb cash at 6-max, 8-max and 9-max.** Everything else is out of scope for now (see the end of this file).
 
-## Where things stand (2026-11-01)
+## Where things stand (2026-11-01, evening)
 
 | | 100bb | 200bb |
 |---|---|---|
 | **6-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. |
-| **8-max** | Built from 9-max GTO Nexus (UTG folded), up to vs 6-bet. Bet sizes assumed. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. |
-| **9-max** | GTO Nexus, up to vs 6-bet. Bet sizes assumed. | GTO Wizard 8-max data, up to vs 6-bet plus limped pots, solver sizes. UTG's lines are estimated from 8-max UTG (about one seat too loose). |
+| **8-max** | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. |
+| **9-max** | GTO Wizard 8-max data once UTG folds, solver sizes, plus limped pots. UTG's lines: GTO Nexus, bet sizes assumed. | GTO Wizard 8-max data, up to vs 6-bet plus limped pots, solver sizes. UTG's lines are estimated from 8-max UTG (about one seat too loose). |
 
 GTO Wizard limits a free account to 100 new spots a day, so the view counts below set how many days each item takes.
 
@@ -32,18 +32,18 @@ At 6-max and 8-max 200bb the SB limps about 40% of its hands. The limp line now 
 - [x] Do the mapping at load time in `index.html`, next to the existing 9 → 8 loop. That way new 8-max nodes, including the limp line from item 1, carry over automatically.
 - Caveat: this ignores the card removal of UTG's folded hand, the same small approximation 8-max already makes.
 
-### 3. Real 8-max 100bb from GTO Wizard
+### 3. ✅ Real 8-max 100bb from GTO Wizard (done 2026-11-01)
 
-- [ ] Pull 8-max 100bb from GTO Wizard. A full tree to vs 6-bet is about 147 spots, so two days. It replaces the 9-max-derived ranges (the derivation loop's `??=` already lets real data win) and brings solver bet sizes.
-  - Started 2026-10-30: 25 spots read (every open, and vs open for UTG, UTG1 and LJ openers). They're kept out of the repo until the tree is complete, so a hand doesn't mix the two sources.
-  - GTO Wizard's SB limps 44.8% at 8-max 100bb (GTO Nexus never does), so this also needs the limp line, about 5 more spots.
+- [x] Pulled 8-max 100bb from GTO Wizard over three days (2026-10-30 to 11-01): 134 spots, every open to vs 4-bet, 28 vs 5-bet, the 9 vs 6-bet spots where the 5-bet isn't already all-in, and the 6-spot limp line (3.5, 15, 26.5, 53, all-in). Totals match GTO Wizard's within 0.07pp.
+- [x] It replaces the 9-max-derived 8-max ranges. The 9 → 8 derivation now skips any depth that has a real 8-max solve, so no GTO Nexus spot is left over where GTO Wizard has no node.
+- GTO Wizard's SB limps 44.8% at 8-max 100bb (GTO Nexus never does), so 8-max and 9-max 100bb now have limped pots too.
 
 ### 4. Solver bet sizes at 100bb
 
-All three formats at 100bb use assumed sizes, because the GTO Nexus files don't include sizes.
+6-max 100bb (and 9-max 100bb UTG lines) still use assumed sizes, because the GTO Nexus files don't include sizes.
 
 - [ ] 6-max: pull 6-max 100bb from GTO Wizard (about 150 spots, two days) and replace the GTO Nexus ranges, so the ranges and sizes come from the same solve. First check which rake settings the free tier offers at 100bb; the free 200bb solve is cEV.
-- [ ] 9-max: GTO Wizard's 9-max is Premium only. Once item 3 is done, apply item 2's mapping at 100bb too. That gives 9-max non-UTG spots GTO Wizard's sizes; UTG spots keep GTO Nexus.
+- [x] 9-max (done 2026-11-01, with item 3): item 2's mapping now runs at 100bb too, so 9-max non-UTG spots use GTO Wizard's ranges and sizes. UTG's lines keep GTO Nexus's real 9-max solve, with assumed sizes. GTO Wizard's 9-max is Premium only.
 
 ### 5. Multiway spots
 

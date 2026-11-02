@@ -138,7 +138,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
     <div class="situation" id="situation"></div>
     <div class="felt" id="felt"></div>
     <div class="actions" id="actions"></div>
-    <div class="note">Range data: GTO Nexus, and GTO Wizard for 6-max 200bb and 8-max 150/200bb (also used for 9-max at those stacks, with 9-max UTG estimated from 8-max UTG). Bet sizes are standard assumptions, except where GTO Wizard's data is used, which carries its own sizes.</div>
+    <div class="note">Range data: GTO Nexus, and GTO Wizard for 6-max 200bb and 8-max 100/150/200bb (also used for 9-max at those stacks once UTG folds; at 150/200bb 9-max UTG is estimated from 8-max UTG). Bet sizes are standard assumptions, except where GTO Wizard's data is used, which carries its own sizes.</div>
   </section>
   <section class="feedback" id="feedback">
     <div class="analysis">
@@ -321,17 +321,21 @@ function parse(key) {
 ORDER["8max"] = ["UTG", "UTG1", "LJ", "HJ", "CO", "BTN", "SB", "BB"];
 for (const key of Object.keys(SPOTS)) {
   const p = key.split("/"), to8 = { UTG1: "UTG", UTG2: "UTG1" };
-  if (p[0] === "9max" && !p.includes("UTG")) SPOTS[["8max", ...p.slice(1).map(x => to8[x] || x)].join("/")] ??= SPOTS[key]; // ??=: keep real 8-max data (data8.js)
+  if (p[0] === "9max" && !p.includes("UTG") && !SIZES[`8max/${p[1]}/UTG/RFI`]) // skip depths with a real 8-max solve (data8.js)
+    SPOTS[["8max", ...p.slice(1).map(x => to8[x] || x)].join("/")] = SPOTS[key];
 }
 // ...and the other way: real 8-max solves (the GTO Wizard spots, which carry SIZES) stand in for 9-max once UTG folds.
-// 9-max UTG's own lines have no solve we trust, so they borrow 8-max UTG's, with UTG1 and UTG2 both playing 8-max UTG1.
+// Where 9-max UTG's own lines have no real 9-max data (150/200bb), they borrow 8-max UTG's, with UTG1 and UTG2 both playing 8-max UTG1.
+// At 100bb GTO Nexus has real 9-max UTG lines, so those stay.
 // ponytail: 9-max UTG plays one seat too loose this way (8-max UTG opens ~13%; GTO Nexus 9-max 100bb UTG ~11%). Swap in GTO Wizard 9-max if it's ever pulled.
 const to9 = m => key => { const p = key.split("/"); return ["9max", ...p.slice(1).map(x => m[x] || x)].join("/"); };
+for (const key of Object.keys(SPOTS)) { const p = key.split("/"); if (p[0] === "9max" && !p.includes("UTG") && SIZES[`8max/${p[1]}/UTG/RFI`]) delete SPOTS[key]; }
 for (const key of Object.keys(SPOTS)) {
   if (!key.startsWith("8max/") || !SIZES[key]) continue;
-  const maps = [to9({ UTG: "UTG1", UTG1: "UTG2" })];
-  if (key.split("/").includes("UTG")) maps.push(to9({}), to9({ UTG1: "UTG2" }));
-  for (const k9 of new Set(maps.map(f => f(key)))) { SPOTS[k9] = SPOTS[key]; SIZES[k9] = SIZES[key]; }
+  const k9 = to9({ UTG: "UTG1", UTG1: "UTG2" })(key);
+  SPOTS[k9] = SPOTS[key]; SIZES[k9] = SIZES[key];
+  if (!key.split("/").includes("UTG") || SPOTS[to9({})(key)]) continue;
+  for (const u of new Set([to9({})(key), to9({ UTG1: "UTG2" })(key)])) { SPOTS[u] = SPOTS[key]; SIZES[u] = SIZES[key]; }
 }
 const ALL = Object.keys(SPOTS).map(parse);
 function situation(s) {
@@ -353,7 +357,7 @@ function situation(s) {
 }
 const label = (a, node) => a === "Raise" ? RAISE_NAME[node] : a === "Call" && node === "RFI" ? "Limp" : a === "Call" && node === "FACINGLIMP" ? "Check" : a === "Allin" ? "All-in" : a;
 // ---------- bet sizing ----------
-// ponytail: standard sizes assumed where the range files carry none (all but the GTO Wizard spots: 6-max 200bb, 8-max 150/200bb): open 2.5bb (2bb ≤40bb, SB 3bb),
+// ponytail: standard sizes assumed where the range files carry none (all but the GTO Wizard spots: 6-max 200bb, 8/9-max 100-200bb except 9-max 100bb UTG): open 2.5bb (2bb ≤40bb, SB 3bb),
 // 3-bet 3x in position / 4x out of position, 4-bet+ 2.3x, shove once a raise passes 55% of the stack.
 function inPosition(a, b, game) {
   if (game === "HU") return a === "SB"; // HU: the SB is the button
