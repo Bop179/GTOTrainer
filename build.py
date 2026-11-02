@@ -11,6 +11,7 @@ HANDS = [R[i] + R[j] + ("" if i == j else "s" if i < j else "o")
 
 spots = {}
 for f in sorted(SRC.rglob("*.txt")):
+    if f.relative_to(SRC).parts[1] not in ("100bb", "200bb"): continue  # only 100bb/200bb cash is in scope
     rows = {r["type"]: r for r in json.loads(f.read_text())}
     # [allin, raise, call, fold, reach]; reach = how often the hand gets to this node
     spots[str(f.relative_to(SRC).with_suffix(""))] = [

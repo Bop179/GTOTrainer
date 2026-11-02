@@ -143,7 +143,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
     <div class="situation" id="situation"></div>
     <div class="felt" id="felt"></div>
     <div class="actions" id="actions"></div>
-    <div class="note">Range data: GTO Nexus, and GTO Wizard for 6-max 100/200bb and 8-max 100/150/200bb (also used for 9-max at those stacks once UTG folds; at 150/200bb 9-max UTG is estimated from 8-max UTG). Bet sizes are standard assumptions, except where GTO Wizard's data is used, which carries its own sizes.</div>
+    <div class="note">Range data: GTO Nexus, and GTO Wizard for 6-max 100/200bb and 8-max 100/200bb (also used for 9-max at those stacks once UTG folds; at 200bb 9-max UTG is estimated from 8-max UTG). Bet sizes are standard assumptions, except where GTO Wizard's data is used, which carries its own sizes.</div>
   </section>
   <section class="feedback" id="feedback">
     <div class="analysis">
@@ -171,7 +171,6 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 const $ = id => document.getElementById(id);
 const RANKS = "AKQJT98765432";
 const ORDER = { "6max": ["UTG","HJ","CO","BTN","SB","BB"], "9max": ["UTG","UTG1","UTG2","LJ","HJ","CO","BTN","SB","BB"], "HU": ["SB","BB"] };
-ORDER["6max_mtt"] = ORDER["6max"];
 const ACTS = ["Allin", "Raise", "Call", "Fold"]; // index matches data.js columns
 const COLOR = { Allin: "var(--allin)", Raise: "var(--raise)", Call: "var(--call)", Fold: "var(--fold)" };
 const KEYS = { Fold: "f", Call: "c", Raise: "r", Allin: "a" };
@@ -335,7 +334,7 @@ for (const key of Object.keys(SPOTS)) {
     SPOTS[["8max", ...p.slice(1).map(x => to8[x] || x)].join("/")] = SPOTS[key];
 }
 // ...and the other way: real 8-max solves (the GTO Wizard spots, which carry SIZES) stand in for 9-max once UTG folds.
-// Where 9-max UTG's own lines have no real 9-max data (150/200bb), they borrow 8-max UTG's, with UTG1 and UTG2 both playing 8-max UTG1.
+// Where 9-max UTG's own lines have no real 9-max data (200bb), they borrow 8-max UTG's, with UTG1 and UTG2 both playing 8-max UTG1.
 // At 100bb GTO Nexus has real 9-max UTG lines, so those stay.
 // ponytail: 9-max UTG plays one seat too loose this way (8-max UTG opens ~13%; GTO Nexus 9-max 100bb UTG ~11%). Swap in GTO Wizard 9-max if it's ever pulled.
 const to9 = m => key => { const p = key.split("/"); return ["9max", ...p.slice(1).map(x => m[x] || x)].join("/"); };
@@ -369,7 +368,7 @@ function situation(s) {
 }
 const label = (a, node) => a === "Raise" ? RAISE_NAME[node] : a === "Call" && node === "RFI" ? "Limp" : a === "Call" && node === "FACINGLIMP" ? "Check" : a === "Allin" ? "All-in" : a;
 // ---------- bet sizing ----------
-// ponytail: standard sizes assumed where the range files carry none (all but the GTO Wizard spots: 6-max 100/200bb, 8/9-max 100-200bb except 9-max 100bb UTG): open 2.5bb (2bb ≤40bb, SB 3bb),
+// ponytail: standard sizes assumed where the range files carry none (all but the GTO Wizard spots: 6-max 100/200bb, 8/9-max 100/200bb except 9-max 100bb UTG, and heads-up): open 2.5bb (SB 3bb),
 // 3-bet 3x in position / 4x out of position, 4-bet+ 2.3x, shove once a raise passes 55% of the stack.
 function inPosition(a, b, game) {
   if (game === "HU") return a === "SB"; // HU: the SB is the button
@@ -381,11 +380,11 @@ const LINES = { RFI: [], FACINGRFI: ["v"], FACING3B: ["h", "v"], FACING4B: ["v",
   FACINGRFI_CALL: ["v", "w call"], FACING3B_COLD: ["v", "w"] }; // w: the second villain
 const bb = x => +x.toFixed(1) + "bb";
 function sizing(s) {
-  const S = parseInt(s.stack), limp = isLimp(s.node), inv = { SB: limp ? 1 : .5, BB: 1 }, ante = s.game.endsWith("mtt") ? 1 : 0; // MTT: 1bb BB ante
+  const S = parseInt(s.stack), limp = isLimp(s.node), inv = { SB: limp ? 1 : .5, BB: 1 };
   let last = 1, n = 0, at = limp ? "FACINGLIMP" : "RFI"; // at: the node each raise in the line is made from
   const raiseTo = (p, other) => {
     if (SIZES[s.key]) return Math.min(SIZES[s.key][n], S); // solver's own sizes (GTO Wizard spots)
-    let to = n === 0 ? (p === "SB" && s.game !== "HU" ? 3 : S <= 40 ? 2 : 2.5)
+    let to = n === 0 ? (p === "SB" && s.game !== "HU" ? 3 : 2.5)
       : n === 1 ? last * (inPosition(p, other, s.game) ? 3 : 4) : last * 2.3;
     to = Math.round(to * 2) / 2;
     return to > S * .55 ? S : to;
@@ -402,7 +401,7 @@ function sizing(s) {
   const heroIn = inv[s.hero] || 0;
   return {
     inv, acts, heroIn, line,
-    pot: ante + Object.values(inv).reduce((a, b) => a + b, 0),
+    pot: Object.values(inv).reduce((a, b) => a + b, 0),
     toCall: Math.min(last, S) - heroIn, raise: raiseTo(s.hero, o), S, heroBehind: S - heroIn,
   };
 }
@@ -423,7 +422,7 @@ const st = { hands: 0, right: 0, streak: 0, cur: null, drill: null };
 $("mute").textContent = muted ? "🔇" : "🔊";
 
 // ---------- settings: chips you click to highlight. Spots and positions take several; none highlighted = all ----------
-const GAMES = { "6max": "6-max", "8max": "8-max", "9max": "9-max", HU: "Heads-up", "6max_mtt": "6-max MTT" };
+const GAMES = { "6max": "6-max", "8max": "8-max", "9max": "9-max", HU: "Heads-up" };
 const SPOT_TYPES = { RFI: "Open", FACINGRFI: "vs Open", FACING3B: "vs 3-bet", "FACING4B|FACING5B|FACING6B": "vs 4-bet+",
   "FACINGLIMP|LIMP_FACING2B|LIMP_FACING3B|LIMP_FACING4B|LIMP_FACING5B|LIMP_FACING6B": "Limped pot",
   FACINGRFI_CALL: "vs Open + call", FACING3B_COLD: "vs Open + 3-bet" };
@@ -480,7 +479,7 @@ function leakType(picked, best) {
 const faced = node => node === "FACINGLIMP" ? "limp" : RAISE_NAME[Object.keys(NEXT).find(k => NEXT[k] === node)].toLowerCase();
 // "UTG open" or, multiway, "UTG open + HJ call"
 const vsText = s => { const [o, w] = villains(s); return w ? `${o} open + ${w} ${s.node === "FACINGRFI_CALL" ? "call" : "3-bet"}` : `${o} ${faced(s.node)}`; };
-const spotName = s => `${s.game.replace("_mtt", " MTT")} ${s.stack} · ` + (s.node === "RFI" ? `${s.hero} open` : `${s.hero} vs ${vsText(s)}`);
+const spotName = s => `${s.game} ${s.stack} · ` + (s.node === "RFI" ? `${s.hero} open` : `${s.hero} vs ${vsText(s)}`);
 function renderLeaks() {
   const log = prog.log, bad = log.filter(e => e[2] === "bad"), tally = (arr, f) => arr.reduce((m, e) => (m[f(e)] = (m[f(e)] || 0) + 1, m), {});
   const types = Object.entries(tally(bad, e => leakType(e[3], e[4]))).sort((a, b) => b[1] - a[1]);
@@ -602,7 +601,7 @@ function showStep(deal) {
   const c = st.cur, spot = c.steps[c.k], rows = SPOTS[spot.key], z = sizing(spot);
   Object.assign(c, { spot, rows, z, answered: false, avail: ACTS.filter((a, k) => rows.some(row => row[4] > 0 && row[k] > 0)) });
   $("feedback").classList.remove("show");
-  $("spot").textContent = `${spot.game.replace("_mtt", " MTT")} · ${spot.stack} · You are ${spot.hero}`
+  $("spot").textContent = `${spot.game} · ${spot.stack} · You are ${spot.hero}`
     + (c.steps.length > 1 ? ` · Decision ${c.k + 1}` : "") + (c.rid ? " · 🔁 Review: you missed this before" : "");
   $("situation").textContent = situation(spot);
   c.E = drawTable(spot, z, c.cards, deal, deal ? 0 : c.shown || 0); // a later decision only replays what happened since your last action
@@ -634,9 +633,9 @@ const tagBg = t => t === "All-in" ? "var(--allin)" : t === "Call" || t === "Limp
 function drawTable(spot, z, heroCards, deal, from = 0) {
   const order = ORDER[spot.game], N = order.length, h = order.indexOf(spot.hero), btn = spot.game === "HU" ? "SB" : "BTN";
   const at = (k, r) => { const t = Math.PI / 2 + k * 2 * Math.PI / N; return `--c:${Math.cos(t).toFixed(3)};--s:${Math.sin(t).toFixed(3)};--r:${r}`; };
-  const E = events(spot, z), inv = { SB: .5, BB: 1 }, tag = {}, gone = new Set(), ante = z.pot - Object.values(z.inv).reduce((x, y) => x + y, 0);
+  const E = events(spot, z), inv = { SB: .5, BB: 1 }, tag = {}, gone = new Set();
   for (const e of E.slice(0, from)) { if (e.tag === "Fold") gone.add(e.p); else inv[e.p] = e.to; tag[e.p] = e.tag; }
-  const pot = () => ante + Object.values(inv).reduce((x, y) => x + y, 0);
+  const pot = () => Object.values(inv).reduce((x, y) => x + y, 0);
   replayTimers.forEach(clearTimeout); replayTimers = [];
   $("felt").classList.toggle("still", !deal); // later decisions in the same hand don't re-deal
   $("felt").innerHTML = order.map((p, i) => {
