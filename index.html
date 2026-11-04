@@ -177,7 +177,7 @@ const KEYS = { Fold: "f", Call: "c", Raise: "r", Allin: "a" };
 const RAISE_NAME = { RFI: "Open", FACINGRFI: "3-bet", FACING3B: "4-bet", FACING4B: "5-bet", FACING5B: "6-bet", FACING6B: "7-bet",
   // limped pots (SB limps, BB to act): the BB's raise is the 2-bet, the SB's re-raise the 3-bet, and so on
   FACINGLIMP: "Raise", LIMP_FACING2B: "3-bet", LIMP_FACING3B: "4-bet", LIMP_FACING4B: "5-bet", LIMP_FACING5B: "6-bet", LIMP_FACING6B: "7-bet",
-  // multiway (6-max only): villain is "OPENER+OTHER", where OTHER called the open (FACINGRFI_CALL) or 3-bet it (FACING3B_COLD)
+  // multiway (6-max, 8/9-max 100bb): villain is "OPENER+OTHER", where OTHER called the open (FACINGRFI_CALL) or 3-bet it (FACING3B_COLD)
   FACINGRFI_CALL: "Squeeze", FACING3B_COLD: "4-bet" };
 const isLimp = node => node.includes("LIMP");
 const villains = s => s.villain ? s.villain.split("+") : [];
@@ -519,7 +519,7 @@ function newHand() {
 }
 
 // ---------- other players: each one plays its own solver strategy with a random hand that reaches its node ----------
-// ponytail: villain hands ignore card removal against yours. Multiway data (6-max only) covers an open plus one call or 3-bet;
+// ponytail: villain hands ignore card removal against yours. Multiway data (6-max, 8/9-max 100bb) covers an open plus one call or 3-bet;
 // past that, or where a format has none, a line that brings in a third player redeals or ends the hand, and a flat call ends it.
 const pick = w => { let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0; while ((r -= w[i]) > 0 && i < w.length - 1) i++; return i; };
 const sampleAct = key => { const rows = SPOTS[key], m = mixOf(rows[pick(rows.map((r, k) => COMBOS(HANDS[k]) * r[4]))]); return ACTS[pick(ACTS.map(a => m[a]))]; };
