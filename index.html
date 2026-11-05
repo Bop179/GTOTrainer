@@ -99,12 +99,14 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .verdict.great { color: var(--great); } .verdict.ok { color: var(--ok); } .verdict.bad { color: var(--bad); }
 .mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 8px 0; }
 .pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
-.pill { display: inline-flex; align-items: baseline; gap: 6px; font-size: 14px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 30%, transparent); }
-/* your hand's breakdown: big colour tiles, the action you picked ringed in white */
+.pill { display: inline-flex; align-items: baseline; gap: 6px; font-size: 14px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 30%, transparent); color: color-mix(in srgb, var(--c), #fff 45%); }
+/* your hand's breakdown: big colour tiles; the action you picked is filled stronger and tagged "You" */
 .pills.big { gap: 8px; }
-.pills.big .pill { flex-direction: column; gap: 0; min-width: 84px; padding: 8px 14px; border: 2px solid var(--c); border-radius: 10px; font-size: 13px; background: color-mix(in srgb, var(--c) 40%, transparent); }
+.pills.big .pill { flex-direction: column; gap: 0; min-width: 84px; padding: 8px 14px; border: 2px solid var(--c); border-radius: 10px; font-size: 13px; background: color-mix(in srgb, var(--c) 22%, transparent); }
 .pills.big .pill b { font-size: 28px; line-height: 1.1; }
-.pills.big .pill.me { box-shadow: 0 0 0 2px #fff; }
+.pills.big .pill.me { background: color-mix(in srgb, var(--c) 45%, transparent); }
+.pill small { display: none; }
+.pills.big .pill small { display: inline; margin-left: 6px; padding: 0 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: var(--c); color: #fff; }
 .range { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .range h4 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .why p { margin: 8px 0; }
@@ -735,7 +737,7 @@ function answer(a) {
 
 // action mix as pills tinted in each action's colour, biggest first; the one you picked is ringed
 const pills = (mix, node, picked) => ACTS.filter(x => mix[x] >= 0.5 || x === picked).sort((x, y) => mix[y] - mix[x]).map(x =>
-  `<span class="pill${x === picked ? " me" : ""}" style="--c:${COLOR[x]}">${label(x, node)} <b>${Math.round(mix[x])}%</b></span>`).join("");
+  `<span class="pill${x === picked ? " me" : ""}" style="--c:${COLOR[x]}"><span>${label(x, node)}${x === picked ? "<small>You</small>" : ""}</span><b>${Math.round(mix[x])}%</b></span>`).join("");
 // the whole range's action mix, weighted by combos × reach
 function rangeMix(rows) {
   let tot = 0; const s = { Allin: 0, Raise: 0, Call: 0, Fold: 0 };
