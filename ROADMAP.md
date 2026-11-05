@@ -2,13 +2,13 @@
 
 **Focus: 100bb and 200bb cash at 6-max, 8-max and 9-max.** Everything else is out of scope for now (see the end of this file).
 
-## Where things stand (2026-11-02)
+## Where things stand (2026-11-05)
 
 | | 100bb | 200bb |
 |---|---|---|
-| **6-max** | GTO Wizard, up to vs 5-bet (every 5-bet is all-in) plus SB-vs-BB limped pots, solver sizes. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. |
-| **8-max** | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots, solver sizes. |
-| **9-max** | GTO Wizard 8-max data once UTG folds, solver sizes, plus limped pots. UTG's lines: GTO Nexus, bet sizes assumed. | GTO Wizard 8-max data, up to vs 6-bet plus limped pots, solver sizes. UTG's lines are estimated from 8-max UTG (about one seat too loose). |
+| **6-max** | GTO Wizard, up to vs 5-bet (every 5-bet is all-in) plus SB-vs-BB limped pots and multiway, solver sizes. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots and multiway, solver sizes. |
+| **8-max** | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots and multiway, solver sizes. | GTO Wizard, up to vs 6-bet plus SB-vs-BB limped pots and multiway, solver sizes. |
+| **9-max** | GTO Wizard 8-max data once UTG folds, solver sizes, plus limped pots and multiway. UTG's lines: GTO Nexus, bet sizes assumed. | GTO Wizard 8-max data, up to vs 6-bet plus limped pots and multiway, solver sizes. UTG's lines are estimated from 8-max UTG (about one seat too loose). |
 
 GTO Wizard limits a free account to 100 new spots a day, so the view counts below set how many days each item takes.
 
@@ -46,16 +46,16 @@ Only 9-max 100bb UTG lines still use assumed sizes (GTO Nexus files don't includ
 - [x] It replaces GTO Nexus's 6-max 100bb ranges entirely, including Nexus's 7 vs 6-bet spots that GTO Wizard has no node for. The SB now limps at 6-max 100bb too.
 - [x] 9-max (done 2026-11-01, with item 3): item 2's mapping now runs at 100bb too, so 9-max non-UTG spots use GTO Wizard's ranges and sizes. UTG's lines keep GTO Nexus's real 9-max solve, with assumed sizes. GTO Wizard's 9-max is Premium only.
 
-### 5. Multiway spots (6-max done 2026-11-02; 8-max and 9-max to do)
+### 5. ✅ Multiway spots (6-max done 2026-11-02, 8-max and 9-max 2026-11-05)
 
 Squeezes (facing an open plus a call), overcalls, BB vs open + call, and cold 4-bets (facing an open and a 3-bet). GTO Wizard's cash solves include them because they're solved with cold calls.
 
 - [x] Key format: `game/stack/OPENER+OTHER/hero/NODE`, with `FACINGRFI_CALL` (OTHER called the open) and `FACING3B_COLD` (OTHER 3-bet it). The trainer splits the villain field on `+`.
 - [x] Pulled 6-max 100bb and 200bb: 20 squeeze/overcall and 20 cold 4-bet spots each (80 views), every opener, caller/3-bettor and hero seat. Totals match GTO Wizard's within 0.05pp. GTO Wizard gives no cold-call option facing an open and a 3-bet, so those spots are 4-bet or fold.
 - [x] Trainer: two new spot types ("vs Open + call", "vs Open + 3-bet", shown only where the data has them), the table replays the open and the call or 3-bet, and solver sizes carry through.
-- [x] Live table: players between the opener and you now act from their own spots, so you face an open plus a call or 3-bet when they do. A line that brings in a third player, or one with no data (8/9-max), redeals. After you call or 3-bet an open, and after a call or 3-bet of your open, the players behind act from the multiway spots; a squeeze or cold 4-bet there ends the hand ("No solver data past this point").
+- [x] Live table: players between the opener and you now act from their own spots, so you face an open plus a call or 3-bet when they do. A line that brings in a third player, or one with no data, redeals. After you call or 3-bet an open, and after a call or 3-bet of your open, the players behind act from the multiway spots; a squeeze or cold 4-bet there ends the hand ("No solver data past this point").
 - [x] 8-max 100bb (2026-11-04): 112 GTO Wizard spots (56 open + call, 56 open + 3-bet) in `data8.js`; 9-max 100bb gets them through the 8 → 9 mapping.
-- [ ] 8-max 200bb: 78 of 112 pulled (all 56 open + call, 22 of 56 open + 3-bet) in `.claude/gw8_200mw.json`. The last 34 come from the next daily pull, then they go into `data8.js`.
+- [x] 8-max 200bb (2026-11-05): 112 GTO Wizard spots in `data8.js`, carried to 9-max 200bb by the 8 → 9 mapping.
 - [x] The 8 → 9 mapping splits `OPENER+OTHER` (2026-11-02), so 9-max gets these spots as soon as 8-max has them. Tested with stand-in data: 80 8-max spots became 120 at 9-max (at 9-max UTG spots are borrowed for both UTG1 and UTG2), and live hands ran clean.
 - Not covered: replies to your squeeze or cold 4-bet, more than two players in front of you, and squeezes of your open (GTO Wizard has these nodes, but they're many more views each).
 

@@ -99,7 +99,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .verdict.great { color: var(--great); } .verdict.ok { color: var(--ok); } .verdict.bad { color: var(--bad); }
 .mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 8px 0; }
 .pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
-.pill { display: inline-flex; align-items: baseline; gap: 6px; font-size: 14px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 30%, transparent); color: color-mix(in srgb, var(--c), #fff 65%); }
+.pill { display: inline-flex; align-items: baseline; gap: 6px; font-size: 14px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 30%, transparent); color: color-mix(in srgb, var(--c), #fff 75%); }
 /* your hand's breakdown: big colour tiles; the action you picked is filled stronger and tagged "You" */
 .pills.big { gap: 8px; }
 .pills.big .pill { flex-direction: column; gap: 0; min-width: 84px; padding: 8px 14px; border: 2px solid var(--c); border-radius: 10px; font-size: 13px; background: color-mix(in srgb, var(--c) 22%, transparent); }
@@ -188,7 +188,7 @@ const KEYS = { Fold: "f", Call: "c", Raise: "r", Allin: "a" };
 const RAISE_NAME = { RFI: "Open", FACINGRFI: "3-bet", FACING3B: "4-bet", FACING4B: "5-bet", FACING5B: "6-bet", FACING6B: "7-bet",
   // limped pots (SB limps, BB to act): the BB's raise is the 2-bet, the SB's re-raise the 3-bet, and so on
   FACINGLIMP: "Raise", LIMP_FACING2B: "3-bet", LIMP_FACING3B: "4-bet", LIMP_FACING4B: "5-bet", LIMP_FACING5B: "6-bet", LIMP_FACING6B: "7-bet",
-  // multiway (6-max, 8/9-max 100bb): villain is "OPENER+OTHER", where OTHER called the open (FACINGRFI_CALL) or 3-bet it (FACING3B_COLD)
+  // multiway (every game but heads-up): villain is "OPENER+OTHER", where OTHER called the open (FACINGRFI_CALL) or 3-bet it (FACING3B_COLD)
   FACINGRFI_CALL: "Squeeze", FACING3B_COLD: "4-bet" };
 const isLimp = node => node.includes("LIMP");
 const villains = s => s.villain ? s.villain.split("+") : [];
@@ -530,7 +530,7 @@ function newHand() {
 }
 
 // ---------- other players: each one plays its own solver strategy with a random hand that reaches its node ----------
-// ponytail: villain hands ignore card removal against yours. Multiway data (6-max, 8/9-max 100bb) covers an open plus one call or 3-bet;
+// ponytail: villain hands ignore card removal against yours. Multiway data (every game but heads-up) covers an open plus one call or 3-bet;
 // past that, or where a format has none, a line that brings in a third player redeals or ends the hand, and a flat call ends it.
 const pick = w => { let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0; while ((r -= w[i]) > 0 && i < w.length - 1) i++; return i; };
 const sampleAct = key => { const rows = SPOTS[key], m = mixOf(rows[pick(rows.map((r, k) => COMBOS(HANDS[k]) * r[4]))]); return ACTS[pick(ACTS.map(a => m[a]))]; };
