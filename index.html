@@ -97,8 +97,13 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .feedback.show { display: grid; }
 .verdict { font-size: 20px; font-weight: 700; }
 .verdict.great { color: var(--great); } .verdict.ok { color: var(--ok); } .verdict.bad { color: var(--bad); }
-.mix { display: flex; height: 26px; border-radius: 6px; overflow: hidden; margin: 10px 0; }
-.mix div { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; }
+.mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 8px 0; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); }
+.pill i { width: 9px; height: 9px; border-radius: 50%; }
+.pill.me { border-color: currentColor; }
+.range { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.range h4 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .why p { margin: 8px 0; }
 .why .muted { color: var(--muted); font-size: 13px; }
 .grid { display: grid; grid-template-columns: repeat(13, 26px); gap: 1px; font-size: 9px; align-self: start; }
@@ -148,13 +153,14 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
   <section class="feedback" id="feedback">
     <div class="analysis">
       <div class="verdict" id="verdict"></div>
-      <div class="mix" id="mix"></div>
+      <div class="pills" id="mix"></div>
       <button class="next" id="next">Next hand <kbd>Space</kbd></button>
       <div class="why" id="why"></div>
     </div>
     <div class="chart">
       <div class="grid" id="grid"></div>
       <div class="legend"><span><i style="background:var(--raise)"></i>Raise</span><span><i style="background:var(--allin)"></i>All-in</span><span><i style="background:var(--call)"></i>Call</span><span><i style="background:var(--fold)"></i>Fold</span></div>
+      <div class="range" id="range"></div>
     </div>
   </section>
 </main>
@@ -705,10 +711,12 @@ function answer(a) {
   }
   $("sHands").textContent = st.hands; $("sAcc").textContent = Math.round(st.right / st.hands * 100) + "%"; $("sStreak").textContent = st.streak;
   $("verdict").className = "verdict " + grade;
-  $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable (mixed spot)", bad: "✗ Mistake" }[grade]
-    + ` — ${label(a, c.spot.node)} is played ${Math.round(f)}% of the time`;
-  $("mix").innerHTML = ACTS.filter(x => mix[x] >= 0.5).map(x =>
-    `<div style="background:${COLOR[x]};width:${mix[x]}%">${mix[x] >= 12 ? label(x, c.spot.node) + " " : ""}${Math.round(mix[x])}%</div>`).join("");
+  $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable", bad: "✗ Mistake" }[grade];
+  $("mix").innerHTML = pills(mix, c.spot.node, a);
+  const rm = rangeMix(c.rows), sp = c.spot;
+  $("range").innerHTML = `<h4>Whole range · ${sp.node === "RFI" ? `opening from ${sp.hero}` : `vs ${vsText(sp)}`}</h4>
+    <div class="mix">${ACTS.filter(x => rm[x] >= 0.5).map(x => `<div style="background:${COLOR[x]};width:${rm[x]}%"></div>`).join("")}</div>
+    <div class="pills">${pills(rm, sp.node)}</div>`;
   $("why").innerHTML = explain(c, mix, a, grade).map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
   // scripted steps continue down the line whatever you picked; after them the other players respond live
   // the scripted line raises at every step, except the SB's limp that starts a limped pot
@@ -722,6 +730,17 @@ function answer(a) {
   $("feedback").classList.add("show");
 }
 
+// action mix as pills, biggest first; the one you picked is outlined
+const pills = (mix, node, picked) => ACTS.filter(x => mix[x] >= 0.5).sort((x, y) => mix[y] - mix[x]).map(x =>
+  `<span class="pill${x === picked ? " me" : ""}"><i style="background:${COLOR[x]}"></i>${label(x, node)} ${Math.round(mix[x])}%</span>`).join("");
+// the whole range's action mix, weighted by combos × reach
+function rangeMix(rows) {
+  let tot = 0; const s = { Allin: 0, Raise: 0, Call: 0, Fold: 0 };
+  rows.forEach((row, i) => { const w = COMBOS(HANDS[i]) * row[4]; if (!w) return; tot += w; const m = mixOf(row); ACTS.forEach(a => s[a] += w * m[a] / 100); });
+  ACTS.forEach(a => s[a] = tot ? s[a] / tot * 100 : 0); return s;
+}
+const vsFull = spot => { const [o, w] = villains(spot); return w ? `${o}'s open and ${w}'s ${spot.node === "FACINGRFI_CALL" ? "call" : "3-bet"}` : `${o}'s ${faced(spot.node)}`; };
+
 // ---------- local, rule-based explanation ----------
 function explain(c, mix, picked, grade) {
   const { spot, rows, hand } = c, node = spot.node, L = a => label(a, node);
@@ -729,10 +748,7 @@ function explain(c, mix, picked, grade) {
   const aggressive = a => a === "Raise" || a === "Allin";
   const out = [];
 
-  // range-wide numbers
-  let tot = 0; const share = { Allin: 0, Raise: 0, Call: 0, Fold: 0 };
-  rows.forEach((row, i) => { const w = COMBOS(HANDS[i]) * row[4]; if (!w) return; tot += w; const m = mixOf(row); ACTS.forEach(a => share[a] += w * m[a] / 100); });
-  const pct = a => Math.round(share[a] / tot * 100);
+  const share = rangeMix(rows), pct = a => Math.round(share[a]);
   const me = chen(hand);
   out.push(`<b>${hand}</b> is ${describe(hand)}.`);
 
@@ -749,8 +765,7 @@ function explain(c, mix, picked, grade) {
     if (best === "Fold") out.push(`${hand} isn't strong or playable enough to open here; it's below the cutoff for ${spot.hero}.`);
     if (best === "Call") out.push(`Limping lets the SB see a cheap flop with hands that play OK but don't want to face a 3-bet.`);
   } else {
-    const [o, w] = villains(spot), vs = w ? `${o}'s open and ${w}'s ${node === "FACINGRFI_CALL" ? "call" : "3-bet"}` : `${o}'s ${faced(node)}`;
-    out.push(`Against ${vs}, your whole range here plays ${ACTS.filter(a => pct(a)).map(a => `${L(a)} ${pct(a)}%`).join(", ")}.`);
+    const [o, w] = villains(spot), vs = vsFull(spot);
     const z = c.z, odds = Math.round(z.toCall / (z.pot + z.toCall) * 100);
     if (node === "FACINGRFI_CALL") out.push(aggressive(best)
       ? `With two players in, a raise here is a <b>squeeze</b>: ${w}'s call mostly caps their range (their best hands would have 3-bet), and the extra money in the pot makes a raise win more when both fold.`
@@ -787,7 +802,6 @@ function explain(c, mix, picked, grade) {
     if (tb !== best && rows[HANDS.indexOf(twin)][4])
       out.push(`~Compare: ${twin} plays ${L(tb)} ${Math.round(tm[tb])}% here. ${hand[2] === "s" ? "Being suited adds about 3% equity and flush potential, which is the difference." : "The suited version plays better because of its flush potential."}`);
   }
-  if (grade === "bad") out.push(`~You chose ${L(picked)}, which the solver ${mix[picked] ? `only uses ${Math.round(mix[picked])}% of the time` : "never uses"} with this hand.`);
   out.push("~Explanations come from simple local rules, not from the solver, so treat them as a guide.");
   return out;
 }
