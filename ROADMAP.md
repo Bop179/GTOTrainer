@@ -57,7 +57,30 @@ Squeezes (facing an open plus a call), overcalls, BB vs open + call, and cold 4-
 - [x] 8-max 100bb (2026-11-04): 112 GTO Wizard spots (56 open + call, 56 open + 3-bet) in `data8.js`; 9-max 100bb gets them through the 8 → 9 mapping.
 - [x] 8-max 200bb (2026-11-05): 112 GTO Wizard spots in `data8.js`, carried to 9-max 200bb by the 8 → 9 mapping.
 - [x] The 8 → 9 mapping splits `OPENER+OTHER` (2026-11-02), so 9-max gets these spots as soon as 8-max has them. Tested with stand-in data: 80 8-max spots became 120 at 9-max (at 9-max UTG spots are borrowed for both UTG1 and UTG2), and live hands ran clean.
-- Not covered: replies to your squeeze or cold 4-bet, more than two players in front of you, and squeezes of your open (GTO Wizard has these nodes, but they're many more views each).
+- Not covered: more than two players in front of you. Squeezes of your open and the replies to your squeeze or cold 4-bet are item 6.
+
+### 6. Squeezes and cold 4-bets against you, and replies to yours (started 2026-11-06)
+
+Four more GTO Wizard nodes per line, read after the players behind the raiser fold:
+
+| Node | Key | Spot |
+|---|---|---|
+| `FACINGSQZ` | `CALLER+SQUEEZER/opener` | You open, one player calls, another squeezes. The caller is still behind you. |
+| `FACINGSQZ_CALLER` | `OPENER+SQUEEZER/caller` | You call an open, someone squeezes, the opener folds. |
+| `FACINGC4B` | `3BETTOR+4BETTOR/opener` | You open, get 3-bet, and someone cold 4-bets. The 3-bettor is still behind you. |
+| `FACINGC4B_3B` | `OPENER+4BETTOR/3-bettor` | You 3-bet an open, someone cold 4-bets, the opener folds. |
+
+The same nodes give the villains' answers when you squeeze or cold 4-bet: the opener answers first, then, if the opener folds, the caller or 3-bettor. Up to 56 nodes per type at 8-max (224 views per stack) and 20 at 6-max (80 views per stack), so about 6 days of the free quota in all.
+
+- [x] Trainer: spot types "vs Squeeze" and "vs Cold 4-bet"; the live table plays these lines and ends the hand only where the data stops. Walker stages 9 to 12 in `.claude/gw_walker.js`, appended to the data file with `.claude/gw_append.py`.
+- [ ] 8-max 200bb: `FACINGSQZ` done (56, 2026-11-06), `FACINGSQZ_CALLER` 8/56, `FACINGC4B`, `FACINGC4B_3B`.
+- [ ] 8-max 100bb (all four).
+- [ ] 6-max 200bb and 100bb (all four).
+- Not covered: your answer after the opener 4-bets your squeeze (or 5-bets your cold 4-bet), and lines where a player behind the raiser comes in too.
+
+### 7. ✅ Range browser (done 2026-11-06)
+
+- [x] A **Ranges** button opens any spot's chart and whole-range mix at the current game and stack, without playing a hand.
 
 ## Out of scope for now
 

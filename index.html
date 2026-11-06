@@ -34,6 +34,9 @@ button { cursor: pointer; }
 .note { color: var(--muted); font-size: 12px; margin-top: 14px; }
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; width: min(640px, calc(100% - 32px)); padding: 20px; }
 dialog::backdrop { background: #000a; }
+.bsub { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+#bSpot { width: 100%; font: inherit; padding: 6px 8px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; }
+.bbody { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; } .bbody .range { flex: 1; min-width: 200px; }
 dialog h2 { margin: 0 0 8px; font-size: 20px; } dialog h3 { margin: 18px 0 6px; font-size: 15px; color: var(--muted); }
 dialog table { width: 100%; border-collapse: collapse; font-size: 14px; }
 dialog td, dialog th { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--line); }
@@ -144,6 +147,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
   </details>
   <button id="mute" title="Toggle sound (M)">🔊</button>
   <button id="leakBtn">Leaks</button>
+  <button id="browseBtn">Ranges</button>
   <div class="stats"><span>Hands <b id="sHands">0</b></span><span>Accuracy <b id="sAcc">–</b></span><span>Streak <b id="sStreak">0</b></span></div>
 </header>
 <main>
@@ -169,6 +173,14 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
     </div>
   </section>
 </main>
+<dialog id="browse">
+  <h2>Ranges</h2>
+  <p class="bsub" id="bSub"></p>
+  <select id="bSpot"></select>
+  <p id="bSit"></p>
+  <div class="bbody"><div class="grid" id="bGrid"></div><div class="range" id="bRange"></div></div>
+  <div class="dlg-btns"><button id="closeBrowse" autofocus>Close</button></div>
+</dialog>
 <dialog id="leaks">
   <h2>Your leaks</h2>
   <div id="leakBody"></div>
@@ -189,7 +201,13 @@ const RAISE_NAME = { RFI: "Open", FACINGRFI: "3-bet", FACING3B: "4-bet", FACING4
   // limped pots (SB limps, BB to act): the BB's raise is the 2-bet, the SB's re-raise the 3-bet, and so on
   FACINGLIMP: "Raise", LIMP_FACING2B: "3-bet", LIMP_FACING3B: "4-bet", LIMP_FACING4B: "5-bet", LIMP_FACING5B: "6-bet", LIMP_FACING6B: "7-bet",
   // multiway (every game but heads-up): villain is "OPENER+OTHER", where OTHER called the open (FACINGRFI_CALL) or 3-bet it (FACING3B_COLD)
-  FACINGRFI_CALL: "Squeeze", FACING3B_COLD: "4-bet" };
+  FACINGRFI_CALL: "Squeeze", FACING3B_COLD: "4-bet",
+  // after a squeeze (open, call, raise) or a cold 4-bet (open, 3-bet, raise): the opener with the other player still behind, or,
+  // once the opener folds, the caller / 3-bettor. Villain is the two players besides you, in the order they acted.
+  FACINGSQZ: "4-bet", FACINGSQZ_CALLER: "4-bet", FACINGC4B: "5-bet", FACINGC4B_3B: "5-bet" };
+// what the two villains in a multiway spot did, in order
+const MW = { FACINGRFI_CALL: ["open", "call"], FACING3B_COLD: ["open", "3-bet"], FACINGSQZ: ["call", "squeeze"],
+  FACINGSQZ_CALLER: ["open", "squeeze"], FACINGC4B: ["3-bet", "cold 4-bet"], FACINGC4B_3B: ["open", "cold 4-bet"] };
 const isLimp = node => node.includes("LIMP");
 const villains = s => s.villain ? s.villain.split("+") : [];
 
@@ -364,6 +382,10 @@ function situation(s) {
   return {
     FACINGRFI_CALL: `${o} opens, ${w} calls. You're in ${h}.`,
     FACING3B_COLD: `${o} opens, ${w} 3-bets. You're in ${h}.`,
+    FACINGSQZ: `You open from ${h}, ${o} calls, ${w} squeezes.`,
+    FACINGSQZ_CALLER: `${o} opens, you call from ${h}, ${w} squeezes, ${o} folds.`,
+    FACINGC4B: `You open from ${h}, ${o} 3-bets, ${w} cold 4-bets.`,
+    FACINGC4B_3B: `${o} opens, you 3-bet from ${h}, ${w} cold 4-bets, ${o} folds.`,
     RFI: ORDER[s.game][0] === h ? `You're first to act in ${h}.` : `Folds to you in ${h}.`,
     FACINGRFI: `${v} opens. You're in ${h}.`,
     FACING3B: `You open from ${h}, ${v} 3-bets.`,
@@ -389,7 +411,8 @@ function inPosition(a, b, game) {
 }
 const LINES = { RFI: [], FACINGRFI: ["v"], FACING3B: ["h", "v"], FACING4B: ["v", "h", "v"], FACING5B: ["h", "v", "h", "v"], FACING6B: ["v", "h", "v", "h", "v"],
   FACINGLIMP: [], LIMP_FACING2B: ["v"], LIMP_FACING3B: ["h", "v"], LIMP_FACING4B: ["v", "h", "v"], LIMP_FACING5B: ["h", "v", "h", "v"], LIMP_FACING6B: ["v", "h", "v", "h", "v"],
-  FACINGRFI_CALL: ["v", "w call"], FACING3B_COLD: ["v", "w"] }; // w: the second villain
+  FACINGRFI_CALL: ["v", "w call"], FACING3B_COLD: ["v", "w"], // w: the second villain
+  FACINGSQZ: ["h", "v call", "w"], FACINGSQZ_CALLER: ["v", "h call", "w", "v fold"], FACINGC4B: ["h", "v", "w"], FACINGC4B_3B: ["v", "h", "w", "v fold"] };
 const bb = x => +x.toFixed(1) + "bb";
 function sizing(s) {
   const S = parseInt(s.stack), limp = isLimp(s.node), inv = { SB: limp ? 1 : .5, BB: 1 };
@@ -405,10 +428,12 @@ function sizing(s) {
   const line = limp ? [["SB", 1, "Limp"]] : []; // [seat, amount to, tag] for each bet in order, for the replay
   const [o, w] = villains(s);
   for (const x of LINES[s.node]) {
-    const p = x === "h" ? s.hero : x[0] === "w" ? w : o, other = x === "h" ? o : s.hero;
-    if (x === "w call") { inv[p] = last; acts[p] = "Call"; line.push([p, last, "Call"]); continue; }
+    const [who, kind] = x.split(" "), p = who === "h" ? s.hero : who === "w" ? w : o, other = who === "h" ? o : s.hero;
+    if (kind === "call") { inv[p] = last; acts[p] = "Call"; line.push([p, last, "Call"]); continue; }
+    if (kind === "fold") { acts[p] = "Fold"; line.push([p, inv[p], "Fold"]); continue; }
+    const sqz = line.at(-1)?.[2] === "Call" && at === "FACINGRFI"; // a raise over an open and a call
     last = inv[p] = raiseTo(p, other);
-    acts[p] = last >= S ? "All-in" : RAISE_NAME[at]; line.push([p, last, acts[p]]); n++; at = NEXT[at];
+    acts[p] = last >= S ? "All-in" : sqz ? "Squeeze" : RAISE_NAME[at]; line.push([p, last, acts[p]]); n++; at = NEXT[at];
   }
   const heroIn = inv[s.hero] || 0;
   return {
@@ -437,7 +462,7 @@ $("mute").textContent = muted ? "🔇" : "🔊";
 const GAMES = { "6max": "6-max", "8max": "8-max", "9max": "9-max", HU: "Heads-up" };
 const SPOT_TYPES = { RFI: "Open", FACINGRFI: "vs Open", FACING3B: "vs 3-bet", "FACING4B|FACING5B|FACING6B": "vs 4-bet+",
   "FACINGLIMP|LIMP_FACING2B|LIMP_FACING3B|LIMP_FACING4B|LIMP_FACING5B|LIMP_FACING6B": "Limped pot",
-  FACINGRFI_CALL: "vs Open + call", FACING3B_COLD: "vs Open + 3-bet" };
+  FACINGRFI_CALL: "vs Open + call", FACING3B_COLD: "vs Open + 3-bet", "FACINGSQZ|FACINGSQZ_CALLER": "vs Squeeze", "FACINGC4B|FACINGC4B_3B": "vs Cold 4-bet" };
 const stacksOf = game => [...new Set(ALL.filter(s => s.game === game).map(s => s.stack))].sort((a, b) => parseInt(a) - parseInt(b));
 let cfg = { game: "6max", stack: "100bb", nodes: [], pos: [] };
 try { cfg = { ...cfg, ...JSON.parse(localStorage.getItem("gto-cfg")) }; } catch {}
@@ -490,7 +515,7 @@ function leakType(picked, best) {
 // what the hero is facing: the villain's raise made one node earlier, or the SB's limp
 const faced = node => node === "FACINGLIMP" ? "limp" : RAISE_NAME[Object.keys(NEXT).find(k => NEXT[k] === node)].toLowerCase();
 // "UTG open" or, multiway, "UTG open + HJ call"
-const vsText = s => { const [o, w] = villains(s); return w ? `${o} open + ${w} ${s.node === "FACINGRFI_CALL" ? "call" : "3-bet"}` : `${o} ${faced(s.node)}`; };
+const vsText = s => { const [o, w] = villains(s); return w ? `${o} ${MW[s.node][0]} + ${w} ${MW[s.node][1]}` : `${o} ${faced(s.node)}`; };
 const spotName = s => `${s.game} ${s.stack} · ` + (s.node === "RFI" ? `${s.hero} open` : `${s.hero} vs ${vsText(s)}`);
 function renderLeaks() {
   const log = prog.log, bad = log.filter(e => e[2] === "bad"), tally = (arr, f) => arr.reduce((m, e) => (m[f(e)] = (m[f(e)] || 0) + 1, m), {});
@@ -563,16 +588,43 @@ function joiner(s, o, w, node) {
     if (b !== "Fold") return [p, b];
   }
 }
+const REPLY = { FACINGRFI_CALL: ["FACINGSQZ", "FACINGSQZ_CALLER"], FACING3B_COLD: ["FACINGC4B", "FACINGC4B_3B"] }; // who answers a squeeze / cold 4-bet
 const joinText = ([p, b], node) => `${p} ${b === "Allin" ? "shoves all-in" : b === "Call" ? "calls too" : node === "FACINGRFI_CALL" ? "squeezes" : "cold 4-bets"}`;
 // What the others do after your action: the next spot you face, or how the hand ends
 function simNext(c, a, pot) {
   const s = c.spot, limp = s.node === "RFI" && a === "Call", node = limp ? "FACINGLIMP" : NEXT[s.node];
   if (a === "Fold") return null;
   if (limp && !SPOTS[nodeKey(s, "BB", s.hero, node)]) return { text: "You limp. The solver data has no limped pot here, so the hand ends." };
-  const shove = a === "Allin" || c.z.raise >= c.z.S;
+  const shove = a === "Allin" || c.z.raise >= c.z.S, [o, w] = villains(s), K = (v, p, n) => [s.game, s.stack, v, p, n].join("/");
+  const what = (b, n) => b === "Allin" ? "shoves all-in" : b === "Call" ? "calls" : RAISE_NAME[n].toLowerCase() + "s";
+  const END = "No solver data past this point, so the hand ends.", NOREPLY = "The solver data doesn't cover the replies to your raise, so the hand ends here.";
+  // the next spot you face, if the data has it and your hand gets there
+  const reach = (text, key) => SPOTS[key]?.[c.i][4] ? { text: text + "!", spot: parse(key) }
+    : { text: `${text}. ${SPOTS[key] ? "The solver never gets here with your hand" : "No solver data past this point"}, so the hand ends.` };
+  // facing a squeeze or cold 4-bet as the opener, the caller or 3-bettor is still behind you; once the opener folds it's heads-up
+  if (s.node === "FACINGSQZ" || s.node === "FACINGC4B") return { text: a === "Call" ? `You call, and ${o} still has to act. ${END}` : NOREPLY };
+  if (s.node === "FACINGSQZ_CALLER" || s.node === "FACINGC4B_3B") return { text: a === "Call" ? "You call: on to the flop, where this preflop trainer stops." : NOREPLY };
+  // you squeezed or cold 4-bet: the opener answers first, then (if the opener folds) the caller or 3-bettor
+  // ponytail: the players behind you are assumed to fold (the data covers only that line), and an all-in gets the same answers as the solver's raise
+  if (REPLY[s.node]) {
+    const [n1, n2] = REPLY[s.node], k1 = K(`${w}+${s.hero}`, o, n1), k2 = K(`${o}+${s.hero}`, w, n2);
+    if (!SPOTS[k1]) return { text: NOREPLY };
+    const b1 = sampleAct(k1);
+    if (b1 !== "Fold") return { text: shove ? `${o} calls your all-in. Cards on their backs!` : `${o} ${what(b1, n1)}. ${END}` };
+    if (!SPOTS[k2]) return { text: `${o} folds. ${END}` };
+    const b2 = sampleAct(k2);
+    if (b2 === "Fold") return { text: `${o} and ${w} fold. You take the ${bb(pot)} pot.` };
+    if (shove) return { text: `${o} folds, ${w} calls your all-in. Cards on their backs!` };
+    return { text: b2 === "Call" ? `${o} folds, ${w} calls: on to the flop, where this preflop trainer stops.` : `${o} folds, ${w} ${what(b2, n2)}. ${END}` };
+  }
   // calling or 3-betting an open: the players behind you act first, from the multiway spot (where the data has one)
   const jn = a === "Call" ? "FACINGRFI_CALL" : "FACING3B_COLD", j = s.node === "FACINGRFI" && !shove && joiner(s, s.villain, s.hero, jn);
-  if (j && j[1] !== "Call") return { text: `${joinText(j, jn)}. No solver data past this point, so the hand ends.` };
+  if (j && j[1] !== "Call") { // squeezed or cold 4-bet behind you: the opener answers first
+    const [n1, n2] = REPLY[jn], k1 = K(`${s.hero}+${j[0]}`, o, n1), b1 = SPOTS[k1] && sampleAct(k1);
+    if (!b1) return { text: `${joinText(j, jn)}. ${END}` };
+    if (b1 !== "Fold") return { text: `${joinText(j, jn)}, ${o} ${what(b1, n1)}. ${END}` };
+    return reach(`${joinText(j, jn)}, ${o} folds`, K(`${o}+${j[0]}`, s.hero, n2));
+  }
   if (a === "Call" && !limp) return { text: `${j ? joinText(j) + ". " : ""}You ${s.node === "FACINGLIMP" ? "check" : "call"}: on to the flop, where this preflop trainer stops.` };
   if (villains(s).length > 1) return { text: "The solver data doesn't cover the replies to your raise, so the hand ends here." };
   // a villain with no spot to respond from would otherwise "fold"
@@ -585,13 +637,11 @@ function simNext(c, a, pot) {
     if (b === "Fold") continue;
     if (shove) return { text: `${p} calls your all-in. Cards on their backs!` };
     if (b === "Call") { caller ??= p; continue; }
-    if (key === mw) return { text: `${caller} calls, ${joinText([p, b], "FACINGRFI_CALL")}. No solver data past this point, so the hand ends.` };
+    if (key === mw) return reach(`${caller} calls, ${joinText([p, b], "FACINGRFI_CALL")}`, K(`${caller}+${p}`, s.hero, "FACINGSQZ"));
     // a 3-bet of your open: the players behind the 3-bettor get a cold 4-bet spot before it's back to you
     const cold = s.node === "RFI" && b !== "Allin" && joiner(s, s.hero, p, "FACING3B_COLD");
-    if (cold) return { text: `${p} 3-bets, ${joinText(cold, "FACING3B_COLD")}. No solver data past this point, so the hand ends.` };
-    const next = nodeKey(s, s.hero, p, NEXT[node]), what = b === "Allin" ? "shoves all-in" : RAISE_NAME[node].toLowerCase() + "s";
-    if (!SPOTS[next]?.[c.i][4]) return { text: `${p} ${what}. ${SPOTS[next] ? "The solver never gets here with your hand" : "No solver data past this point"}, so the hand ends.` };
-    return { text: `${p} ${what}!`, spot: parse(next) };
+    if (cold) return reach(`${p} 3-bets, ${joinText(cold, "FACING3B_COLD")}`, K(`${p}+${cold[0]}`, s.hero, "FACINGC4B"));
+    return reach(`${p} ${what(b, node)}`, nodeKey(s, s.hero, p, NEXT[node]));
   }
   return { text: caller ? `${caller} ${limp ? "checks" : "calls"}: on to the flop, where this preflop trainer stops.` : `Everyone folds. You take the ${bb(pot)} pot.` };
 }
@@ -599,11 +649,12 @@ function simNext(c, a, pot) {
 // Earlier decisions that lead to a spot, oldest first: e.g. "HJ opens, you 3-bet from SB, HJ 4-bets"
 // is preceded by "HJ opens, you're in SB". Stops where the data has no such spot or the hand never gets there.
 const PREV = { FACING3B: "RFI", FACING4B: "FACINGRFI", FACING5B: "FACING3B", FACING6B: "FACING4B",
-  LIMP_FACING2B: "RFI", LIMP_FACING3B: "FACINGLIMP", LIMP_FACING4B: "LIMP_FACING2B", LIMP_FACING5B: "LIMP_FACING3B", LIMP_FACING6B: "LIMP_FACING4B" };
+  LIMP_FACING2B: "RFI", LIMP_FACING3B: "FACINGLIMP", LIMP_FACING4B: "LIMP_FACING2B", LIMP_FACING5B: "LIMP_FACING3B", LIMP_FACING6B: "LIMP_FACING4B",
+  FACINGSQZ: "RFI", FACINGC4B: "RFI", FACINGSQZ_CALLER: "FACINGRFI", FACINGC4B_3B: "FACINGRFI" };
 function chainOf(spot, i) {
   const steps = [spot];
   for (let s = spot; PREV[s.node]; ) {
-    const key = PREV[s.node] === "RFI" ? [s.game, s.stack, s.hero, "RFI"].join("/") : [s.game, s.stack, s.villain, s.hero, PREV[s.node]].join("/");
+    const key = PREV[s.node] === "RFI" ? [s.game, s.stack, s.hero, "RFI"].join("/") : [s.game, s.stack, villains(s)[0], s.hero, PREV[s.node]].join("/");
     if (!SPOTS[key]?.[i][4]) break;
     steps.unshift(s = parse(key));
   }
@@ -718,14 +769,12 @@ function answer(a) {
   $("verdict").className = "verdict " + grade;
   $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable", bad: "✗ Mistake" }[grade];
   $("mix").innerHTML = pills(mix, c.spot.node, a);
-  const rm = rangeMix(c.rows), sp = c.spot;
-  $("range").innerHTML = `<h4>Whole range · ${sp.node === "RFI" ? `opening from ${sp.hero}` : `vs ${vsText(sp)}`}</h4>
-    <div class="mix">${ACTS.filter(x => rm[x] >= 0.5).map(x => `<div style="background:${COLOR[x]};width:${rm[x]}%"></div>`).join("")}</div>
-    <div class="pills">${pills(rm, sp.node)}</div>`;
+  $("range").innerHTML = rangeHTML(c.spot);
   $("why").innerHTML = explain(c, mix, a, grade).map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
   // scripted steps continue down the line whatever you picked; after them the other players respond live
-  // the scripted line raises at every step, except the SB's limp that starts a limped pot
-  let more = c.k + 1 < c.steps.length, want = more && c.spot.node === "RFI" && isLimp(c.steps[c.k + 1].node) ? "Call" : "Raise";
+  // the scripted line raises at every step, except the SB's limp that starts a limped pot and the call that gets squeezed
+  let more = c.k + 1 < c.steps.length, nx = more && c.steps[c.k + 1].node;
+  let want = more && (c.spot.node === "RFI" && isLimp(nx) || nx === "FACINGSQZ_CALLER") ? "Call" : "Raise";
   let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
   if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } }
@@ -744,7 +793,7 @@ function rangeMix(rows) {
   rows.forEach((row, i) => { const w = COMBOS(HANDS[i]) * row[4]; if (!w) return; tot += w; const m = mixOf(row); ACTS.forEach(a => s[a] += w * m[a] / 100); });
   ACTS.forEach(a => s[a] = tot ? s[a] / tot * 100 : 0); return s;
 }
-const vsFull = spot => { const [o, w] = villains(spot); return w ? `${o}'s open and ${w}'s ${spot.node === "FACINGRFI_CALL" ? "call" : "3-bet"}` : `${o}'s ${faced(spot.node)}`; };
+const vsFull = spot => { const [o, w] = villains(spot); return w ? `${o}'s ${MW[spot.node][0]} and ${w}'s ${MW[spot.node][1]}` : `${o}'s ${faced(spot.node)}`; };
 
 // ---------- local, rule-based explanation ----------
 function explain(c, mix, picked, grade) {
@@ -776,6 +825,10 @@ function explain(c, mix, picked, grade) {
       ? `With two players in, a raise here is a <b>squeeze</b>: ${w}'s call mostly caps their range (their best hands would have 3-bet), and the extra money in the pot makes a raise win more when both fold.`
       : `Two players are already in, so a squeeze has more to win than a normal 3-bet and the solver squeezes a bit more often, while calls lean on hands that play well multiway: pairs and suited hands.`);
     if (node === "FACING3B_COLD") out.push(`Facing an open and a 3-bet, only very strong hands continue: you're up against the 3-bettor's range with ${o} still to act behind you. This solve has no cold-call option, so it's 4-bet or fold.`);
+    if (node === "FACINGSQZ") out.push(`A squeeze over an open and a call is a strong range, and ${o} can still wake up behind you, so you continue tighter than against a plain 3-bet.`);
+    if (node === "FACINGSQZ_CALLER") out.push(`You flatted the open, so your range is capped: your best hands would have 3-bet. With ${o} out it's you against the squeezer, and calls lean on hands that play well after the flop.`);
+    if (node === "FACINGC4B") out.push(`A cold 4-bet over a 3-bet is about as strong as a preflop range gets, and ${o} is still behind you, so only the very top of your range goes on.`);
+    if (node === "FACINGC4B_3B") out.push(`${w} cold 4-bet into your 3-bet, which is a very strong range. With ${o} out it's heads-up, and only strong hands continue.`);
     if (z.toCall) out.push(`Pot odds: calling ${bb(z.toCall)} to win a ${bb(z.pot)} pot means you need about ${odds}% equity, before accounting for position and how much of that equity you actually realize${z.toCall >= z.heroBehind ? " (this call puts you all-in, so there's nothing left to realize: raw equity is what counts)" : ""}.`);
     if (aggressive(best)) {
       const raisers = rows.map((row, i) => [row, i]).filter(([row]) => row[4] && row[0] + row[1] >= 50).map(([, i]) => chen(HANDS[i])).sort((x, y) => x - y);
@@ -811,14 +864,39 @@ function explain(c, mix, picked, grade) {
   return out;
 }
 
-function drawGrid(c) {
-  $("grid").innerHTML = HANDS.map((h, i) => {
-    const row = c.rows[i], m = mixOf(row);
+const drawGrid = c => $("grid").innerHTML = gridHTML(c.rows, c.spot.node, c.i);
+function gridHTML(rows, node, me) {
+  return HANDS.map((h, i) => {
+    const row = rows[i], m = mixOf(row);
     let at = 0;
     const stops = ACTS.map(a => { const s = `${COLOR[a]} ${at}% ${at + m[a]}%`; at += m[a]; return s; }).join(",");
     const op = row[4] ? .35 + .65 * row[4] : .15;
-    return `<div class="${i === c.i ? "me" : ""}" style="background:linear-gradient(to right,${stops});opacity:${op}" title="${h}: ${ACTS.filter(a => m[a] >= .5).map(a => label(a, c.spot.node) + " " + Math.round(m[a]) + "%").join(", ")}">${h}</div>`;
+    return `<div class="${i === me ? "me" : ""}" style="background:linear-gradient(to right,${stops});opacity:${op}" title="${h}: ${ACTS.filter(a => m[a] >= .5).map(a => label(a, node) + " " + Math.round(m[a]) + "%").join(", ")}">${h}</div>`;
   }).join("");
+}
+function rangeHTML(sp) {
+  const rm = rangeMix(SPOTS[sp.key]);
+  return `<h4>Whole range · ${sp.node === "RFI" ? `opening from ${sp.hero}` : `vs ${vsText(sp)}`}</h4>
+    <div class="mix">${ACTS.filter(x => rm[x] >= 0.5).map(x => `<div style="background:${COLOR[x]};width:${rm[x]}%"></div>`).join("")}</div>
+    <div class="pills">${pills(rm, sp.node)}</div>`;
+}
+
+// ---------- range browser: any spot's chart at the current game and stack, without playing a hand ----------
+function openBrowse() {
+  const g = cfg.game + "/" + cfg.stack, order = ORDER[cfg.game];
+  const rank = s => [s.hero, ...villains(s)].reduce((r, p) => r * 10 + order.indexOf(p) + 1, 0); // your seat, then the villains' seats
+  const groups = Object.entries(SPOT_TYPES).map(([n, t]) => [t, ALL.filter(s => s.game + "/" + s.stack === g && n.split("|").includes(s.node))
+    .sort((a, b) => rank(a) - rank(b) || a.node.localeCompare(b.node))]).filter(([, l]) => l.length);
+  const cur = st.cur?.spot?.key;
+  $("bSpot").innerHTML = groups.map(([t, l]) => `<optgroup label="${t}">${l.map(s => `<option value="${s.key}"${s.key === cur ? " selected" : ""}>${spotName(s).split(" · ").slice(1).join(" · ")}</option>`).join("")}</optgroup>`).join("");
+  $("bSub").textContent = `${GAMES[cfg.game]} · ${cfg.stack} (change the game or stack in Settings)`;
+  drawBrowse(); $("browse").showModal();
+}
+function drawBrowse() {
+  const sp = parse($("bSpot").value);
+  $("bSit").textContent = situation(sp);
+  $("bGrid").innerHTML = gridHTML(SPOTS[sp.key], sp.node, -1);
+  $("bRange").innerHTML = rangeHTML(sp);
 }
 
 // ---------- wiring ----------
@@ -854,6 +932,9 @@ $("vol").onchange = () => play("chip");
 document.querySelector(".previews").onclick = e => { const p = e.target.dataset.p; if (p) { const m = muted; muted = false; play(p); muted = m; } };
 $("leakBtn").onclick = () => { renderLeaks(); $("resetProg").textContent = "Reset progress"; $("leaks").showModal(); };
 $("closeLeaks").onclick = () => $("leaks").close();
+$("browseBtn").onclick = openBrowse;
+$("bSpot").onchange = drawBrowse;
+$("closeBrowse").onclick = () => $("browse").close();
 $("resetProg").onclick = () => { // two clicks so one stray click can't wipe your history
   if ($("resetProg").textContent !== "Click again to erase") return $("resetProg").textContent = "Click again to erase";
   prog = { n: 0, log: [], srs: {} }; saveProg(); renderLeaks(); $("resetProg").textContent = "Reset progress";
@@ -863,7 +944,7 @@ $("mute").onclick = () => {
   try { localStorage.setItem("gto-muted", muted ? "1" : "0"); } catch {}
 };
 document.addEventListener("keydown", e => {
-  if ($("leaks").open || ["SELECT", "INPUT"].includes(e.target.tagName) || e.metaKey || e.ctrlKey) return;
+  if ($("leaks").open || $("browse").open || ["SELECT", "INPUT"].includes(e.target.tagName) || e.metaKey || e.ctrlKey) return;
   const k = e.key.toLowerCase();
   if ((k === " " || k === "enter") && st.cur?.answered) { e.preventDefault(); next(); return; }
   if (k === "m") return $("mute").click();

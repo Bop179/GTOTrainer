@@ -8,7 +8,7 @@ Open `index.html` in a browser. You don't need to install anything, run a server
 
 ## Using it
 
-- **⚙ Settings:** pick the format, stack depth, spot types (Open, vs Open, vs 3-bet, vs 4-bet+, Limped pot, and at 6-max 100/200bb vs Open + call and vs Open + 3-bet) and your positions. Leave the spot types on **Live table** and hands play out like a real table: the other seats act from the same ranges, and the hand continues until it ends or the data runs out.
+- **⚙ Settings:** pick the format, stack depth, spot types (Open, vs Open, vs 3-bet, vs 4-bet+, Limped pot, vs Open + call, vs Open + 3-bet, vs Squeeze and vs Cold 4-bet; only the types the chosen format and stack have data for are shown) and your positions. Leave the spot types on **Live table** and hands play out like a real table: the other seats act from the same ranges, and the hand continues until it ends or the data runs out.
 - **Action replay:** before each decision the table plays out what happened since your last action, one seat at a time: folders throw their cards in, bets slide out from the seat. The buttons unlock when it's your turn.
 - **Keys:** `F` fold, `C` call/check/limp, `R` raise, `A` all-in, `Space` for the next step or hand, `M` to mute.
 - **Grading:**
@@ -16,6 +16,7 @@ Open `index.html` in a browser. You don't need to install anything, run a server
   - ≈ Acceptable: a mixed action played at least 15% of the time.
   - ✗ Mistake: anything less.
 - **Leaks:** shows your mistake types and your worst spot and hand-type combinations, with a **Drill** button for each. Hands you miss come back for review after 3, then 10, 30 and 100 hands.
+- **Ranges:** pick any spot at the current format and stack and see its full chart and action mix, without playing a hand.
 - **Sound:** nine sound packs and a volume slider, in Settings.
 
 ## What's covered
