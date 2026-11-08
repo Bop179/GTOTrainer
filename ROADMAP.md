@@ -73,8 +73,8 @@ Four more GTO Wizard nodes per line, read after the players behind the raiser fo
 The same nodes give the villains' answers when you squeeze or cold 4-bet: the opener answers first, then, if the opener folds, the caller or 3-bettor. Up to 56 nodes per type at 8-max (224 views per stack) and 20 at 6-max (80 views per stack), so about 6 days of the free quota in all.
 
 - [x] Trainer: spot types "vs Squeeze" and "vs Cold 4-bet"; the live table plays these lines and ends the hand only where the data stops. Walker stages 9 to 12 in `.claude/gw_walker.js`, appended to the data file with `.claude/gw_append.py`.
-- [ ] 8-max 200bb: `FACINGSQZ` done (56, 2026-11-06), `FACINGSQZ_CALLER` done (56, 2026-11-06), `FACINGC4B` 51/56, `FACINGC4B_3B`.
-- [ ] 8-max 100bb (all four).
+- [x] 8-max 200bb: all four done, 224 spots (2026-11-06 to 11-07).
+- [ ] 8-max 100bb: `FACINGSQZ` 34/56 (2026-11-07), `FACINGSQZ_CALLER`, `FACINGC4B`, `FACINGC4B_3B`.
 - [ ] 6-max 200bb and 100bb (all four).
 - Not covered: your answer after the opener 4-bets your squeeze (or 5-bets your cold 4-bet), and lines where a player behind the raiser comes in too.
 
