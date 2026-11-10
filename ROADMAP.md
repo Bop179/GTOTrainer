@@ -74,7 +74,7 @@ The same nodes give the villains' answers when you squeeze or cold 4-bet: the op
 
 - [x] Trainer: spot types "vs Squeeze" and "vs Cold 4-bet"; the live table plays these lines and ends the hand only where the data stops. Walker stages 9 to 12 in `.claude/gw_walker.js`, appended to the data file with `.claude/gw_append.py`.
 - [x] 8-max 200bb: all four done, 224 spots (2026-11-06 to 11-07).
-- [ ] 8-max 100bb: `FACINGSQZ` done (56), `FACINGSQZ_CALLER` done (56, 2026-11-08), `FACINGC4B` 19/56, `FACINGC4B_3B`.
+- [x] 8-max 100bb: all four done, 224 spots (2026-11-07 to 11-09).
 - [ ] 6-max 200bb and 100bb (all four).
 - Not covered: your answer after the opener 4-bets your squeeze (or 5-bets your cold 4-bet), and lines where a player behind the raiser comes in too.
 
