@@ -34,12 +34,14 @@ button { cursor: pointer; }
 .note { color: var(--muted); font-size: 12px; margin-top: 14px; }
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; width: min(640px, calc(100% - 32px)); padding: 20px; }
 dialog::backdrop { background: #000a; }
-.bbody { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; } .bbody .range { flex: 1; min-width: 200px; }
+#browse { width: min(1100px, calc(100% - 32px)); }
+.bwrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; } .bwrap > div:first-child { flex: 1; min-width: 300px; }
 dialog h2 { margin: 0 0 8px; font-size: 20px; } dialog h2 small { margin-left: 8px; font-size: 14px; font-weight: 400; color: var(--muted); } dialog h3 { margin: 18px 0 6px; font-size: 15px; color: var(--muted); }
 dialog table { width: 100%; border-collapse: collapse; font-size: 14px; }
 dialog td, dialog th { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--line); }
 dialog td:last-child, dialog th:last-child { text-align: right; white-space: nowrap; }
 .dlg-btns { display: flex; justify-content: space-between; margin-top: 18px; }
+.dlg-x { position: absolute; top: 16px; right: 16px; }
 .drillbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border: 1px solid var(--ok); border-radius: 10px; background: #d9a43a1a; }
 .drillbar[hidden] { display: none; }
 .drill { padding: 3px 10px; font-size: 13px; }
@@ -172,16 +174,14 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
   </section>
 </main>
 <dialog id="browse">
-  <h2>Ranges<small id="bSub"></small></h2>
-  <div id="bPick"></div>
-  <p id="bSit"></p>
-  <div class="bbody"><div class="grid" id="bGrid"></div><div class="range" id="bRange"></div></div>
-  <div class="dlg-btns"><button id="closeBrowse" autofocus>Close</button></div>
+  <h2>Ranges<small id="bSub"></small></h2><button class="dlg-x" id="closeBrowse" autofocus>Close</button>
+  <div class="bwrap"><div><div id="bPick"></div><p id="bSit"></p></div>
+  <div><div class="grid" id="bGrid"></div><div class="range" id="bRange"></div></div></div>
 </dialog>
 <dialog id="leaks">
-  <h2>Your leaks<small id="leakStats"></small></h2>
+  <h2>Your leaks<small id="leakStats"></small></h2><button class="dlg-x" id="closeLeaks" autofocus>Close</button>
   <div id="leakBody"></div>
-  <div class="dlg-btns"><button id="resetProg">Reset progress</button><button id="closeLeaks" autofocus>Close</button></div>
+  <div class="dlg-btns"><button id="resetProg">Reset progress</button></div>
 </dialog>
 <script src="data.js"></script>
 <script src="data200.js"></script>
@@ -530,7 +530,7 @@ function renderLeaks() {
   $("leakStats").textContent = !log.length ? "" : `${log.length} hands · ${Math.round((1 - bad.length / log.length) * 100)}% right · ${Object.keys(prog.srs).length} to review (${due} due)`;
   $("leakBody").innerHTML = !log.length ? "<p>Play some hands first.</p>" : `
     <h3>Mistake types</h3>${types.length ? `<table>${types.map(([t, n]) => `<tr><td>${t}</td><td>${n} (${Math.round(n / bad.length * 100)}%)</td></tr>`).join("")}</table>` : "<p>No mistakes yet.</p>"}
-    <h3>Biggest leaks</h3>${top.length ? `<p><button class="drill" data-b="all">Drill all ${top.length} leaks</button> mixed together</p><table><tr><th>Spot · hand type</th><th>Wrong</th><th></th></tr>${top.map(([b, n]) => `<tr><td>${b}</td><td>${n} of ${seen[b]} (${Math.round(n / seen[b] * 100)}%)</td><td><button class="drill" data-b="${b}">Drill</button></td></tr>`).join("")}</table>`
+    <h3>Biggest leaks</h3>${top.length ? `${top.length > 1 ? `<p><button class="drill" data-b="all">Drill all ${top.length} leaks</button> mixed together</p>` : ""}<table><tr><th>Spot · hand type</th><th>Wrong</th><th></th></tr>${top.map(([b, n]) => `<tr><td>${b}</td><td>${n} of ${seen[b]} (${Math.round(n / seen[b] * 100)}%)</td><td><button class="drill" data-b="${b}">Drill</button></td></tr>`).join("")}</table>`
       : "<p>Not enough data yet: a spot and hand type needs at least 3 hands.</p>"}`;
 }
 
