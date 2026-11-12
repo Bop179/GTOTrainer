@@ -530,7 +530,7 @@ function renderLeaks() {
   $("leakStats").textContent = !log.length ? "" : `${log.length} hands · ${Math.round((1 - bad.length / log.length) * 100)}% right · ${Object.keys(prog.srs).length} to review (${due} due)`;
   $("leakBody").innerHTML = !log.length ? "<p>Play some hands first.</p>" : `
     <h3>Mistake types</h3>${types.length ? `<table>${types.map(([t, n]) => `<tr><td>${t}</td><td>${n} (${Math.round(n / bad.length * 100)}%)</td></tr>`).join("")}</table>` : "<p>No mistakes yet.</p>"}
-    <h3>Biggest leaks</h3>${top.length ? `<table><tr><th>Spot · hand type</th><th>Wrong</th><th>${top.length > 1 ? `<button class="drill" data-b="all">Drill all</button>` : ""}</th></tr>${top.map(([b, n]) => `<tr><td>${b}</td><td>${n} of ${seen[b]} (${Math.round(n / seen[b] * 100)}%)</td><td><button class="drill" data-b="${b}">Drill</button></td></tr>`).join("")}</table>`
+    <h3>Biggest leaks</h3>${top.length ? `<table><tr><th>Spot · hand type</th><th>Mistakes</th><th>${top.length > 1 ? `<button class="drill" data-b="all">Drill all</button>` : ""}</th></tr>${top.map(([b, n]) => `<tr><td>${b}</td><td>${n} of ${seen[b]} hands (${Math.round(n / seen[b] * 100)}%)</td><td><button class="drill" data-b="${b}">Drill</button></td></tr>`).join("")}</table>`
       : "<p>Not enough data yet: a spot and hand type needs at least 3 hands.</p>"}`;
 }
 
