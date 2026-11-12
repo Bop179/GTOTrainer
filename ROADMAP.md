@@ -83,7 +83,7 @@ The same nodes give the villains' answers when you squeeze or cold 4-bet: the op
 
 - [x] A **Ranges** button opens any spot's chart and whole-range mix at the current game and stack, without playing a hand.
 
-### 8. Grade by how much a mistake costs (after item 6)
+### 8. Show every action's EV (gain or loss) and grade by it (after item 6)
 
 Grading now goes by how often the solver plays your action. Grading by EV loss would mark a 0% action that loses almost nothing as close, and a cheap-looking fold that throws away a lot as a big mistake.
 
