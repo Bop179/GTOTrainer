@@ -23,8 +23,8 @@ button { cursor: pointer; }
 .menu[open] summary { border-color: var(--ok); }
 .menu > div { position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; width: min(460px, calc(100vw - 32px)); display: grid; gap: 10px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px #000a; }
 .menu label { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
-.menu h4 { margin: 6px 0; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
-.menu h4 small { text-transform: none; letter-spacing: 0; }
+.menu h4, #bPick h4 { margin: 6px 0; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.menu h4 small, #bPick h4 small { text-transform: none; letter-spacing: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chips button { padding: 5px 12px; border-radius: 999px; font-size: 13px; }
 .chips button.on { background: var(--ok); border-color: var(--ok); color: #111; font-weight: 600; }
@@ -35,7 +35,6 @@ button { cursor: pointer; }
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; width: min(640px, calc(100% - 32px)); padding: 20px; }
 dialog::backdrop { background: #000a; }
 .bsub { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
-#bSpot { width: 100%; font: inherit; padding: 6px 8px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; }
 .bbody { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; } .bbody .range { flex: 1; min-width: 200px; }
 dialog h2 { margin: 0 0 8px; font-size: 20px; } dialog h3 { margin: 18px 0 6px; font-size: 15px; color: var(--muted); }
 dialog table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -176,7 +175,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 <dialog id="browse">
   <h2>Ranges</h2>
   <p class="bsub" id="bSub"></p>
-  <select id="bSpot"></select>
+  <div id="bPick"></div>
   <p id="bSit"></p>
   <div class="bbody"><div class="grid" id="bGrid"></div><div class="range" id="bRange"></div></div>
   <div class="dlg-btns"><button id="closeBrowse" autofocus>Close</button></div>
@@ -887,18 +886,28 @@ function rangeHTML(sp) {
 }
 
 // ---------- range browser: any spot's chart at the current game and stack, without playing a hand ----------
+let bKey; // the chart on show
 function openBrowse() {
-  const g = cfg.game + "/" + cfg.stack, order = ORDER[cfg.game];
-  const rank = s => [s.hero, ...villains(s)].reduce((r, p) => r * 10 + order.indexOf(p) + 1, 0); // your seat, then the villains' seats
-  const groups = Object.entries(SPOT_TYPES).map(([n, t]) => [t, ALL.filter(s => s.game + "/" + s.stack === g && n.split("|").includes(s.node))
-    .sort((a, b) => rank(a) - rank(b) || a.node.localeCompare(b.node))]).filter(([, l]) => l.length);
-  const cur = st.cur?.spot?.key;
-  $("bSpot").innerHTML = groups.map(([t, l]) => `<optgroup label="${t}">${l.map(s => `<option value="${s.key}"${s.key === cur ? " selected" : ""}>${spotName(s).split(" · ").slice(1).join(" · ")}</option>`).join("")}</optgroup>`).join("");
+  bKey = st.cur?.spot?.key;
   $("bSub").textContent = `${GAMES[cfg.game]} · ${cfg.stack} (change the game or stack in Settings)`;
   drawBrowse(); $("browse").showModal();
 }
+// three chip rows: spot type, your seat, who you're up against. Each chip carries the key of the chart it opens,
+// keeping as much of the current pick (seat, opponents) as that row allows
 function drawBrowse() {
-  const sp = parse($("bSpot").value);
+  const g = cfg.game + "/" + cfg.stack, order = ORDER[cfg.game];
+  const rank = s => [s.hero, ...villains(s)].reduce((r, p) => r * 10 + order.indexOf(p) + 1, 0); // your seat, then the villains' seats
+  const here = ALL.filter(s => s.game + "/" + s.stack === g).sort((a, b) => rank(a) - rank(b) || a.node.localeCompare(b.node));
+  const typeOf = s => Object.keys(SPOT_TYPES).find(n => n.split("|").includes(s.node));
+  const sp = here.find(s => s.key === bKey) || here[0], type = typeOf(sp);
+  bKey = sp.key;
+  const best = l => l.find(s => s.hero === sp.hero && s.villain === sp.villain) || l.find(s => s.hero === sp.hero) || l[0];
+  const ofType = here.filter(s => typeOf(s) === type), mine = ofType.filter(s => s.hero === sp.hero);
+  const types = Object.keys(SPOT_TYPES).map(t => [t, here.filter(s => typeOf(s) === t)]).filter(([, l]) => l.length);
+  const row = (title, items) => `<h4>${title}</h4><div class="chips">${items.map(([s, t]) => `<button data-v="${s.key}"${s.key === sp.key ? ' class="on"' : ""}>${t}</button>`).join("")}</div>`;
+  $("bPick").innerHTML = row("Spot", types.map(([t, l]) => [l.includes(sp) ? sp : best(l), SPOT_TYPES[t]]))
+    + row("Your seat", order.filter(p => ofType.some(s => s.hero === p)).map(p => [p === sp.hero ? sp : best(ofType.filter(s => s.hero === p)), p]))
+    + (sp.node === "RFI" ? "" : row("Against", mine.map(s => [s, vsText(s)])));
   $("bSit").textContent = situation(sp);
   $("bGrid").innerHTML = gridHTML(SPOTS[sp.key], sp.node, -1);
   $("bRange").innerHTML = rangeHTML(sp);
@@ -938,7 +947,7 @@ document.querySelector(".previews").onclick = e => { const p = e.target.dataset.
 $("leakBtn").onclick = () => { renderLeaks(); $("resetProg").textContent = "Reset progress"; $("leaks").showModal(); };
 $("closeLeaks").onclick = () => $("leaks").close();
 $("browseBtn").onclick = openBrowse;
-$("bSpot").onchange = drawBrowse;
+$("bPick").onclick = e => { const v = e.target.closest("button")?.dataset.v; if (v) { bKey = v; drawBrowse(); } };
 $("closeBrowse").onclick = () => $("browse").close();
 $("resetProg").onclick = () => { // two clicks so one stray click can't wipe your history
   if ($("resetProg").textContent !== "Click again to erase") return $("resetProg").textContent = "Click again to erase";
