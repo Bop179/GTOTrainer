@@ -521,25 +521,27 @@ const faced = node => node === "FACINGLIMP" ? "limp" : RAISE_NAME[Object.keys(NE
 // "UTG open" or, multiway, "UTG open + HJ call"
 const vsText = s => { const [o, w] = villains(s); return w ? `${o} ${MW[s.node][0]} + ${w} ${MW[s.node][1]}` : `${o} ${faced(s.node)}`; };
 const spotName = s => `${s.game} ${s.stack} · ` + (s.node === "RFI" ? `${s.hero} open` : `${s.hero} vs ${vsText(s)}`);
+let leakTop = [];
 function renderLeaks() {
   const log = prog.log, bad = log.filter(e => e[2] === "bad"), tally = (arr, f) => arr.reduce((m, e) => (m[f(e)] = (m[f(e)] || 0) + 1, m), {});
   const types = Object.entries(tally(bad, e => leakType(e[3], e[4]))).sort((a, b) => b[1] - a[1]);
   const seen = tally(log, e => spotName(parse(e[0])) + " · " + handType(e[1]));
   const missed = tally(bad, e => spotName(parse(e[0])) + " · " + handType(e[1]));
-  const top = Object.entries(missed).filter(([b]) => seen[b] >= 3).sort((a, b) => b[1] - a[1] || b[1] / seen[b[0]] - a[1] / seen[a[0]]).slice(0, 10);
+  const top = leakTop = Object.entries(missed).filter(([b]) => seen[b] >= 3).sort((a, b) => b[1] - a[1] || b[1] / seen[b[0]] - a[1] / seen[a[0]]).slice(0, 10);
   const due = Object.values(prog.srs).filter(r => r.due <= prog.n).length;
   $("leakBody").innerHTML = !log.length ? "<p>Play some hands first.</p>" : `
     <p>${log.length} hands logged · ${Math.round((1 - bad.length / log.length) * 100)}% accuracy · ${Object.keys(prog.srs).length} hands in your review queue (${due} due now)</p>
     <h3>Mistake types</h3>${types.length ? `<table>${types.map(([t, n]) => `<tr><td>${t}</td><td>${n} (${Math.round(n / bad.length * 100)}%)</td></tr>`).join("")}</table>` : "<p>No mistakes yet.</p>"}
-    <h3>Biggest leaks</h3>${top.length ? `<table><tr><th>Spot · hand type</th><th>Wrong</th><th></th></tr>${top.map(([b, n]) => `<tr><td>${b}</td><td>${n} of ${seen[b]} (${Math.round(n / seen[b] * 100)}%)</td><td><button class="drill" data-b="${b}">Drill</button></td></tr>`).join("")}</table>`
+    <h3>Biggest leaks</h3>${top.length ? `<p><button class="drill" data-b="all">Drill all ${top.length} leaks</button> mixed together</p><table><tr><th>Spot · hand type</th><th>Wrong</th><th></th></tr>${top.map(([b, n]) => `<tr><td>${b}</td><td>${n} of ${seen[b]} (${Math.round(n / seen[b] * 100)}%)</td><td><button class="drill" data-b="${b}">Drill</button></td></tr>`).join("")}</table>`
       : "<p>Not enough data yet: a spot and hand type needs at least 3 hands.</p>"}`;
 }
 
 function newHand() {
   const g = cfg.game + "/" + cfg.stack, nodes = cfg.nodes.flatMap(n => n.split("|")), pos = cfg.pos;
   const fits = s => s.game + "/" + s.stack === g && (!nodes.length || nodes.includes(s.node)) && (!pos.length || pos.includes(s.hero));
-  // drilling a leak overrides the filters: only that spot, only that hand type
-  const pool = st.drill ? ALL.filter(s => spotName(s) === st.drill.spot) : ALL.filter(fits);
+  // drilling a leak overrides the filters: only that spot, only that hand type ("drill all" picks one of its leaks each hand)
+  const lk = st.drill?.leaks[Math.floor(Math.random() * st.drill.leaks.length)];
+  const pool = lk ? ALL.filter(s => spotName(s) === lk.spot) : ALL.filter(fits);
   $("feedback").classList.remove("show");
   if (!pool.length) { replayTimers.forEach(clearTimeout); $("situation").textContent = "No spots match these filters."; $("felt").innerHTML = $("actions").innerHTML = ""; return; }
   const rid = !st.drill && !st.cur?.rid && dueReview(fits); // never two reviews in a row, so new hands keep flowing
@@ -548,8 +550,8 @@ function newHand() {
   else {
     spot = !st.drill && !nodes.length && liveStart(g, pos) || pool[Math.floor(Math.random() * pool.length)];
     // deal a hand weighted by combos × how often it actually reaches this node
-    const w = HANDS.map((h, k) => COMBOS(h) * SPOTS[spot.key][k][4] * (!st.drill || handType(h) === st.drill.cat));
-    if (!w.some(x => x)) { st.drill = null; drawDrill(); return newHand(); } // drilled hand type no longer in the data
+    const w = HANDS.map((h, k) => COMBOS(h) * SPOTS[spot.key][k][4] * (!lk || handType(h) === lk.cat));
+    if (!w.some(x => x)) { st.drill.leaks = st.drill.leaks.filter(l => l !== lk); if (!st.drill.leaks.length) st.drill = null; drawDrill(); return newHand(); } // drilled hand type no longer in the data
     i = pick(w);
   }
   // drills stay on the drilled spot; otherwise replay the hand from your first decision on this line
@@ -933,8 +935,9 @@ $("stopDrill").onclick = () => { stopDrill(); newHand(); };
 $("leakBody").onclick = e => {
   const b = e.target.dataset.b;
   if (!b) return;
-  const cut = b.lastIndexOf(" · ");
-  st.drill = { label: b, spot: b.slice(0, cut), cat: b.slice(cut + 3), n: 0, right: 0 };
+  const leak = b => { const cut = b.lastIndexOf(" · "); return { spot: b.slice(0, cut), cat: b.slice(cut + 3) }; };
+  st.drill = b === "all" ? { label: `all ${leakTop.length} leaks`, leaks: leakTop.map(([x]) => leak(x)), n: 0, right: 0 }
+    : { label: b, leaks: [leak(b)], n: 0, right: 0 };
   $("leaks").close(); drawDrill(); newHand();
 };
 $("vol").value = volume;
