@@ -477,12 +477,12 @@ function drawSettings() {
   const many = (g, v) => v ? cfg[g].includes(v) : !cfg[g].length;
   $("chips").innerHTML = group("game", "Game", Object.entries(GAMES).filter(([g]) => stacksOf(g).length), v => v === cfg.game)
     + group("stack", "Stack depth", stacksOf(cfg.game).map(s => [s, s]), v => v === cfg.stack)
-    + group("nodes", "Spots <small>· pick several, or Live table for everything</small>", [["", "Live table"]], v => many("nodes", v))
+    + group("nodes", "Spots <small>· pick several, or All</small>", [["", "All"]], v => many("nodes", v))
     + SPOT_ROWS.map(([t, row]) => [t, Object.entries(row).filter(([n]) => ALL.some(s => s.game === cfg.game && s.stack === cfg.stack && n.split("|").includes(s.node)))])
       .filter(([, items]) => items.length).map(([t, items]) => group("nodes", `<small>${t}</small>`, items, v => many("nodes", v))).join("")
     + group("pos", "Your position <small>· pick several</small>", [["", "Any"], ...ORDER[cfg.game].map(p => [p, p])], v => many("pos", v))
     + group("pack", "Sound pack", Object.entries(PACKS).map(([k, p]) => [k, p.name]), v => v === pack);
-  $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "Live table"} · ${cfg.pos.join(", ") || "Any seat"}`;
+  $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}`;
 }
 
 const handType = h => describe(h).replace(/^an? /, "");
