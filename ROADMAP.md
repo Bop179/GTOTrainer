@@ -94,7 +94,7 @@ Grading now goes by how often the solver plays your action. Grading by EV loss w
 
 ## Out of scope for now
 
-You can do these later, but they don't come before the items above:
+Might do these later, might never do these:
 
 - Heads-up.
 - Postflop.
