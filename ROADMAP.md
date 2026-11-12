@@ -89,7 +89,7 @@ Grading now goes by how often the solver plays your action. Grading by EV loss w
 
 - GTO Wizard's free tier shows EV (checked 2026-11-06): the grid's display menu has Strategy, Strategy + EV, EV, Compare EV, Range and All, and the Hands panel lists each action's EV per combo.
 - [ ] Find the cheapest way to read per-action EV for all 169 hands (Compare EV mode, the Table tab, or the Hands panel) and add it to the walker. Non-Strategy modes put text in the grid cells and break the current reader, so it needs its own pass.
-- [ ] Re-read every node with EV: over 1,000 nodes across the four stacks, so 10+ days of the free quota.
+- [ ] Re-read every node with EV: 1,352 nodes (8-max 100bb 470, 8-max 200bb 488, 6-max 100bb 190, 6-max 200bb 204), about 15 days of the free quota. Daily pull started 2026-11-12, in that order.
 - [ ] Trainer: add the EV to each spot's rows, grade by EV lost against the best action (thresholds to pick), and show "you lost X bb" in the feedback.
 
 ## Out of scope for now
