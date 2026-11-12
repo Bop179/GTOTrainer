@@ -34,7 +34,6 @@ button { cursor: pointer; }
 .note { color: var(--muted); font-size: 12px; margin-top: 14px; }
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; width: min(640px, calc(100% - 32px)); padding: 20px; }
 dialog::backdrop { background: #000a; }
-.bsub { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
 .bbody { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; } .bbody .range { flex: 1; min-width: 200px; }
 dialog h2 { margin: 0 0 8px; font-size: 20px; } dialog h2 small { margin-left: 8px; font-size: 14px; font-weight: 400; color: var(--muted); } dialog h3 { margin: 18px 0 6px; font-size: 15px; color: var(--muted); }
 dialog table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -173,8 +172,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
   </section>
 </main>
 <dialog id="browse">
-  <h2>Ranges</h2>
-  <p class="bsub" id="bSub"></p>
+  <h2>Ranges<small id="bSub"></small></h2>
   <div id="bPick"></div>
   <p id="bSit"></p>
   <div class="bbody"><div class="grid" id="bGrid"></div><div class="range" id="bRange"></div></div>
@@ -891,7 +889,7 @@ function rangeHTML(sp) {
 let bKey; // the chart on show
 function openBrowse() {
   bKey = st.cur?.spot?.key;
-  $("bSub").textContent = `${GAMES[cfg.game]} · ${cfg.stack} (change the game or stack in Settings)`;
+  $("bSub").textContent = `${GAMES[cfg.game]} · ${cfg.stack}`;
   drawBrowse(); $("browse").showModal();
 }
 // three chip rows: spot type, your seat, who you're up against. Each chip carries the key of the chart it opens,
