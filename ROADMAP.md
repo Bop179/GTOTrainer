@@ -59,7 +59,7 @@ Squeezes (facing an open plus a call), overcalls, BB vs open + call, and cold 4-
 - [x] The 8 → 9 mapping splits `OPENER+OTHER` (2026-11-02), so 9-max gets these spots as soon as 8-max has them. Tested with stand-in data: 80 8-max spots became 120 at 9-max (at 9-max UTG spots are borrowed for both UTG1 and UTG2), and live hands ran clean.
 - Not covered: more than two players in front of you. Squeezes of your open and the replies to your squeeze or cold 4-bet are item 6.
 
-### 6. Squeezes and cold 4-bets against you, and replies to yours (started 2026-11-06)
+### 6. ✅ Squeezes and cold 4-bets against you, and replies to yours (done 2026-11-11)
 
 Four more GTO Wizard nodes per line, read after the players behind the raiser fold:
 
@@ -76,7 +76,7 @@ The same nodes give the villains' answers when you squeeze or cold 4-bet: the op
 - [x] 8-max 200bb: all four done, 224 spots (2026-11-06 to 11-07).
 - [x] 8-max 100bb: all four done, 224 spots (2026-11-07 to 11-09).
 - [x] 6-max 200bb: all four done, 80 spots (2026-11-10).
-- [ ] 6-max 100bb (all four).
+- [x] 6-max 100bb: all four done, 80 spots (2026-11-11).
 - Not covered: your answer after the opener 4-bets your squeeze (or 5-bets your cold 4-bet), and lines where a player behind the raiser comes in too.
 
 ### 7. ✅ Range browser (done 2026-11-06)

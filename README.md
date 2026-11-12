@@ -23,12 +23,12 @@ Open `index.html` in a browser. You don't need to install anything, run a server
 
 | Format | Stack | Spots |
 |---|---|---|
-| 6-max | 100bb | up to vs 5-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets |
-| 6-max | 200bb | up to vs 6-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets |
-| 8-max | 100bb | up to vs 6-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets |
-| 8-max | 200bb | up to vs 6-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets |
-| 9-max | 200bb | up to vs 6-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets |
-| 9-max | 100bb | up to vs 6-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets |
+| 6-max | 100bb | up to vs 5-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets, and your replies when you face one |
+| 6-max | 200bb | up to vs 6-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets, and your replies when you face one |
+| 8-max | 100bb | up to vs 6-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets, and your replies when you face one |
+| 8-max | 200bb | up to vs 6-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets, and your replies when you face one |
+| 9-max | 200bb | up to vs 6-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets, and your replies when you face one |
+| 9-max | 100bb | up to vs 6-bet, plus SB-vs-BB limped pots and multiway: squeezes, overcalls and cold 4-bets, and your replies when you face one |
 | Heads-up | 100bb | up to vs 5-bet |
 
 When a hand reaches a spot that has no data, it ends with "No solver data past this point". Planned additions are in [ROADMAP.md](ROADMAP.md).
