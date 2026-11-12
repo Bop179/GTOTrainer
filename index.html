@@ -460,9 +460,13 @@ $("mute").textContent = muted ? "🔇" : "🔊";
 
 // ---------- settings: chips you click to highlight. Spots and positions take several; none highlighted = all ----------
 const GAMES = { "6max": "6-max", "8max": "8-max", "9max": "9-max", HU: "Heads-up" };
-const SPOT_TYPES = { RFI: "Open", FACINGRFI: "vs Open", FACING3B: "vs 3-bet", "FACING4B|FACING5B|FACING6B": "vs 4-bet+",
-  "FACINGLIMP|LIMP_FACING2B|LIMP_FACING3B|LIMP_FACING4B|LIMP_FACING5B|LIMP_FACING6B": "Limped pot",
-  FACINGRFI_CALL: "vs Open + call", FACING3B_COLD: "vs Open + 3-bet", "FACINGSQZ|FACINGSQZ_CALLER": "vs Squeeze", "FACINGC4B|FACINGC4B_3B": "vs Cold 4-bet" };
+// spot chips in rows, each named for the decision you make; the keys are the saved node filters, so old settings still load
+const SPOT_ROWS = [
+  ["Your first move", { RFI: "Open", FACINGRFI: "vs Open", FACINGRFI_CALL: "Squeeze", FACING3B_COLD: "Cold 4-bet" }],
+  ["Re-raised after you act", { FACING3B: "vs 3-bet", "FACINGSQZ|FACINGSQZ_CALLER": "vs Squeeze", "FACINGC4B|FACINGC4B_3B": "vs Cold 4-bet",
+    "FACING4B|FACING5B|FACING6B": "vs 4-bet+" }],
+  ["Limped pots", { "FACINGLIMP|LIMP_FACING2B|LIMP_FACING3B|LIMP_FACING4B|LIMP_FACING5B|LIMP_FACING6B": "Limped pot" }]];
+const SPOT_TYPES = Object.assign({}, ...SPOT_ROWS.map(r => r[1]));
 const stacksOf = game => [...new Set(ALL.filter(s => s.game === game).map(s => s.stack))].sort((a, b) => parseInt(a) - parseInt(b));
 let cfg = { game: "6max", stack: "100bb", nodes: [], pos: [] };
 try { cfg = { ...cfg, ...JSON.parse(localStorage.getItem("gto-cfg")) }; } catch {}
@@ -474,8 +478,9 @@ function drawSettings() {
   const many = (g, v) => v ? cfg[g].includes(v) : !cfg[g].length;
   $("chips").innerHTML = group("game", "Game", Object.entries(GAMES).filter(([g]) => stacksOf(g).length), v => v === cfg.game)
     + group("stack", "Stack depth", stacksOf(cfg.game).map(s => [s, s]), v => v === cfg.stack)
-    + group("nodes", "Spots <small>· pick several, or Live table for everything</small>", [["", "Live table"], ...Object.entries(SPOT_TYPES)
-      .filter(([n]) => ALL.some(s => s.game === cfg.game && s.stack === cfg.stack && n.split("|").includes(s.node)))], v => many("nodes", v))
+    + group("nodes", "Spots <small>· pick several, or Live table for everything</small>", [["", "Live table"]], v => many("nodes", v))
+    + SPOT_ROWS.map(([t, row]) => [t, Object.entries(row).filter(([n]) => ALL.some(s => s.game === cfg.game && s.stack === cfg.stack && n.split("|").includes(s.node)))])
+      .filter(([, items]) => items.length).map(([t, items]) => group("nodes", `<small>${t}</small>`, items, v => many("nodes", v))).join("")
     + group("pos", "Your position <small>· pick several</small>", [["", "Any"], ...ORDER[cfg.game].map(p => [p, p])], v => many("pos", v))
     + group("pack", "Sound pack", Object.entries(PACKS).map(([k, p]) => [k, p.name]), v => v === pack);
   $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "Live table"} · ${cfg.pos.join(", ") || "Any seat"}`;
