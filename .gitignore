@@ -3,3 +3,4 @@ SPEC.md
 .claude/
 __pycache__/
 solver/target/
+solver/jobs/
