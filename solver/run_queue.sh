@@ -1,13 +1,25 @@
 #!/bin/bash
-# Solve every ~/jobs/<scenario>/<flop>.json into ~/results/<scenario>/<flop>.json.gz, skipping finished ones.
-# Run on the VM only:  sudo systemd-run --unit gto-queue --uid ubuntu -p WorkingDirectory=/home/ubuntu bash ~/solver/run_queue.sh
+# Solve ~/jobs/<scenario>/<flop>.json into ~/results/<scenario>/<flop>.json.gz, scenarios in ~/jobs/order.txt order
+# (most common first), skipping finished ones. The next job is looked up after every solve, so adding, removing or
+# reordering jobs takes effect without a restart.
+# Run on the VM only:  sudo systemd-run --unit gto-queue --uid ubuntu -p WorkingDirectory=/home/ubuntu -p Environment=HOME=/home/ubuntu /bin/bash /home/ubuntu/solver/run_queue.sh
 # Progress: tail ~/results/queue.log   Stop: sudo systemctl stop gto-queue
 cd ~ || exit 1
 BIN=~/solver/target/release/gto-solve
 mkdir -p results
-for j in jobs/*/*.json; do
+
+next() {
+  local d j
+  for d in $(cat jobs/order.txt); do
+    for j in jobs/$d/*.json; do
+      [ -e "results/${j#jobs/}.gz" ] || [ -e "results/${j#jobs/}.gz.failed" ] || { echo "$j"; return 0; }
+    done
+  done
+  return 1
+}
+
+while j=$(next); do
   out=results/${j#jobs/}.gz
-  [ -e "$out" ] || [ -e "$out.failed" ] && continue
   mkdir -p "$(dirname "$out")"
   if "$BIN" "$j" /tmp/gto-out.json 2>/tmp/gto-err.txt && gzip -c /tmp/gto-out.json > "$out.tmp"; then
     mv "$out.tmp" "$out"

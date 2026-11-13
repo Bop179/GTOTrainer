@@ -97,8 +97,11 @@ Grading now goes by how often the solver plays your action. Grading by EV loss w
 
 Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only. The flop and turn are solved ahead of time on a free Oracle Cloud VM; the river is solved live in the browser.
 
-- **Spots:** 8 heads-up single-raised pots at 6-max 100bb: BTN, CO, SB, HJ and UTG opening against a BB call, and CO, HJ and UTG opening against a BTN call. Ranges and open sizes come from `data6.js` (GTO Wizard). Each spot assumes the players behind fold.
-- **Flops:** 95 of the 1,755 distinct flops, sampled so each texture shows up about as often as it's dealt (5 monotone, 16 paired). The trainer deals only these.
+- **Spots:** all 15 heads-up single-raised pots at 6-max 100bb (every opener and caller pair). Ranges and open sizes come from `data6.js` (GTO Wizard). Each spot assumes the players behind fold.
+  - They're ranked by how often they happen: open frequency × flat frequency from the same data. The queue solves the most common first.
+  - The six at 5% or more of heads-up single-raised pots get 95 flops: BTN vs BB 28%, CO vs BB 14%, SB vs BB 12%, HJ vs BB 9%, UTG vs BB 7%, BTN vs SB 6%.
+  - The nine rarer ones get 40 flops (decided 2026-11-13). CO vs BTN, at 4.9%, is the most common of them.
+- **Flops:** 95 (common matchups) or 40 (rare ones) of the 1,755 distinct flops, sampled so each texture shows up about as often as it's dealt (5 of 95 monotone, 16 paired). The trainer deals only these.
 - **Bet sizes:**
   - Flop: 33% and 75% of the pot.
   - Turn: 75% and a 125% overbet.
@@ -107,7 +110,7 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
   - All-in: offered once the stack is 1.5x the pot or less.
 - **Accuracy:** each solve stops at 1% of the pot exploitability (about 0.05bb a hand in a single-raised pot) or 1,000 iterations.
 - **Code:** `solver/`, Rust on b-inary's `postflop-solver` (AGPL-3.0).
-  - `make_jobs.py` builds the 760 jobs.
+  - `make_jobs.py` builds the 930 jobs and the queue order (`jobs/order.txt`).
   - `run_queue.sh` solves them on the VM.
   - `src/lib.rs` holds the solve and node dump, shared by the VM binary and the browser build.
 - **Rules:**
@@ -116,7 +119,7 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
 
 - [x] Solver wrapper, job builder and queue runner, with a memory guard and a restart after a reboot.
 - [x] Oracle VM running (4 OCPU / 24 GB, Always Free). Quotas and a $0.01 budget alert keep the account at $0.
-- [ ] Pre-solve the flop and turn: 760 solves, about 2 to 3 weeks. Started 2026-11-13, BTN vs BB first.
+- [ ] Pre-solve the flop and turn: 930 solves (6 × 95 + 9 × 40) at about 12 minutes each, about 8 days. Started 2026-11-13, BTN vs BB first. The six common matchups should be done about 2026-11-18.
   - Each solve saves every flop decision, and every turn decision after a flop line with no raise (check-check or bet-call). Hands below 0.1% reach are dropped. Frequencies are whole percentages and EVs are rounded to 0.01bb.
   - Turn data is about 8 MB a flop compressed (measured on an unconverged test), so about 6 GB in all. It stays on the VM, which has 41 GB free.
 - [x] River solver in the browser (2026-11-13). `river.js` and `river_wasm.js`: the same solver compiled to WebAssembly (1.4 MB, base64 so it loads from `file://`). Rebuild it with `solver/build_wasm.sh`.
@@ -127,7 +130,7 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
 - [ ] Serve the solutions to other users from a static file server on the VM (decided 2026-11-13). Set it up once the postflop mode exists; opening a port earlier only adds exposure.
   - Egress is free up to 10 TB a month. The security list needs port 443 opened.
   - Not Object Storage: its API requests are only free up to 50,000 a month, and quotas can't cap them.
-  - Room to grow: all heads-up single-raised and 3-bet pots at 6-max and 8-max 100bb come to an estimated 8,000 solves and about 40 GB. That fits the free 200 GB of block storage (47 GB is the boot disk). Solve time is the real limit: about 80 days of the VM nonstop.
+  - Room to grow: with 40 flops for rare matchups, all heads-up single-raised and 3-bet pots at 6-max and 8-max 100bb come to an estimated 5,000 solves and about 25 GB. That fits the free 200 GB of block storage (47 GB is the boot disk). Solve time is the real limit: about 30 days of the VM nonstop (3-bet pots guessed at 5 minutes a solve).
   - 9-max postflop reuses the 8-max solves, as preflop already does once UTG folds (decided 2026-11-13).
 - [ ] Trainer postflop mode:
   - Deal a spot and one of its 95 flops, ask for the action at each flop and turn node, and grade by frequency and EV lost.
