@@ -42,7 +42,7 @@ def job(opener, caller, flop):
     order = ["SB", "BB", "UTG", "HJ", "CO", "BTN"]  # postflop action order: the later seat is in position
     ip_is_opener = order.index(opener) > order.index(caller)
     return {"oop": c if ip_is_opener else o, "ip": o if ip_is_opener else c, "flop": flop,
-            "pot": pot, "stack": 100 - o_size, **SIZES, "target": 0.005, "max_iter": 1000}
+            "pot": pot, "stack": 100 - o_size, **SIZES, "target": 0.01, "max_iter": 1000}
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "jobs")
