@@ -103,11 +103,12 @@ async function postBegin(c) {
   const hero = holeStr(...mine), vr = nodes[me ? "" : "0"], hr = nodes[me ? "0" : ""]; // villain's / your range at the flop
   P = { postflop: true, scen, me, sig, seat: [m.oop, m.ip], pot0: m.pot, stack: m.stack, board: [flop.slice(0, 2), flop.slice(2, 4), flop.slice(4)],
     flop, nodes, k: "", street: 0, spent: [0, 0], put: [0, 0], tag: ["", ""], hist: [], over: false, answered: false, cards: c.cards, isNew: 3,
-    story: [`Preflop: ${opener === c.spot.hero ? "you open" : opener + " opens"} ${bb(100 - m.stack)}, ${caller === c.spot.hero ? "you call" : caller + " calls"}.`] };
+    // the hand so far: street names ({s}) and actions ({t, k}); a closing message ({t, end}) when it's over
+    story: [{ s: "Preflop" }, { t: `${opener === c.spot.hero ? "you open" : opener + " opens"} ${bb(100 - m.stack)}`, k: "Raise" }, { t: caller === c.spot.hero ? "you call" : caller + " calls", k: "Call" }] };
   P.hands = [];
   P.hands[me] = hero;
   P.hands[1 - me] = vr.hands[pick(vr.hands.map((h, i) => cardsOf(h).some(x => mine.includes(x)) ? 0 : vr.reach[i]))];
-  P.story.push("Flop:"); // the cards are on the board; the story only says who did what
+  P.story.push({ s: "Flop" }); // the cards are on the board; the story only says who did what
   st.cur = P;
   if (!hr.hands.includes(hero)) end(`${HANDS[c.i]} isn't in the solved range at the flop (the solver doesn't play it this way preflop), so the hand ends here.`);
   postDraw(true);
@@ -123,12 +124,11 @@ async function step(i) {
   P.put[p] += add; P.spent[p] += add;
   P.hist.push({ street: P.street, node, p, i });
   P.tag[p] = k === "Allin" ? "All-in" : k;
-  P.story[P.story.length - 1] += " " + say(p, a, add) + ",";
+  P.story.push({ t: say(p, a, add), k });
   if (k === "Fold") return end(`${say0(P.me === p ? `${P.seat[1 - p]} takes` : "you take")} the ${bb(potNow() - P.put[1 - p] + P.put[p])} pot.`); // the uncalled bet goes back
   const nk = P.k ? P.k + "-" + i : String(i);
   if (P.nodes[nk]) { P.k = nk; return; }
   // street over: a call, or a check behind. Let it land on the table before the chips go in and the next card comes
-  P.story[P.story.length - 1] = P.story.at(-1).replace(/,$/, ".");
   postDraw(false); await new Promise(r => setTimeout(r, 700));
   if (P.spent[0] >= P.stack - .01 && P.spent[1] >= P.stack - .01) {
     while (P.board.length < 5) P.board.push(dealOne());
@@ -137,7 +137,7 @@ async function step(i) {
   if (P.street === 2) return end(`Showdown: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}.`, true);
   const c = dealOne();
   P.board.push(c); P.street++; P.put = [0, 0]; P.tag = ["", ""]; P.isNew = P.board.length - 1;
-  P.story.push(`${STREET[P.street]}:`);
+  P.story.push({ s: STREET[P.street] });
   if (P.street === 1) {
     const turn = await loadPiece(`${P.scen}/${P.flop}/${c}`);
     P.nodes = { ...P.nodes, ...turn }; P.k = nk + "-" + c;
@@ -181,7 +181,7 @@ async function run() {
   } catch (e) { return end(e.message); }
   if (!P.over && !cur().hands.includes(P.hands[P.me])) end("The solver never gets here with your hand, so the hand ends.");
 }
-function end(text, show) { P.story[P.story.length - 1] = P.story.at(-1).replace(/,$/, "."); P.over = true; P.show = show; P.story.push(`<b>${text}</b>`); }
+function end(text, show) { P.over = true; P.show = show; P.story.push({ t: text, end: true }); }
 
 // redraws the table; whatever changed since the last draw animates as in preflop: bets slide in, a fold tosses its cards
 function postDraw(fresh) {
@@ -192,7 +192,9 @@ function postDraw(fresh) {
   const moved = p => P.put[p] && P.put[p] !== was.put[p], folds = p => P.tag[p] === "Fold" && was.tag[p] !== "Fold";
   if (moved(them)) play("chip");
   if (folds(them) || P.isNew < P.board.length) play("deal");
-  $("situation").innerHTML = P.story.filter(s => !s.endsWith(":")).map(s => `<div>${say0(s)}</div>`).join(""); // a street shows once someone acts // one street per line; the current one stands out
+  const acted = P.story.filter((x, j) => !x.s || P.story[j + 1]?.k); // a street shows once someone acts on it
+  $("situation").innerHTML = `<div class="hist">${acted.filter(x => !x.end).map(x => x.s ? `<b>${x.s}</b>` : `<span style="--c:${AC[x.k]}">${say0(x.t)}</span>`).join("")}</div>`
+    + acted.filter(x => x.end).map(x => `<div class="end">${x.t}</div>`).join("");
   const seat = (p, s) => `<div class="seat${p === me ? " hero" : ""}${P.tag[p] === "Fold" ? " folded" : ""}${p === me && mine ? " turn" : ""}${folds(p) ? " toss" : ""}" style="--c:0;--s:${s};--r:1">`
     + (p === me || P.show ? `<div class="cards">${cardsOf(P.hands[p]).map(x => cardHTML(x)).join("")}</div>`
       : `<div class="backs">${P.tag[p] !== "Fold" || folds(p) ? "<i></i><i></i>" : ""}</div>`)
