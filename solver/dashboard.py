@@ -2,7 +2,7 @@
 """Queue dashboard for the solver VM. Binds 127.0.0.1 only; view from the Mac with
    ssh -N -L 8080:localhost:8080 gto-vm   then open http://localhost:8080
 Reads ~/jobs, ~/results and ~/results/queue.log (written by run_queue.sh) plus /proc."""
-import html, os, re, sys, time
+import html, os, re, subprocess, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -60,6 +60,8 @@ def page():
         rows.append(f"<tr><td>{html.escape(sc)}</td><td>{done}/{total}</td><td><div class=bar><i style='width:{pct:.1f}%'></i></div></td>"
                     f"<td>{nfail or ''}</td><td>{fmt(avg) if avg else '–'}</td><td>{fmt(left * avg) if avg and left else '–'}</td></tr>")
     job, elapsed = current_job()
+    svc = subprocess.run(["systemctl", "is-active", "gto-queue"], capture_output=True, text=True).stdout.strip() or "unknown"
+    svc_color = "#3a7" if svc == "active" else "#d43"
     load = open("/proc/loadavg").read().split()[:3]
     mem = dict(l.split(":") for l in open("/proc/meminfo"))
     kb = lambda k: int(mem[k].split()[0])
@@ -72,7 +74,7 @@ def page():
 table{{border-collapse:collapse;width:100%}}td,th{{padding:4px 8px;text-align:left;border-bottom:1px solid #8884}}
 .bar{{width:160px;height:10px;background:#8883}}.bar i{{display:block;height:100%;background:#3a7}}code{{font-size:12px}}</style>
 <h2>Solver queue — {tot_done}/{tot_all} flops, ETA {fmt(eta) if eta else '–'}</h2>
-<p>Now: <code>{html.escape(job or 'idle')}</code>{f' ({fmt(elapsed)} in)' if job else ''} ·
+<p>Service gto-queue: <b style="color:{svc_color}">{html.escape(svc)}</b> · Now: <code>{html.escape(job or 'idle')}</code>{f' ({fmt(elapsed)} in)' if job else ''} ·
 load {' '.join(load)} (4 cores) · RAM {used:.1f}/{total_mem:.1f} GB · avg last 20: {fmt(overall) if overall else '–'}</p>
 <table><tr><th>Scenario</th><th>Done</th><th></th><th>Failed</th><th>Avg</th><th>ETA</th></tr>{''.join(rows)}</table>
 <h3>Recent failures</h3><ul>{fails}</ul><p><small>{time.strftime('%F %T UTC', time.gmtime())} · refreshes every 30 s</small></p>"""
