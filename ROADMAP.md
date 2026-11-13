@@ -119,7 +119,7 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
 
 - [x] Solver wrapper, job builder and queue runner, with a memory guard and a restart after a reboot.
 - [x] Oracle VM running (4 OCPU / 24 GB, Always Free). Quotas and a $0.01 budget alert keep the account at $0.
-- [ ] Pre-solve the flop and turn: 1,530 solves, about 9 days. That's 930 single-raised (6 × 95 + 9 × 40, about 12 minutes each) and 600 3-bet (15 × 40, about 2 minutes each). Started 2026-11-13, BTN vs BB first. The six common matchups should be done about 2026-11-18.
+- [ ] Pre-solve the flop and turn for every heads-up pot at 6-max and 8-max 100bb (2026-11-13): 285 scenarios, 12,225 solves, about 32 days of the VM (rough: only the 6-max single-raised and 3-bet times are measured). Started 2026-11-13. The queue finishes 6-max BTN vs BB first, then goes strictly by frequency (`jobs/order.txt`).
   - Each solve saves every flop decision, and every turn decision after a flop line with no raise (check-check or bet-call). Hands below 0.1% reach are dropped. Frequencies are whole percentages and EVs are rounded to 0.01bb.
   - Turn data is about 8 MB a flop compressed (measured on an unconverged test), so about 6 GB in all. It stays on the VM, which has 41 GB free.
 - [x] River solver in the browser (2026-11-13). `river.js` and `river_wasm.js`: the same solver compiled to WebAssembly (1.4 MB, base64 so it loads from `file://`). Rebuild it with `solver/build_wasm.sh`.
@@ -132,7 +132,7 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
   - [ ] Open TCP 443: ingress rule in the OCI security list, and `iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT` + `netfilter-persistent save` on the VM.
   - Egress is free up to 10 TB a month. The security list needs port 443 opened.
   - Not Object Storage: its API requests are only free up to 50,000 a month, and quotas can't cap them.
-  - Room to grow: with 40 flops for rare matchups, all heads-up single-raised and 3-bet pots at 6-max and 8-max 100bb come to an estimated 5,000 solves and about 25 GB. That fits the free 200 GB of block storage (47 GB is the boot disk). Solve time is the real limit: about 30 days of the VM nonstop (3-bet pots guessed at 5 minutes a solve).
+  - Size: every heads-up pot at 6-max and 8-max 100bb is now queued (12,225 solves); see the items below. About 90 GB on the VM, which fits the free 200 GB of block storage once a volume is added (47 GB is the boot disk).
   - 9-max postflop reuses the 8-max solves, as preflop already does once UTG folds (decided 2026-11-13).
 - [x] Postflop in the live hand (2026-11-13), `postflop.js`. When preflop ends heads-up in a solved matchup, the hand goes on to the flop instead of stopping.
   - The flop is one of that matchup's solved flops that misses your cards, with its suits randomly relabelled. The villain's hand is drawn from their range at the flop, and they play by sampling their solved strategy.
@@ -142,18 +142,23 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
   - Data: `solver/pull_post.sh` runs `solver/split.py` on the VM (one flop piece and one piece per turn card, gzipped and base64 inside a `<script>` so it loads from `file://`), then mirrors the scenarios you name (default BTN vs BB) into `post/` (gitignored, about 14 MB a flop, so not all 15 fit on the Mac) and writes `post/index.js` listing only flops on disk.
   - Not yet: a showdown winner (it only shows the villain's cards); hands after a raised flop end at the turn (no turn data); postflop hands aren't in the leak log or reviews.
 
-- [ ] More heads-up pots. Each is ranked by the same frequency rule and gets 95 or 40 flops, and the queue takes all pot types in frequency order. Each type needs a job-builder change; the ranges are already in `data6.js`.
-  - [x] 3-bet pots (2026-11-13): `6max_100bb_<OPENER>_v_<3BETTOR>_3bet`, all 15 pairs, 40 flops each (all under the 5% cutoff; BTN vs SB 3-bet is the most common at 2.8%).
-    - Ranges: the 3-bettor's raise from `<opener>/<3-bettor>/FACINGRFI`, and the opener's call from `<3-bettor>/<opener>/FACING3B`. The reach column there is the opener's open frequency, so the call % times reach is the calling range.
-    - Sizes from `SIZES`: CO opens 2.5 and BTN 3-bets to 8.5, so the pot is 18.5 and 91.5bb is behind.
-    - The trees are small (stack-to-pot 3.3 to 5.3, at most 1.9 GB). One test solve took about 2 minutes.
+- [x] Every heads-up pot type queued (2026-11-13). `make_jobs.py` builds them all, at 6-max (`data6.js`) and 8-max (`data8.js`) 100bb; 9-max reuses 8-max. Each is ranked by frequency (within its game, against that game's single-raised total) and gets 95 or 40 flops by the 5% rule. 15 scenarios get 95 flops, 270 get 40. The script's header lists the names and range sources.
+  - Single-raised: 15 pairs at 6-max, 28 at 8-max.
+  - 3-bet pots, `..._<OPENER>_v_<3BETTOR>_3bet`: the 3-bettor's raise from `FACINGRFI`, and the opener's call from `FACING3B` (reach there is the opener's open frequency). Sizes from `SIZES`. Stack-to-pot 3.3 to 5.3, at most 1.9 GB, about 2 minutes a solve.
     - [x] The trainer sends 3-bet pots to the flop (2026-11-13, untested until the first one is pulled): you call a heads-up 3-bet of your open, or you 3-bet and the opener calls; "Play to postflop" deals those lines too.
-  - 4-bet pots: the same pattern, one level up (`FACING4B`).
-  - **Multiway preflop that ends heads-up** (added 2026-11-13):
-    - Squeeze pots: open, call, squeeze, the opener folds, the caller calls. The squeezer's range is the raise in `<opener>+<caller>/<squeezer>/FACINGRFI_CALL`, and the caller's is the call in `<opener>+<squeezer>/<caller>/FACINGSQZ_CALLER`. The opener's 2.5bb is dead money.
-    - Cold 4-bet pots: open, 3-bet, cold 4-bet, the opener folds, the 3-bettor calls. Ranges from `FACING3B_COLD` (the raise) and `FACINGC4B_3B` (the call).
-    - Only the "opener folds" version of each line is in the data. When the opener calls the squeeze or the cold 4-bet, the other player's reply isn't, and the pot can still go 3-way, so those lines are skipped.
-    - These spots have no `SIZES`. Use the trainer's own sizing (`sizing()` in `index.html`) so the postflop pot matches what the preflop replay showed.
+  - 4-bet pots, `..._<OPENER>_v_<3BETTOR>_4bet`: the opener's 4-bet from `FACING3B` and the 3-bettor's call from `FACING4B`. Sizes from `SIZES` (CO 4-bets to 23 against BTN's 8.5, so the pot is 47.5). A 4-bet that's all-in has no postflop and is skipped.
+  - **SB vs BB limped pots**, `..._SB_v_BB_limp` and `..._SB_v_BB_limpraise`.
+    - At 100bb the SB limps 49% of hands, so the limped pot is the most common heads-up pot in both games: 44% of the single-raised total at 6-max, 35% at 8-max.
+    - The full sizes needed 62 GB, so limped pots use smaller ones (`LIMP_SIZES`): flop 33% and 75%, turn and river 75%, 3x raises. That's 26 GB, 13 GB compressed.
+    - The limp-raise pot (BB raises to 3.5, SB calls) keeps the normal sizes (18 GB, compressed automatically).
+  - **Multiway preflop that ends heads-up:**
+    - Squeeze pots, `..._<CALLER>_v_<SQUEEZER>_sqz_<OPENER>`: open, flat, squeeze, the opener folds, the caller calls. Ranges from `FACINGRFI_CALL` (the squeeze) and `FACINGSQZ_CALLER` (the call); the opener's fold from `FACINGSQZ` sets the frequency.
+    - Cold 4-bet pots, `..._<3BETTOR>_v_<C4BETTOR>_c4b_<OPENER>`: open, 3-bet, cold 4-bet, the opener folds, the 3-bettor calls. Ranges from `FACING3B_COLD` and `FACINGC4B_3B`.
+    - The opener's money is dead in the pot.
+    - These spots have no `SIZES`, so they copy `sizing()` in `index.html`: open 2.5 (3 from the SB), the first raise x3 in position or x4 out of position, the next raise x2.3, rounded to 0.5 with halves up, and all-in once a raise passes 55% of the stack. The postflop pot then matches the preflop replay.
+    - Only the "opener folds" line is in the data. When the opener calls, the other player's reply isn't, and the pot could go 3-way, so those lines are skipped.
+- [ ] Trainer: send limped, 4-bet, squeeze and cold-4-bet pots, and 8-max hands, to the flop. 3-bet pots are done. `split.py` needs no change, since parts [2] and [4] of every name are the two seats.
+- [ ] Disk: about 90 GB of results and trainer pieces at the end against 40 GB free on the VM, full in about 2 weeks. Add a block volume (about 150 GB is left in the free 200 GB) and move `~/results` and `~/post` onto it.
   - `postflop.js` matches hands to solved scenarios by name, so new pot types need scenario names it can find from the preflop line (agree with the trainer side first).
 
 ## Out of scope for now
