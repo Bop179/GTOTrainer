@@ -202,13 +202,12 @@ async function postAnswer(i) {
   const best = ev.indexOf(Math.max(...ev)), loss = ev[best] - ev[i], pot = potNow();
   const grade = f >= 25 || loss <= .02 * pot ? "great" : f >= 5 || loss <= .05 * pot ? "ok" : "bad";
   tally(grade); play(kind(node.actions[i]) === "Fold" ? "deal" : "chip");
-  document.querySelectorAll("#actions button").forEach(b => { b.disabled = true; b.classList.toggle("picked", b.dataset.a === String(i)); });
+  stamp(String(i), j => node.strat[j][h], j => ev[j].toFixed(2) + "bb");
+  const btns = $("actions").innerHTML; // the graded buttons stay up until you continue, though the hand has moved on
   const names = node.actions.map(actName), hand = cardsOf(P.hands[P.me]).map(cardText).join("");
   $("verdict").className = "verdict " + grade;
   $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable", bad: "✗ Mistake" }[grade];
-  const order = node.actions.map((_, j) => j).sort((x, y) => node.strat[y][h] - node.strat[x][h]);
-  const pill = (j, v, me) => `<span class="pill${me ? " me" : ""}" style="--c:${AC[kind(node.actions[j])]}"><span>${names[j]}${me ? "<small>You</small>" : ""}</span><b>${Math.round(v)}%</b></span>`;
-  $("mix").innerHTML = order.filter(j => node.strat[j][h] >= .5 || j === i).map(j => pill(j, node.strat[j][h], j === i)).join("");
+  const pill = (j, v) => `<span class="pill" style="--c:${AC[kind(node.actions[j])]}"><span>${names[j]}</span><b>${Math.round(v)}%</b></span>`;
   // whole range at this node, weighted by reach
   const tot = node.reach.reduce((x, y) => x + y, 0) || 1, rm = node.strat.map(s => s.reduce((t, x, j) => t + x * node.reach[j], 0) / tot);
   $("range").innerHTML = `<h4>Whole range · ${P.seat[P.me]} on the ${STREET[P.board.length - 3].toLowerCase()}</h4>
@@ -222,10 +221,9 @@ async function postAnswer(i) {
   try { await step(i); } catch (e) { end(e.message); }
   P.busy = false;
   postDraw(false);
-  document.querySelectorAll("#actions button").forEach(b => { b.disabled = true; });
+  $("actions").innerHTML = btns;
   $("why").innerHTML = why.map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
   $("next").innerHTML = P.over ? "Next hand <kbd>Space</kbd>" : "Continue hand ▸<kbd>Space</kbd>";
-  if (P.over) $("actions").innerHTML = "";
   $("feedback").classList.add("show");
 }
 async function postNext() {

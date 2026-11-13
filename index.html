@@ -92,9 +92,13 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
   .card { width: 46px; height: 66px; font-size: 20px; } .card span { font-size: 17px; }
 }
 .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.actions button { min-width: 110px; padding: 12px 16px; font-weight: 600; border: 0; }
+.actions button { min-width: 150px; min-height: 84px; padding: 14px 22px; font-size: 18px; font-weight: 600; border: 0; }
 .actions button:disabled { opacity: .45; cursor: default; }
-.actions button.picked { outline: 3px solid #fff; }
+/* after you answer each button shows the solver's frequency (and EV when the data has it); yours stays lit and ringed */
+.actions button.done:disabled { opacity: .6; }
+.actions button.picked { outline: 3px solid #fff; opacity: 1 !important; }
+.actions .res { display: block; } .actions .res b { font-size: 26px; line-height: 1.1; } .actions .res small { font-size: 13px; opacity: .85; margin-left: 4px; }
+@media (max-width: 600px) { .actions button { min-width: 0; flex: 1 1 40%; } }
 kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .feedback { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: none; gap: 16px; grid-template-columns: 1fr auto; }
 .feedback.show { display: grid; }
@@ -103,13 +107,6 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 8px 0; }
 .pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
 .pill { display: inline-flex; align-items: baseline; gap: 6px; font-size: 14px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 30%, transparent); color: color-mix(in srgb, var(--c), #fff 75%); }
-/* your hand's breakdown: big colour tiles; the action you picked is filled stronger and tagged "You" */
-.pills.big { gap: 8px; }
-.pills.big .pill { flex-direction: column; gap: 0; min-width: 84px; padding: 8px 14px; border: 2px solid var(--c); border-radius: 10px; font-size: 13px; background: color-mix(in srgb, var(--c) 22%, transparent); }
-.pills.big .pill b { font-size: 28px; line-height: 1.1; }
-.pills.big .pill.me { background: color-mix(in srgb, var(--c) 45%, transparent); }
-.pill small { display: none; }
-.pills.big .pill small { display: inline; margin-left: 6px; padding: 0 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: var(--c); color: #fff; }
 .range { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .range h4 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .why p { margin: 8px 0; }
@@ -165,7 +162,6 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
   <section class="feedback" id="feedback">
     <div class="analysis">
       <div class="verdict" id="verdict"></div>
-      <div class="pills big" id="mix"></div>
       <button class="next" id="next">Next hand <kbd>Space</kbd></button>
       <div class="why" id="why"></div>
     </div>
@@ -784,7 +780,7 @@ function answer(a) {
   play(a === "Fold" ? "deal" : "chip");
   if (st.drill) { st.drill.n++; if (grade !== "bad") st.drill.right++; drawDrill(); }
 
-  document.querySelectorAll("#actions button").forEach(b => { b.disabled = true; b.classList.toggle("picked", b.dataset.a === a); });
+  stamp(a, x => mix[x]);
   // show your action on the table: fold mucks your cards, anything else moves chips in
   const z = c.z, put = { Fold: z.heroIn, Call: z.heroIn + z.toCall, Raise: z.raise, Allin: z.S }[a];
   Object.assign($("heroTag"), { hidden: false, textContent: a === "Raise" && z.raise >= z.S ? "All-in" : label(a, c.spot.node) }).style.background = COLOR[a];
@@ -796,7 +792,6 @@ function answer(a) {
   }
   $("verdict").className = "verdict " + grade;
   $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable", bad: "✗ Mistake" }[grade];
-  $("mix").innerHTML = pills(mix, c.spot.node, a);
   $("range").innerHTML = rangeHTML(c.spot);
   $("why").innerHTML = explain(c, mix, a, grade).map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
   // scripted steps continue down the line whatever you picked; after them the other players respond live
@@ -812,9 +807,16 @@ function answer(a) {
   $("feedback").classList.add("show");
 }
 
-// action mix as pills tinted in each action's colour, biggest first; the one you picked is ringed
-const pills = (mix, node, picked) => ACTS.filter(x => mix[x] >= 0.5 || x === picked).sort((x, y) => mix[y] - mix[x]).map(x =>
-  `<span class="pill${x === picked ? " me" : ""}" style="--c:${COLOR[x]}"><span>${label(x, node)}${x === picked ? "<small>You</small>" : ""}</span><b>${Math.round(mix[x])}%</b></span>`).join("");
+// after you answer: every action button shows how often the solver takes it, plus its EV when given; yours is ringed
+function stamp(picked, pct, ev) {
+  document.querySelectorAll("#actions button").forEach(b => {
+    const a = b.dataset.a; b.disabled = true; b.classList.add("done"); b.classList.toggle("picked", a === picked);
+    b.insertAdjacentHTML("beforeend", `<span class="res"><b>${Math.round(pct(a))}%</b>${ev ? `<small>EV ${ev(a)}</small>` : ""}</span>`);
+  });
+}
+// action mix as pills tinted in each action's colour, biggest first
+const pills = (mix, node) => ACTS.filter(x => mix[x] >= 0.5).sort((x, y) => mix[y] - mix[x]).map(x =>
+  `<span class="pill" style="--c:${COLOR[x]}"><span>${label(x, node)}</span><b>${Math.round(mix[x])}%</b></span>`).join("");
 // the whole range's action mix, weighted by combos × reach
 function rangeMix(rows) {
   let tot = 0; const s = { Allin: 0, Raise: 0, Call: 0, Fold: 0 };
