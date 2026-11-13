@@ -136,7 +136,7 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
   - Each flop, turn and river decision is graded by frequency and EV lost: right if the solver plays it 25% or more or it loses 2% of the pot or less, acceptable at 5% or 5% of the pot. The feedback lists every action's EV, the hand's mix, the whole range's mix and a 13x13 chart of the node.
   - River: both ranges come from the turn reach times the frequency of each player's last turn action, solved live with 33%, 75% and 125% bets (about 0.1 s).
   - **Play to postflop** setting: deals only preflop spots that lead into a solved matchup (an open from the opener's seat, or the caller facing it) with a hand that opens or calls there; the others are scripted to fold and the caller to call.
-  - Data: `solver/pull_post.sh` runs `solver/split.py` on the VM (one flop piece and one piece per turn card, gzipped and base64 inside a `<script>` so it loads from `file://`), then mirrors it into `post/` (gitignored, about 14 MB a flop).
+  - Data: `solver/pull_post.sh` runs `solver/split.py` on the VM (one flop piece and one piece per turn card, gzipped and base64 inside a `<script>` so it loads from `file://`), then mirrors the scenarios you name (default BTN vs BB) into `post/` (gitignored, about 14 MB a flop, so not all 15 fit on the Mac) and writes `post/index.js` listing only flops on disk.
   - Not yet: a showdown winner (it only shows the villain's cards); hands after a raised flop end at the turn (no turn data); postflop hands aren't in the leak log or reviews.
 
 ## Out of scope for now
