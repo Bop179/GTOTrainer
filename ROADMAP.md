@@ -124,9 +124,10 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
   - Its result matched the native solver exactly.
   - Not loaded by `index.html` yet; that waits for the postflop mode.
 - [ ] Shrink the turn data before shipping it to the trainer. Turn cards with the same suit pattern give the same strategy with suits swapped (checked), so store one of each and map suits in the trainer.
-- [ ] Decide where the solutions live for other users. They're too big for git: a few GB once deduplicated.
-  - Option: a static file server on the VM. Egress is free up to 10 TB a month, and the security list needs port 443 opened.
-  - Option: Oracle Object Storage, 20 GB free. Its API requests are only free up to 50,000 a month, and quotas can't cap them.
+- [ ] Serve the solutions to other users from a static file server on the VM (decided 2026-11-13). Set it up once the postflop mode exists; opening a port earlier only adds exposure.
+  - Egress is free up to 10 TB a month. The security list needs port 443 opened.
+  - Not Object Storage: its API requests are only free up to 50,000 a month, and quotas can't cap them.
+  - Room to grow: all heads-up single-raised and 3-bet pots at 6-max and 8-max, 100bb and 200bb, come to an estimated 16,000 solves and about 110 GB (9-max reusing 8-max). That fits the free 200 GB of block storage (47 GB is the boot disk). Solve time is the real limit: about 170 days of the VM nonstop. Some 200bb trees may need fewer sizes to fit in 23 GB.
 - [ ] Trainer postflop mode:
   - Deal a spot and one of its 95 flops, ask for the action at each flop and turn node, and grade by frequency and EV lost.
   - At the river, build both ranges from the turn reach and the strategy along the line played, call `RiverSolver.solve`, and grade the river decision the same way.
