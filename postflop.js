@@ -237,8 +237,24 @@ function postButtons(mine) {
 function postExplain(node, h) {
   const out = [], board = P.board, me = P.me, hc = handClass(cardsOf(P.hands[me]), board);
   out.push(`You have ${hc.text}. The board is ${texture(board)}.`);
-  const call = P.put[1 - me] - P.put[me];
-  if (call > 0) out.push(`Calling ${bb(call)} into a ${bb(potNow())} pot needs ${Math.round(call / (potNow() + call) * 100)}% equity, before position and how much of it you realize.`);
+  // the maths: equity needed to call, and a draw's outs by the rule of 2 and 4
+  const call = P.put[1 - me] - P.put[me], need = call / (potNow() + call) * 100, f1 = x => +x.toFixed(1);
+  if (call > 0) out.push(`Equity needed to call = call ÷ (pot + call) = ${f1(call)} ÷ (${f1(potNow())} + ${f1(call)}) = ${f1(call)} ÷ ${f1(potNow() + call)} = <b>${f1(need)}%</b>.`);
+  if (hc.draw) {
+    const hole = cardsOf(P.hands[me]), used = new Set([...hole, ...board]), left = 52 - used.size;
+    const BIG = ["a straight", "a flush", "a full house", "quads"];
+    const outs = [...UP].flatMap(r => [...SUIT].map(s => r + s)).filter(c => !used.has(c) && BIG.includes(handClass(hole, [...board, c]).made)).length;
+    const next = outs * 2, both = outs * 4, allin = call > 0 && call >= P.stack - P.spent[me] - .01;
+    const goal = [hc.draw.includes("flush") && "flush", hc.draw.includes("straight") || hc.draw.includes("gutshot") ? "straight" : ""].filter(Boolean).join(" or ");
+    out.push(`Outs: <b>${outs}</b> cards make your ${goal}. Next card ≈ ${outs} × 2 = <b>${next}%</b> (exactly ${outs} ÷ ${left} = ${f1(outs / left * 100)}%)`
+      + (board.length === 3 ? `; by the river ≈ ${outs} × 4 = <b>${both}%</b>, but only if you get to see both cards.` : "."));
+    if (call > 0) {
+      // compare exact odds: one card, or both when this call is all-in on the flop
+      const have = 100 * (board.length === 3 && allin ? 1 - (left - outs) / left * (left - 1 - outs) / (left - 1) : outs / left);
+      out.push(have >= need ? `${f1(have)}% ≥ ${f1(need)}%: the draw alone pays for the call.`
+        : `${f1(have)}% < ${f1(need)}%: the draw alone doesn't pay for the call${board.length === 3 && !allin ? " on one card" : ""}; it needs extra from money you win when you hit (implied odds), hitting a pair instead, or a later bluff.`);
+    }
+  }
   // your range here ranked by the solver's EV for each hand (best action)
   const best = j => Math.max(...node.ev.map(e => e[j])), mine = best(h);
   let tot = 0, above = 0;
