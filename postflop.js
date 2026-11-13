@@ -110,8 +110,8 @@ async function postBegin(c) {
   P.story.push(`Flop ${P.board.map(cardText).join(" ")}:`);
   st.cur = P;
   if (!hr.hands.includes(hero)) end(`${HANDS[c.i]} isn't in the solved range at the flop (the solver doesn't play it this way preflop), so the hand ends here.`);
-  else await run();
   postDraw(true);
+  if (!P.over) { P.busy = true; await run(); P.busy = false; postDraw(false); }
 }
 
 // apply action i at the current node, for whoever is to act; deals the next card when a street closes
@@ -169,27 +169,46 @@ const strat = (node, hand) => {
   return node.strat.map(s => s.reduce((t, x, j) => t + x * node.reach[j], 0)); // trimmed hand: the range's average
 };
 // the villain acts until it's your turn or the hand ends
+// one action at a time, like preflop: a beat, then the action lands on the table
 async function run() {
-  try { while (!P.over && cur().player !== P.me) await step(pick(strat(cur(), P.hands[1 - P.me]))); } catch (e) { return end(e.message); }
+  try {
+    while (!P.over && cur().player !== P.me) {
+      await new Promise(r => setTimeout(r, 650));
+      await step(pick(strat(cur(), P.hands[1 - P.me])));
+      postDraw(false);
+    }
+  } catch (e) { return end(e.message); }
   if (!P.over && !cur().hands.includes(P.hands[P.me])) end("The solver never gets here with your hand, so the hand ends.");
 }
 function end(text, show) { P.story[P.story.length - 1] = P.story.at(-1).replace(/,$/, "."); P.over = true; P.show = show; P.story.push(`<b>${text}</b>`); }
 
+// redraws the table; whatever changed since the last draw animates as in preflop: bets slide in, a fold tosses its cards
 function postDraw(fresh) {
-  const me = P.me, them = 1 - me;
+  const me = P.me, them = 1 - me, was = P.drawn || { put: [0, 0], tag: ["", ""] }, mine = !P.over && cur().player === me;
+  const key = JSON.stringify([P.put, P.tag, P.spent, P.board, P.over, P.show, mine, P.story]);
+  if (!fresh && key === P.drawnKey) return postButtons(mine); // nothing new: don't cut a running animation short
+  P.drawn = { put: [...P.put], tag: [...P.tag] }; P.drawnKey = key;
+  const moved = p => P.put[p] && P.put[p] !== was.put[p], folds = p => P.tag[p] === "Fold" && was.tag[p] !== "Fold";
+  if (moved(them)) play("chip");
+  if (folds(them) || P.isNew < P.board.length) play("deal");
   // earlier streets on one muted line, the current one below it
   const past = P.story.slice(0, -1).map(say0).join(" ");
   $("situation").innerHTML = (past ? `<div>${past}</div>` : "") + `<div>${say0(P.story.at(-1))}</div>`;
-  const seat = (p, s) => `<div class="seat${p === me ? " hero" : ""}${P.tag[p] === "Fold" ? " folded" : ""}${p === me && !P.over ? " turn" : ""}" style="--c:0;--s:${s};--r:1">`
-    + (p === me || P.show ? `<div class="cards">${cardsOf(P.hands[p]).map(x => cardHTML(x)).join("")}</div>` : `<div class="backs"><i></i><i></i></div>`)
+  const seat = (p, s) => `<div class="seat${p === me ? " hero" : ""}${P.tag[p] === "Fold" ? " folded" : ""}${p === me && mine ? " turn" : ""}${folds(p) ? " toss" : ""}" style="--c:0;--s:${s};--r:1">`
+    + (p === me || P.show ? `<div class="cards">${cardsOf(P.hands[p]).map(x => cardHTML(x)).join("")}</div>`
+      : `<div class="backs">${P.tag[p] !== "Fold" || folds(p) ? "<i></i><i></i>" : ""}</div>`)
     + `<div class="plate"><b>${p === me ? "You · " : ""}${P.seat[p]}</b><span>${bb(P.stack - P.spent[p])}</span></div>`
     + `<em class="tag"${P.tag[p] ? ` style="background:${AC[kind(P.tag[p] === "All-in" ? "Allin" : P.tag[p])]}"` : " hidden"}>${P.tag[p]}</em></div>`
-    + (P.put[p] ? `<div class="bet" style="--c:.4;--s:${p === me ? .55 : -.6};--r:1">${bb(P.put[p])}</div>` : "");
+    + (P.put[p] ? `<div class="bet post${moved(p) ? " fly" : ""}" style="--c:.4;--s:${p === me ? .55 : -.66};--r:1;--y0:${50 + s * 41}%">${bb(P.put[p])}</div>` : "");
   $("felt").classList.toggle("still", !fresh);
   $("felt").innerHTML = seat(them, -1) + seat(me, 1)
     + `<div class="board">${P.board.map((x, j) => cardHTML(x, j >= P.isNew ? " new" : "")).join("")}</div>`
     + `<div class="pot" style="top:64%">Pot <b>${bb(potNow() - P.put[0] - P.put[1])}</b></div>`;
   P.isNew = 9;
+  postButtons(mine);
+}
+function postButtons(mine) {
+  if (!P.over && !mine) return document.querySelectorAll("#actions button").forEach(b => b.disabled = true); // their move: keep your last buttons, greyed
   if (P.over) { P.answered = true; $("actions").innerHTML = `<button data-next style="background:var(--panel)">Next hand<kbd>Space</kbd></button>`; return; }
   $("actions").innerHTML = cur().actions.map((a, i) => `<button data-a="${i}" style="background:${AC[kind(a)]}">${actName(a)}<kbd>${i + 1}</kbd></button>`).join("");
 }

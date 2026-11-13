@@ -83,6 +83,8 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
 @keyframes deal { from { transform: translateY(-30px) rotate(-8deg); opacity: 0; } }
 @keyframes toss { to { transform: translate(calc(var(--c) * -1 * min(22vw, 230px)), calc(var(--s) * -1 * min(14vw, 130px))) rotate(180deg) scale(.6); opacity: 0; } }
 @keyframes fly { from { --r: .95; opacity: 0; } }
+.bet.post.fly { animation-name: flypost; } /* postflop bets sit off to the side: slide from the seat's spot (--y0) */
+@keyframes flypost { from { left: 50%; top: var(--y0); opacity: 0; } }
 @media (max-width: 600px) {
   .felt { --rx: 37%; --ry: 42%; aspect-ratio: 4 / 5; margin: 12px 0 64px; }
   .felt::before { inset: 3% 8%; }
