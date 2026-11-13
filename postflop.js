@@ -232,14 +232,16 @@ function postButtons(mine) {
   $("actions").innerHTML = cur().actions.map((a, i) => `<button data-a="${i}" style="background:${AC[kind(a)]}">${btnLabel(a, i)}</button>`).join("");
 }
 
-// graded like preflop, plus EV: lose little EV against the best action (or pick a frequent one) and it's right.
-// ponytail: thresholds (25% / 2% of the pot, 5% / 5% of the pot) are a first guess
+// graded by frequency first, EV second: EV gaps of a few % of the pot are solver noise (a 35% action can trail by that much),
+// so a small gap can't rescue an action the solver (almost) never takes.
+// right: played 25%+, or 5%+ and within 2% of the pot. acceptable: played 5%+, or 1%+ and within 5%, or under 1% and within 1%.
+// ponytail: thresholds are a judgment call
 async function postAnswer(i) {
   if (P.over || P.answered || P.busy || !cur().actions[i]) return;
   P.answered = P.busy = true;
   const node = cur(), h = node.hands.indexOf(P.hands[P.me]), f = node.strat[i][h], ev = node.ev.map(e => e[h]);
   const best = ev.indexOf(Math.max(...ev)), loss = ev[best] - ev[i], pot = potNow();
-  const grade = f >= 25 || loss <= .02 * pot ? "great" : f >= 5 || loss <= .05 * pot ? "ok" : "bad";
+  const grade = f >= 25 || f >= 5 && loss <= .02 * pot ? "great" : f >= 5 || f >= 1 && loss <= .05 * pot || loss <= .01 * pot ? "ok" : "bad";
   tally(grade); play(kind(node.actions[i]) === "Fold" ? "deal" : "chip");
   stamp(String(i), j => node.strat[j][h], j => ev[j].toFixed(2) + "bb");
   const btns = $("actions").innerHTML; // the graded buttons stay up until you continue, though the hand has moved on
@@ -254,7 +256,7 @@ async function postAnswer(i) {
     <div class="pills">${rm.map((v, j) => v >= .5 ? pill(j, v) : "").join("")}</div>`;
   $("grid").innerHTML = gridHTML(classRows(node), "POST", HANDS.indexOf(classOf(P.hands[P.me])));
   const why = [`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}, pot ${bb(pot)}.`,
-    i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : ""}.`];
+    i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`];
   try { await step(i, true); } catch (e) { end(e.message); }
   P.busy = false;
   postDraw(false);
