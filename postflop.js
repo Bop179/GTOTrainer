@@ -125,7 +125,8 @@ async function postBegin(c) {
 }
 
 // apply action i at the current node, for whoever is to act; deals the next card when a street closes
-async function step(i) {
+// hold: your own action closed the street; the next card waits until you continue (closeStreet from postNext)
+async function step(i, hold) {
   const node = cur(), p = node.player, a = node.actions[i], k = kind(a);
   let add = 0;
   if (k === "Call") add = P.put[1 - p] - P.put[p];
@@ -138,7 +139,13 @@ async function step(i) {
   const nk = P.k ? P.k + "-" + i : String(i);
   if (P.nodes[nk]) { P.k = nk; return; }
   // street over: a call, or a check behind. Let it land on the table before the chips go in and the next card comes
+  P.nk = nk; P.closing = true;
+  if (hold) return;
   postDraw(false); await new Promise(r => setTimeout(r, 700));
+  return closeStreet();
+}
+async function closeStreet() {
+  const nk = P.nk; P.closing = false;
   if (P.spent[0] >= P.stack - .01 && P.spent[1] >= P.stack - .01) {
     while (P.board.length < 5) P.board.push(dealOne());
     return end(`All-in: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}.`, true);
@@ -194,7 +201,7 @@ function end(text, show) { P.over = true; P.show = show; P.story.push({ t: text,
 
 // redraws the table; whatever changed since the last draw animates as in preflop: bets slide in, a fold tosses its cards
 function postDraw(fresh) {
-  const me = P.me, them = 1 - me, was = P.drawn || { put: [0, 0], tag: ["", ""] }, mine = !P.over && cur().player === me;
+  const me = P.me, them = 1 - me, was = P.drawn || { put: [0, 0], tag: ["", ""] }, mine = !P.over && !P.closing && cur().player === me;
   const key = JSON.stringify([P.put, P.tag, P.spent, P.board, P.over, P.show, mine, P.story]);
   if (!fresh && key === P.drawnKey) return postButtons(mine); // nothing new: don't cut a running animation short
   P.drawn = { put: [...P.put], tag: [...P.tag] }; P.drawnKey = key;
@@ -248,7 +255,7 @@ async function postAnswer(i) {
   $("grid").innerHTML = gridHTML(classRows(node), "POST", HANDS.indexOf(classOf(P.hands[P.me])));
   const why = [`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}, pot ${bb(pot)}.`,
     i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : ""}.`];
-  try { await step(i); } catch (e) { end(e.message); }
+  try { await step(i, true); } catch (e) { end(e.message); }
   P.busy = false;
   postDraw(false);
   $("actions").innerHTML = btns;
@@ -259,7 +266,9 @@ async function postAnswer(i) {
 async function postNext() {
   if (P.over || P.busy) return P.busy || newHand();
   $("feedback").classList.remove("show");
-  P.busy = true; await run(); P.busy = false; P.answered = false;
+  P.busy = true;
+  if (P.closing) { try { await closeStreet(); } catch (e) { end(e.message); } postDraw(false); }
+  await run(); P.busy = false; P.answered = false;
   postDraw(false);
 }
 // the node's strategy folded into the 13×13 chart: [all-in, bet/raise, check/call, fold, reach 0..1] per hand class
