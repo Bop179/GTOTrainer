@@ -178,7 +178,9 @@ function end(text, show) { P.story[P.story.length - 1] = P.story.at(-1).replace(
 function postDraw(fresh) {
   const me = P.me, them = 1 - me, B = P.board.length;
   $("spot").textContent = `${P.scen.split("_").slice(0, 2).join(" ").replace("max", "-max")} · You are ${P.seat[me]} (${me ? "in" : "out of"} position) · ${STREET[B - 3]}`;
-  $("situation").innerHTML = P.story.map(s => `<div>${say0(s)}</div>`).join("");
+  // earlier streets on one muted line, the current one below it
+  const past = P.story.slice(0, -1).map(say0).join(" ");
+  $("situation").innerHTML = (past ? `<div>${past}</div>` : "") + `<div>${say0(P.story.at(-1))}</div>`;
   const seat = (p, s) => `<div class="seat${p === me ? " hero" : ""}${P.tag[p] === "Fold" ? " folded" : ""}${p === me && !P.over ? " turn" : ""}" style="--c:0;--s:${s};--r:1">`
     + (p === me || P.show ? `<div class="cards">${cardsOf(P.hands[p]).map(x => cardHTML(x)).join("")}</div>` : `<div class="backs"><i></i><i></i></div>`)
     + `<div class="plate"><b>${p === me ? "You · " : ""}${P.seat[p]}</b><span>${bb(P.stack - P.spent[p])}</span></div>`

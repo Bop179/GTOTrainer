@@ -50,7 +50,7 @@ dialog td:last-child, dialog th:last-child { text-align: right; white-space: now
 main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
 .table { text-align: center; }
 .spot { color: var(--muted); margin-bottom: 4px; }
-.situation { font-size: 18px; }
+.situation { font-size: 18px; margin-bottom: 28px; } /* room for the top seat's cards */
 /* seats sit on an ellipse: --c/--s are cos/sin of the seat angle, --r scales toward the centre (bets, dealer button) */
 .felt { --rx: 46%; --ry: 41%; position: relative; aspect-ratio: 2 / 1; margin: 12px 2% 64px; font-variant-numeric: tabular-nums; }
 .felt::before { content: ""; position: absolute; inset: 4% 3%; border-radius: 50%; background: radial-gradient(ellipse at center, #1f5e42, var(--felt) 55%, var(--felt2)); border: 12px solid #4a2c18; box-shadow: inset 0 0 50px #000a, 0 0 0 2px #6b4527, 0 14px 40px #000a; }
@@ -91,14 +91,14 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
   .plate { min-width: 54px; padding: 2px 6px; font-size: 11px; }
   .card { width: 46px; height: 66px; font-size: 20px; } .card span { font-size: 17px; }
 }
-.actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.actions button { min-width: 150px; min-height: 84px; padding: 14px 22px; font-size: 18px; font-weight: 600; border: 0; }
+.actions { display: flex; gap: 8px; justify-content: center; }
+.actions button { flex: 0 1 auto; min-width: 96px; min-height: 64px; padding: 8px 14px; font-size: 15px; font-weight: 600; border: 0; white-space: nowrap; }
 .actions button:disabled { opacity: .45; cursor: default; }
 /* after you answer each button shows the solver's frequency (and EV when the data has it); yours stays lit and ringed */
-.actions button.done:disabled { opacity: .6; }
+.actions button.done:disabled { opacity: .9; }
 .actions button.picked { outline: 3px solid #fff; opacity: 1 !important; }
-.actions .res { display: block; } .actions .res b { font-size: 26px; line-height: 1.1; } .actions .res small { font-size: 13px; opacity: .85; margin-left: 4px; }
-@media (max-width: 600px) { .actions button { min-width: 0; flex: 1 1 40%; } }
+.actions .res { display: block; } .actions .res b { font-size: 20px; line-height: 1.2; } .actions .res small { font-size: 12px; opacity: .9; margin-left: 4px; }
+@media (max-width: 600px) { .actions { flex-wrap: wrap; } .actions button { min-width: 0; flex: 1 1 40%; } }
 kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .feedback { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: none; gap: 16px; grid-template-columns: 1fr auto; }
 .feedback.show { display: grid; }
@@ -119,7 +119,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .next { margin: 0 0 4px; }
 .board { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); display: flex; gap: 6px; }
 .still .card.new { animation: deal .25s ease-out both; }
-.situation div:not(:last-child) { font-size: 14px; color: var(--muted); }
+.situation div:not(:last-child) { font-size: 14px; line-height: 1.5; color: var(--muted); margin-bottom: 4px; }
 /* keep the whole table on screen: cap the felt by viewport height (2:1 felt, ~290px of header, text and buttons) */
 @media (min-width: 601px) { .felt { max-width: calc((100vh - 290px) * 2); margin-inline: auto; } }
 /* wide screens: range chart | table | analysis side by side, so feedback never needs a scroll */
@@ -901,7 +901,7 @@ function gridHTML(rows, node, me) {
     let at = 0;
     const stops = ACTS.map(a => { const s = `${COLOR[a]} ${at}% ${at + m[a]}%`; at += m[a]; return s; }).join(",");
     const op = row[4] ? .35 + .65 * row[4] : .15;
-    return `<div class="${i === me ? "me" : ""}" style="background:linear-gradient(to right,${stops});opacity:${op}" title="${h}: ${ACTS.filter(a => m[a] >= .5).map(a => label(a, node) + " " + Math.round(m[a]) + "%").join(", ")}">${h}</div>`;
+    return `<div class="${i === me ? "me" : ""}" style="background:linear-gradient(to right,${stops});opacity:${op}" title="${h}: ${ACTS.filter(a => m[a] >= .5).map(a => (node === "POST" ? { Allin: "All-in", Raise: "Bet/raise", Call: "Check/call", Fold: "Fold" }[a] : label(a, node)) + " " + Math.round(m[a]) + "%").join(", ")}">${h}</div>`;
   }).join("");
 }
 function rangeHTML(sp) {
