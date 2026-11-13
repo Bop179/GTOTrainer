@@ -85,8 +85,9 @@ fn main() {
         add_allin_threshold: 1.5, force_allin_threshold: 0.15, merging_threshold: 0.1,
     };
     let mut g = PostFlopGame::with_config(card_config, ActionTree::new(tree).unwrap()).unwrap();
-    let compress = j["compress"].as_bool().unwrap_or(false);
     let mem = g.memory_usage();
+    // 16-bit storage halves memory (negligible accuracy cost); forced above 16 GB so the 23 GB VM never runs out
+    let compress = j["compress"].as_bool().unwrap_or(false) || mem.0 as f64 / 1073741824.0 > 16.0;
     let mem_gb = (if compress { mem.1 } else { mem.0 }) as f64 / 1073741824.0;
     eprintln!("memory {:.2} GB (compressed {:.2} GB)", mem.0 as f64 / 1073741824.0, mem.1 as f64 / 1073741824.0);
     // refuse to allocate past the machine's budget (job "max_gb", default 20 for the 24 GB VM) instead of swapping

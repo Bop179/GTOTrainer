@@ -8,7 +8,7 @@ R = "AKQJT98765432"
 H = [R[i] + R[j] if i == j else (R[i] + R[j] + "s" if i < j else R[j] + R[i] + "o") for i in range(13) for j in range(13)]
 SRC = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data6.js")).read()
 SCENARIOS = [("BTN", "BB"), ("CO", "BB"), ("SB", "BB"), ("HJ", "BB"), ("UTG", "BB"), ("CO", "BTN"), ("HJ", "BTN"), ("UTG", "BTN")]
-SIZES = {"flop_sizes": ["33%, 75%", "2.5x"], "turn_sizes": ["75%", "2.5x"], "river_sizes": ["75%", "2.5x"]}
+SIZES = {"flop_sizes": ["33%, 75%", "2.5x"], "turn_sizes": ["75%, 125%", "2.5x"], "river_sizes": ["75%", "2.5x"]}
 N_FLOPS = 95
 
 def rows(key):
