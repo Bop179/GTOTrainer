@@ -31,7 +31,6 @@ button { cursor: pointer; }
 @media (max-width: 600px) { .menu > div { position: fixed; top: auto; left: 16px; right: 16px; width: auto; max-height: 75vh; overflow: auto; } }
 .previews { display: flex; flex-wrap: wrap; gap: 6px; }
 .previews button { padding: 4px 8px; font-size: 13px; }
-.note { color: var(--muted); font-size: 12px; margin-top: 14px; }
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; width: min(640px, calc(100% - 32px)); padding: 20px; }
 dialog::backdrop { background: #000a; }
 #browse { width: min(1100px, calc(100% - 32px)); }
@@ -49,7 +48,6 @@ dialog td:last-child, dialog th:last-child { text-align: right; white-space: now
 .stats b { color: var(--text); }
 main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
 .table { text-align: center; }
-.spot { color: var(--muted); margin-bottom: 4px; }
 .situation { font-size: 18px; margin-bottom: 28px; } /* room for the top seat's cards */
 /* seats sit on an ellipse: --c/--s are cos/sin of the seat angle, --r scales toward the centre (bets, dealer button) */
 .felt { --rx: 46%; --ry: 41%; position: relative; aspect-ratio: 2 / 1; margin: 12px 2% 64px; font-variant-numeric: tabular-nums; }
@@ -153,11 +151,9 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 <main>
   <div class="drillbar" id="drillBar" hidden><span id="drillText"></span><button id="stopDrill">Stop drilling</button></div>
   <section class="table">
-    <div class="spot" id="spot"></div>
     <div class="situation" id="situation"></div>
     <div class="felt" id="felt"></div>
     <div class="actions" id="actions"></div>
-    <div class="note">Range data: GTO Nexus, and GTO Wizard for 6-max 100/200bb and 8-max 100/200bb (also used for 9-max at those stacks once UTG folds; at 200bb 9-max UTG is estimated from 8-max UTG). Bet sizes are standard assumptions, except where GTO Wizard's data is used, which carries its own sizes.</div>
   </section>
   <section class="feedback" id="feedback">
     <div class="analysis">
@@ -683,8 +679,6 @@ function showStep(deal) {
   const c = st.cur, spot = c.steps[c.k], rows = SPOTS[spot.key], z = sizing(spot);
   Object.assign(c, { spot, rows, z, answered: false, avail: ACTS.filter((a, k) => rows.some(row => row[4] > 0 && row[k] > 0)) });
   $("feedback").classList.remove("show");
-  $("spot").textContent = `${spot.game} · ${spot.stack} · You are ${spot.hero}`
-    + (c.steps.length > 1 ? ` · Decision ${c.k + 1}` : "") + (c.rid ? " · 🔁 Review: you missed this before" : "");
   $("situation").textContent = situation(spot);
   c.E = drawTable(spot, z, c.cards, deal, deal ? 0 : c.shown || 0); // a later decision only replays what happened since your last action
   if (deal) dealSounds(2 * ORDER[spot.game].length);

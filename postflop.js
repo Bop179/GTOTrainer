@@ -176,8 +176,7 @@ async function run() {
 function end(text, show) { P.story[P.story.length - 1] = P.story.at(-1).replace(/,$/, "."); P.over = true; P.show = show; P.story.push(`<b>${text}</b>`); }
 
 function postDraw(fresh) {
-  const me = P.me, them = 1 - me, B = P.board.length;
-  $("spot").textContent = `${P.scen.split("_").slice(0, 2).join(" ").replace("max", "-max")} · You are ${P.seat[me]} (${me ? "in" : "out of"} position) · ${STREET[B - 3]}`;
+  const me = P.me, them = 1 - me;
   // earlier streets on one muted line, the current one below it
   const past = P.story.slice(0, -1).map(say0).join(" ");
   $("situation").innerHTML = (past ? `<div>${past}</div>` : "") + `<div>${say0(P.story.at(-1))}</div>`;
@@ -217,9 +216,7 @@ async function postAnswer(i) {
     <div class="pills">${rm.map((v, j) => v >= .5 ? pill(j, v) : "").join("")}</div>`;
   $("grid").innerHTML = gridHTML(classRows(node), "POST", HANDS.indexOf(classOf(P.hands[P.me])));
   const why = [`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}, pot ${bb(pot)}.`,
-    `EV of each action (your share of the pot from here, in bb): ` + names.map((n, j) => `${j === best ? "<b>" : ""}${n} ${ev[j].toFixed(2)}bb${j === best ? "</b>" : ""}`).join(" · ") + ".",
-    i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : ""}.`,
-    `~${P.street < 2 ? "Pre-solved to within 1% of the pot." : "River solved live in your browser to within 1% of the pot."} EVs within a few hundredths of a bb are a tie.`];
+    i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : ""}.`];
   try { await step(i); } catch (e) { end(e.message); }
   P.busy = false;
   postDraw(false);
