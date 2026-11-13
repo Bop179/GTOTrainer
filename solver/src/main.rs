@@ -1,11 +1,11 @@
-// gto-solve: solve one heads-up postflop spot with postflop-solver and dump every flop decision node.
+// gto-solve: solve one heads-up postflop spot with postflop-solver and dump the flop and (unraised-flop) turn decision nodes.
 // Usage: gto-solve job.json out.json
 // job: {"oop": range, "ip": range, "flop": "Td9d6h", "pot": 5.5, "stack": 97.5,      (pot/stack in bb)
 //       "flop_sizes": ["33%, 75%", "2.5x"], "turn_sizes": [...], "river_sizes": [...],  ([bet, raise], both players)
 //       "target": 0.005, "max_iter": 1000, "compress": false}
-// out:  {"flop","pot","stack","exploit","iters","secs","mem_gb","nodes": {"<history, e.g. 0-1>": node}}
+// out:  {"flop","pot","stack","exploit","iters","secs","mem_gb","nodes": {"<history, e.g. 0-1 or 0-1-Kh-0>": node}}
 //       node = {"player": 0 OOP | 1 IP, "actions": ["Check","Bet 1.8",...], "hands": ["AhKh",...],
-//               "reach": [normalized reach per hand], "strat": [[freq per hand] per action], "ev": [[bb per hand] per action]}
+//               "reach": [normalized reach per hand], "strat": [[% per hand] per action], "ev": [[bb per hand] per action]}
 use postflop_solver::*;
 use serde_json::{json, Value};
 use std::time::Instant;
@@ -26,27 +26,42 @@ fn act(a: &Action) -> String {
     }
 }
 
-// walk the flop street; stop at chance (turn card) and terminal nodes
-fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, out: &mut serde_json::Map<String, Value>) {
-    if g.is_terminal_node() || g.is_chance_node() { return; }
+// Walk the flop, and the turn after every flop line without a raise (check-check, bet-call); stop at the river card.
+// Key tokens: action indices and dealt cards, e.g. "0-1-Kh-0-2" = check, bet, call ... turn Kh, check, bet 2.
+// Trimmed for size: hands with reach < 0.001 dropped, strategy as whole percentages, EV to 0.01 bb.
+fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, street: u8, raised: bool, out: &mut serde_json::Map<String, Value>) {
+    if g.is_terminal_node() { return; }
+    if g.is_chance_node() {
+        if street > 0 || raised { return; }
+        let cards = g.possible_cards();
+        for c in (0..52u8).filter(|c| cards >> c & 1 == 1) {
+            g.play(c as usize); g.cache_normalized_weights(); hist.push(c as usize); key.push(card_to_string(c).unwrap());
+            walk(g, hist, key, 1, false, out);
+            hist.pop(); key.pop(); g.apply_history(hist); g.cache_normalized_weights();
+        }
+        return;
+    }
     let p = g.current_player();
     let acts = g.available_actions();
     let n = g.private_cards(p).len();
-    let (st, ev) = (g.strategy(), g.expected_values_detail(p));
+    let (st, ev, reach) = (g.strategy(), g.expected_values_detail(p), g.normalized_weights(p).to_vec());
+    let keep: Vec<usize> = (0..n).filter(|&h| reach[h] >= 0.001).collect();
+    let hands = holes_to_strings(g.private_cards(p)).unwrap();
     let r = |x: f32, k: f64| ((x as f64) * k).round() / k;
-    let split = |v: &[f32], k: f64, s: f64| (0..acts.len()).map(|a| v[a * n..(a + 1) * n].iter().map(|&x| r(x * s as f32, k)).collect::<Vec<_>>()).collect::<Vec<_>>();
-    out.insert(hist.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("-"), json!({
+    let per = |v: &[f32], k: f64, s: f64| (0..acts.len()).map(|a| keep.iter().map(|&h| r(v[a * n + h] * s as f32, k)).collect::<Vec<_>>()).collect::<Vec<_>>();
+    out.insert(key.join("-"), json!({
         "player": p,
         "actions": acts.iter().map(act).collect::<Vec<_>>(),
-        "hands": holes_to_strings(g.private_cards(p)).unwrap(),
-        "reach": g.normalized_weights(p).iter().map(|&x| r(x, 1000.0)).collect::<Vec<_>>(),
-        "strat": split(&st, 1000.0, 1.0),
-        "ev": split(&ev, 100.0, 1.0 / CHIPS),
+        "hands": keep.iter().map(|&h| hands[h].clone()).collect::<Vec<_>>(),
+        "reach": keep.iter().map(|&h| r(reach[h], 1000.0)).collect::<Vec<_>>(),
+        "strat": per(&st, 1.0, 100.0),
+        "ev": per(&ev, 100.0, 1.0 / CHIPS),
     }));
     for i in 0..acts.len() {
-        g.play(i); g.cache_normalized_weights(); hist.push(i);
-        walk(g, hist, out);
-        hist.pop(); g.apply_history(hist); g.cache_normalized_weights();
+        let rz = matches!(acts[i], Action::Raise(_) | Action::AllIn(_));
+        g.play(i); g.cache_normalized_weights(); hist.push(i); key.push(i.to_string());
+        walk(g, hist, key, street, raised || (street == 0 && rz), out);
+        hist.pop(); key.pop(); g.apply_history(hist); g.cache_normalized_weights();
     }
 }
 
@@ -92,9 +107,9 @@ fn main() {
     eprintln!("solved: {it} iterations, exploitability {:.3}% of pot, {secs:.0}s", ex as f64 / (f("pot") * CHIPS) * 100.0);
     g.back_to_root(); g.cache_normalized_weights();
     let mut nodes = serde_json::Map::new();
-    walk(&mut g, &mut vec![], &mut nodes);
+    walk(&mut g, &mut vec![], &mut vec![], 0, false, &mut nodes);
     let out = json!({"flop": j["flop"], "pot": f("pot"), "stack": f("stack"), "iters": it, "secs": secs.round(), "mem_gb": (mem_gb * 100.0).round() / 100.0,
         "exploit": ex as f64 / (f("pot") * CHIPS), "nodes": nodes});
     std::fs::write(&args[2], serde_json::to_string(&out).unwrap()).unwrap();
-    eprintln!("{} flop nodes -> {}", out["nodes"].as_object().unwrap().len(), args[2]);
+    eprintln!("{} flop+turn nodes -> {}", out["nodes"].as_object().unwrap().len(), args[2]);
 }
