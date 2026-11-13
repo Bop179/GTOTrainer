@@ -494,8 +494,10 @@ function drawDrill() {
 let prog = { n: 0, log: [], srs: {} };
 try { prog = { ...prog, ...JSON.parse(localStorage.getItem("gto-progress")) }; } catch {}
 const saveProg = () => { try { localStorage.setItem("gto-progress", JSON.stringify(prog)); } catch {} };
-// Leitner boxes counted in hands, not days: a missed spot returns after 3 hands, then 10, 30, 100; get it right after that and it's learned.
-const GAP = [3, 10, 30, 100];
+// Leitner boxes counted in hands, not days: a missed spot returns after 3 hands, then 10; right twice in a row and it's learned
+// (it drops out of training reviews but stays in the Leaks drills, which read the hand log).
+const GAP = [3, 10];
+for (const id in prog.srs) if (prog.srs[id].box >= GAP.length) delete prog.srs[id]; // already learned under the old 4-box schedule
 function dueReview(fits) {
   return Object.entries(prog.srs).filter(([id, r]) => r.due <= prog.n && SPOTS[id.split("|")[0]] && fits(parse(id.split("|")[0])))
     .sort((a, b) => a[1].due - b[1].due)[0]?.[0];
