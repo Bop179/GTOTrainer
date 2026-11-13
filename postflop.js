@@ -232,6 +232,32 @@ function postButtons(mine) {
   $("actions").innerHTML = cur().actions.map((a, i) => `<button data-a="${i}" style="background:${AC[kind(a)]}">${btnLabel(a, i)}</button>`).join("");
 }
 
+// a short read of the spot: what you hold, the board, the price, where your hand sits in your range,
+// and what the solver does with hands like it (the classification is local rules; the numbers are the solver's)
+function postExplain(node, h) {
+  const out = [], board = P.board, me = P.me, hc = handClass(cardsOf(P.hands[me]), board);
+  out.push(`You have ${hc.text}. The board is ${texture(board)}.`);
+  const call = P.put[1 - me] - P.put[me];
+  if (call > 0) out.push(`Calling ${bb(call)} into a ${bb(potNow())} pot needs ${Math.round(call / (potNow() + call) * 100)}% equity, before position and how much of it you realize.`);
+  // your range here ranked by the solver's EV for each hand (best action)
+  const best = j => Math.max(...node.ev.map(e => e[j])), mine = best(h);
+  let tot = 0, above = 0;
+  node.hands.forEach((_, j) => { const w = node.reach[j]; if (!w) return; tot += w; if (best(j) > mine) above += w; });
+  const topPct = Math.max(1, Math.round(above / (tot || 1) * 100));
+  out.push(`By the solver's EV, about ${topPct}% of the hands you'd have here do better than yours: ${topPct <= 25 ? "near the top of your range" : topPct <= 60 ? "the middle of your range" : "the bottom part of your range"}.`);
+  // hands in the same group: same made hand and draw; if that's thin, same made hand only
+  const cls = node.hands.map(x => handClass(cardsOf(x), board));
+  const group = by => node.hands.map((_, j) => j).filter(j => node.reach[j] > 0 && by(cls[j]));
+  let g = group(c => c.made === hc.made && c.draw === hc.draw), label = hc.text;
+  if (g.length < 6) { g = group(c => c.made === hc.made); label = hc.made; }
+  if (g.length >= 2) {
+    const w = g.reduce((t, j) => t + node.reach[j], 0) || 1;
+    const mix = node.actions.map((a, k) => [actName(a), g.reduce((t, j) => t + node.strat[k][j] * node.reach[j], 0) / w]).filter(([, v]) => v >= .5).sort((x, y) => y[1] - x[1]);
+    out.push(`Hands like yours (${label}, ${g.length} combos): ${mix.map(([n, v]) => `${n} ${Math.round(v)}%`).join(" · ")}.`);
+  }
+  return out;
+}
+
 // graded by frequency first, EV second: EV gaps of a few % of the pot are solver noise (a 35% action can trail by that much),
 // so a small gap can't rescue an action the solver (almost) never takes.
 // right: played 25%+, or 5%+ and within 2% of the pot. acceptable: played 5%+, or 1%+ and within 5%, or under 1% and within 1%.
@@ -255,8 +281,9 @@ async function postAnswer(i) {
     <div class="mix">${rm.map((v, j) => v >= .5 ? `<div style="background:${AC[kind(node.actions[j])]};width:${v}%"></div>` : "").join("")}</div>
     <div class="pills">${rm.map((v, j) => v >= .5 ? pill(j, v) : "").join("")}</div>`;
   $("grid").innerHTML = gridHTML(classRows(node), "POST", HANDS.indexOf(classOf(P.hands[P.me])));
-  const why = [`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}, pot ${bb(pot)}.`,
-    i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`];
+  const why = [`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}, pot ${bb(pot)}, ${P.me ? "in" : "out of"} position.`, ...postExplain(node, h),
+    i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`,
+    "~Hand groups and board reads come from simple local rules; the percentages and EVs are the solver's."];
   try { await step(i, true); } catch (e) { end(e.message); }
   P.busy = false;
   postDraw(false);
