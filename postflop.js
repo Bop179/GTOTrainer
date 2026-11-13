@@ -184,7 +184,7 @@ function postDraw(fresh) {
     + (p === me || P.show ? `<div class="cards">${cardsOf(P.hands[p]).map(x => cardHTML(x)).join("")}</div>` : `<div class="backs"><i></i><i></i></div>`)
     + `<div class="plate"><b>${p === me ? "You · " : ""}${P.seat[p]}</b><span>${bb(P.stack - P.spent[p])}</span></div>`
     + `<em class="tag"${P.tag[p] ? ` style="background:${AC[kind(P.tag[p] === "All-in" ? "Allin" : P.tag[p])]}"` : " hidden"}>${P.tag[p]}</em></div>`
-    + (P.put[p] ? `<div class="bet" style="--c:0;--s:${s};--r:${p === me ? .4 : .55}">${bb(P.put[p])}</div>` : "");
+    + (P.put[p] ? `<div class="bet" style="--c:.4;--s:${p === me ? .55 : -.6};--r:1">${bb(P.put[p])}</div>` : "");
   $("felt").classList.toggle("still", !fresh);
   $("felt").innerHTML = seat(them, -1) + seat(me, 1)
     + `<div class="board">${P.board.map((x, j) => cardHTML(x, j >= P.isNew ? " new" : "")).join("")}</div>`
