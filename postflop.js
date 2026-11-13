@@ -191,9 +191,7 @@ function postDraw(fresh) {
   const moved = p => P.put[p] && P.put[p] !== was.put[p], folds = p => P.tag[p] === "Fold" && was.tag[p] !== "Fold";
   if (moved(them)) play("chip");
   if (folds(them) || P.isNew < P.board.length) play("deal");
-  // earlier streets on one muted line, the current one below it
-  const past = P.story.slice(0, -1).map(say0).join(" ");
-  $("situation").innerHTML = (past ? `<div>${past}</div>` : "") + `<div>${say0(P.story.at(-1))}</div>`;
+  $("situation").innerHTML = P.story.map(s => `<div>${say0(s)}</div>`).join(""); // one street per line; the current one stands out
   const seat = (p, s) => `<div class="seat${p === me ? " hero" : ""}${P.tag[p] === "Fold" ? " folded" : ""}${p === me && mine ? " turn" : ""}${folds(p) ? " toss" : ""}" style="--c:0;--s:${s};--r:1">`
     + (p === me || P.show ? `<div class="cards">${cardsOf(P.hands[p]).map(x => cardHTML(x)).join("")}</div>`
       : `<div class="backs">${P.tag[p] !== "Fold" || folds(p) ? "<i></i><i></i>" : ""}</div>`)

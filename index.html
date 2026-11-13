@@ -48,7 +48,7 @@ dialog td:last-child, dialog th:last-child { text-align: right; white-space: now
 .stats b { color: var(--text); }
 main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
 .table { text-align: center; }
-.situation { font-size: 18px; margin-bottom: 28px; } /* room for the top seat's cards */
+.situation { font-size: 18px; text-align: center; margin-bottom: 12px; }
 /* seats sit on an ellipse: --c/--s are cos/sin of the seat angle, --r scales toward the centre (bets, dealer button) */
 .felt { --rx: 46%; --ry: 41%; position: relative; aspect-ratio: 2 / 1; margin: 12px 2% 64px; font-variant-numeric: tabular-nums; }
 .felt::before { content: ""; position: absolute; inset: 4% 3%; border-radius: 50%; background: radial-gradient(ellipse at center, #1f5e42, var(--felt) 55%, var(--felt2)); border: 12px solid #4a2c18; box-shadow: inset 0 0 50px #000a, 0 0 0 2px #6b4527, 0 14px 40px #000a; }
@@ -119,12 +119,16 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .next { margin: 0 0 4px; }
 .board { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); display: flex; gap: 6px; }
 .still .card.new { animation: deal .25s ease-out both; }
-.situation div:not(:last-child) { font-size: 14px; line-height: 1.5; color: var(--muted); margin-bottom: 4px; }
+.situation div:not(:last-child) { font-size: 14px; line-height: 1.5; color: var(--muted); display: inline; margin-right: .4em; } /* narrow: earlier streets run together above the table */
 /* keep the whole table on screen: cap the felt by viewport height (2:1 felt, ~290px of header, text and buttons) */
 @media (min-width: 601px) { .felt { max-width: calc((100vh - 290px) * 2); margin-inline: auto; } }
 /* wide screens: range chart | table | analysis side by side, so feedback never needs a scroll */
 @media (min-width: 1200px) {
-  main { max-width: 1600px; grid-template-columns: 360px minmax(0, 1fr) 360px; grid-template-areas: "drill drill drill" "chart table analysis"; align-items: start; }
+  main { max-width: 1600px; grid-template-columns: 360px minmax(0, 1fr) 360px; grid-template-areas: "drill drill drill" "chart table hist" "chart table analysis"; grid-template-rows: auto auto 1fr; align-items: start; }
+  /* the hand so far, one street per line, at the top of the right column */
+  .situation { grid-area: hist; text-align: left; margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 16px; line-height: 1.5; }
+  .situation div:not(:last-child) { display: block; margin: 0 0 6px; }
+  .table { padding-top: 28px; } /* room for the top seat's cards */
   .drillbar { grid-area: drill; } .table { grid-area: table; } .chart { grid-area: chart; } .analysis { grid-area: analysis; }
   .feedback, .feedback.show { display: contents; }
   .feedback > div { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
@@ -152,8 +156,8 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 </header>
 <main>
   <div class="drillbar" id="drillBar" hidden><span id="drillText"></span><button id="stopDrill">Stop drilling</button></div>
+  <div class="situation" id="situation"></div>
   <section class="table">
-    <div class="situation" id="situation"></div>
     <div class="felt" id="felt"></div>
     <div class="actions" id="actions"></div>
   </section>
