@@ -120,6 +120,9 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .legend { display: flex; gap: 10px; font-size: 12px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
 .next { margin: 0 0 4px; }
+.board { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); display: flex; gap: 6px; }
+.still .card.new { animation: deal .25s ease-out both; }
+.situation div:not(:last-child) { font-size: 14px; color: var(--muted); }
 /* keep the whole table on screen: cap the felt by viewport height (2:1 felt, ~290px of header, text and buttons) */
 @media (min-width: 601px) { .felt { max-width: calc((100vh - 290px) * 2); margin-inline: auto; } }
 /* wide screens: range chart | table | analysis side by side, so feedback never needs a scroll */
@@ -168,7 +171,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
     </div>
     <div class="chart">
       <div class="grid" id="grid"></div>
-      <div class="legend"><span><i style="background:var(--raise)"></i>Raise</span><span><i style="background:var(--allin)"></i>All-in</span><span><i style="background:var(--call)"></i>Call</span><span><i style="background:var(--fold)"></i>Fold</span></div>
+      <div class="legend"><span><i style="background:var(--raise)"></i>Raise / bet</span><span><i style="background:var(--allin)"></i>All-in</span><span><i style="background:var(--call)"></i>Call / check</span><span><i style="background:var(--fold)"></i>Fold</span></div>
       <div class="range" id="range"></div>
     </div>
   </section>
@@ -187,6 +190,10 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 <script src="data200.js"></script>
 <script src="data8.js"></script>
 <script src="data6.js"></script>
+<script src="river_wasm.js"></script>
+<script src="river.js"></script>
+<script src="post/index.js"></script><!-- from solver/pull_post.sh; missing = no postflop yet -->
+<script src="postflop.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const RANKS = "AKQJT98765432";
@@ -469,6 +476,7 @@ let cfg = { game: "6max", stack: "100bb", nodes: [], pos: [] };
 try { cfg = { ...cfg, ...JSON.parse(localStorage.getItem("gto-cfg")) }; } catch {}
 if (!stacksOf(cfg.game).length) cfg = { game: "6max", stack: "100bb", nodes: [], pos: [] };
 if (!stacksOf(cfg.game).includes(cfg.stack)) cfg.stack = stacksOf(cfg.game).at(-1);
+const toPost = () => cfg.toPost && postGames().includes(cfg.game + "/" + cfg.stack);
 function drawSettings() {
   const group = (g, title, items, on) => `<h4>${title}</h4><div class="chips" data-g="${g}">`
     + items.map(([v, t]) => `<button data-v="${v}"${on(v) ? ' class="on"' : ""}>${t}</button>`).join("") + "</div>";
@@ -479,8 +487,9 @@ function drawSettings() {
     + SPOT_ROWS.map(([t, row]) => [t, Object.entries(row).filter(([n]) => ALL.some(s => s.game === cfg.game && s.stack === cfg.stack && n.split("|").includes(s.node)))])
       .filter(([, items]) => items.length).map(([t, items]) => group("nodes", `<small>${t}</small>`, items, v => many("nodes", v))).join("")
     + group("pos", "Your position <small>· pick several</small>", [["", "Any"], ...ORDER[cfg.game].map(p => [p, p])], v => many("pos", v))
+    + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Postflop <small>· deal only hands that reach a solved heads-up pot (overrides Spots)</small>", [["on", "Play to postflop"]], () => cfg.toPost) : "")
     + group("pack", "Sound pack", Object.entries(PACKS).map(([k, p]) => [k, p.name]), v => v === pack);
-  $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}`;
+  $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}${toPost() ? " · to postflop" : ""}`;
 }
 
 const handType = h => describe(h).replace(/^an? /, "");
@@ -543,10 +552,12 @@ function newHand() {
   const lk = st.drill?.leaks[Math.floor(Math.random() * st.drill.leaks.length)];
   const pool = lk ? ALL.filter(s => spotName(s) === lk.spot) : ALL.filter(fits);
   $("feedback").classList.remove("show");
-  if (!pool.length) { replayTimers.forEach(clearTimeout); $("situation").textContent = "No spots match these filters."; $("felt").innerHTML = $("actions").innerHTML = ""; return; }
-  const rid = !st.drill && !st.cur?.rid && dueReview(fits); // never two reviews in a row, so new hands keep flowing
+  const pd = !st.drill && toPost() && postDeal(g, pos); // "Play to postflop" overrides the spot filters
+  if (!pool.length && !pd) { replayTimers.forEach(clearTimeout); $("situation").textContent = "No spots match these filters."; $("felt").innerHTML = $("actions").innerHTML = ""; return; }
+  const rid = !pd && !st.drill && !st.cur?.rid && dueReview(fits); // never two reviews in a row, so new hands keep flowing
   let spot, i = 0;
-  if (rid) { spot = parse(rid.split("|")[0]); i = HANDS.indexOf(rid.split("|")[1]); }
+  if (pd) ({ spot, i } = pd);
+  else if (rid) { spot = parse(rid.split("|")[0]); i = HANDS.indexOf(rid.split("|")[1]); }
   else {
     spot = !st.drill && !nodes.length && liveStart(g, pos) || pool[Math.floor(Math.random() * pool.length)];
     // deal a hand weighted by combos × how often it actually reaches this node
@@ -556,7 +567,7 @@ function newHand() {
   }
   // drills stay on the drilled spot; otherwise replay the hand from your first decision on this line
   const steps = st.drill ? [spot] : chainOf(spot, i);
-  st.cur = { steps, k: 0, i, hand: HANDS[i], cards: dealCards(HANDS[i]), rid };
+  st.cur = { steps, k: 0, i, hand: HANDS[i], cards: dealCards(HANDS[i]), rid, scen: pd && pd.scen };
   showStep(true);
 }
 
@@ -600,6 +611,7 @@ const joinText = ([p, b], node) => `${p} ${b === "Allin" ? "shoves all-in" : b =
 function simNext(c, a, pot) {
   const s = c.spot, limp = s.node === "RFI" && a === "Call", node = limp ? "FACINGLIMP" : NEXT[s.node];
   if (a === "Fold") return null;
+  const pr = postReply(c, a); if (pr) return pr;
   if (limp && !SPOTS[nodeKey(s, "BB", s.hero, node)]) return { text: "You limp. The solver data has no limped pot here, so the hand ends." };
   const shove = a === "Allin" || c.z.raise >= c.z.S, [o, w] = villains(s), K = (v, p, n) => [s.game, s.stack, v, p, n].join("/");
   const what = (b, n) => b === "Allin" ? "shoves all-in" : b === "Call" ? "calls" : RAISE_NAME[n].toLowerCase() + "s";
@@ -631,24 +643,29 @@ function simNext(c, a, pot) {
     if (b1 !== "Fold") return { text: `${joinText(j, jn)}, ${o} ${what(b1, n1)}. ${END}` };
     return reach(`${joinText(j, jn)}, ${o} folds`, K(`${o}+${j[0]}`, s.hero, n2));
   }
+  // heads-up in a solved single-raised pot: the hand goes on to the flop
+  const sc = a === "Call" && !j && s.node === "FACINGRFI" && scenOf(s.game, s.stack, s.villain, s.hero);
+  if (sc) return { text: "The rest fold: on to the flop!", post: sc };
   if (a === "Call" && !limp) return { text: `${j ? joinText(j) + ". " : ""}You ${s.node === "FACINGLIMP" ? "check" : "call"}: on to the flop, where this preflop trainer stops.` };
   if (villains(s).length > 1) return { text: "The solver data doesn't cover the replies to your raise, so the hand ends here." };
   // a villain with no spot to respond from would otherwise "fold"
   if (!node || s.villain && !SPOTS[nodeKey(s, s.villain, s.hero, node)]) return { text: "No solver data past this point, so the hand ends here." };
-  let caller;
+  let caller, callers = 0;
   for (const p of limp ? ["BB"] : s.node === "RFI" ? ORDER[s.game].slice(ORDER[s.game].indexOf(s.hero) + 1) : [s.villain]) {
     // after a call of your open, the rest face the open plus that call
     const mw = caller && [s.game, s.stack, `${s.hero}+${caller}`, p, "FACINGRFI_CALL"].join("/");
     const key = SPOTS[mw] ? mw : nodeKey(s, p, s.hero, node), b = SPOTS[key] ? sampleAct(key) : "Fold";
     if (b === "Fold") continue;
     if (shove) return { text: `${p} calls your all-in. Cards on their backs!` };
-    if (b === "Call") { caller ??= p; continue; }
+    if (b === "Call") { caller ??= p; callers++; continue; }
     if (key === mw) return reach(`${caller} calls, ${joinText([p, b], "FACINGRFI_CALL")}`, K(`${caller}+${p}`, s.hero, "FACINGSQZ"));
     // a 3-bet of your open: the players behind the 3-bettor get a cold 4-bet spot before it's back to you
     const cold = s.node === "RFI" && b !== "Allin" && joiner(s, s.hero, p, "FACING3B_COLD");
     if (cold) return reach(`${p} 3-bets, ${joinText(cold, "FACING3B_COLD")}`, K(`${p}+${cold[0]}`, s.hero, "FACINGC4B"));
     return reach(`${p} ${what(b, node)}`, nodeKey(s, s.hero, p, NEXT[node]));
   }
+  const sc2 = callers === 1 && !limp && s.node === "RFI" && scenOf(s.game, s.stack, s.hero, caller);
+  if (sc2) return { text: `${caller} calls: on to the flop!`, post: sc2 };
   return { text: caller ? `${caller} ${limp ? "checks" : "calls"}: on to the flop, where this preflop trainer stops.` : `Everyone folds. You take the ${bb(pot)} pot.` };
 }
 
@@ -680,7 +697,8 @@ function showStep(deal) {
 }
 function next() {
   const c = st.cur;
-  if (c?.steps && c.k + 1 < c.steps.length) { c.k++; showStep(); play("chip"); } else newHand();
+  if (c?.postflop) return postNext();
+  if (c?.steps && c.k + 1 < c.steps.length) { c.k++; showStep(); play("chip"); } else if (c?.post) { play("deal"); postBegin(c); } else newHand();
 }
 
 // Everything that happens before your decision, in table order: folds, and each bet in the line (opens, raises, the SB's limp).
@@ -742,23 +760,28 @@ function drawTable(spot, z, heroCards, deal, from = 0) {
 const toss = (seat, sel) => seat.querySelectorAll(sel).forEach((x, j) => x.style.animationDelay = j * .07 + "s");
 const fly = b => { b.classList.remove("fly"); void b.offsetWidth; b.classList.add("fly"); }; // restart the slide-in
 
+// score a decision (preflop or postflop): header stats and the grade sound
+function tally(grade) {
+  st.hands++; if (grade !== "bad") st.right++;
+  st.streak = grade === "bad" ? 0 : st.streak + 1;
+  $("sHands").textContent = st.hands; $("sAcc").textContent = Math.round(st.right / st.hands * 100) + "%"; $("sStreak").textContent = st.streak;
+  play(grade); if (grade !== "bad" && st.streak % 10 === 0) play("streak");
+}
 function answer(a) {
+  if (st.cur?.postflop) return postAnswer(+a);
   const c = st.cur;
   if (!c || c.answered || c.busy || !c.avail.includes(a)) return;
   c.answered = true; c.shown = c.E.length + 1; // the next decision replays from after your action
   document.querySelector(".seat.hero").classList.remove("turn");
   const mix = mixOf(c.rows[c.i]), f = mix[a], best = Math.max(...Object.values(mix));
   const grade = f >= best - 5 || f >= 50 ? "great" : f >= 15 ? "ok" : "bad";
-  st.hands++; if (grade !== "bad") st.right++;
-  st.streak = grade === "bad" ? 0 : st.streak + 1;
+  tally(grade);
   prog.n++;
   prog.log.push([c.spot.key, c.hand, grade, a, ACTS.reduce((x, y) => mix[y] > mix[x] ? y : x)]);
   if (prog.log.length > 3000) prog.log.shift();
   review(c.spot.key + "|" + c.hand, grade === "bad");
   saveProg();
   play(a === "Fold" ? "deal" : "chip");
-  play(grade);
-  if (grade !== "bad" && st.streak % 10 === 0) play("streak");
   if (st.drill) { st.drill.n++; if (grade !== "bad") st.drill.right++; drawDrill(); }
 
   document.querySelectorAll("#actions button").forEach(b => { b.disabled = true; b.classList.toggle("picked", b.dataset.a === a); });
@@ -771,7 +794,6 @@ function answer(a) {
     document.querySelector(".hero .plate span").textContent = bb(z.S - put);
     $("pot").innerHTML = `Pot <b>${bb(z.pot - z.heroIn + put)}</b>`;
   }
-  $("sHands").textContent = st.hands; $("sAcc").textContent = Math.round(st.right / st.hands * 100) + "%"; $("sStreak").textContent = st.streak;
   $("verdict").className = "verdict " + grade;
   $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable", bad: "✗ Mistake" }[grade];
   $("mix").innerHTML = pills(mix, c.spot.node, a);
@@ -783,7 +805,7 @@ function answer(a) {
   let want = more && (c.spot.node === "RFI" && isLimp(nx) || nx === "FACINGSQZ_CALLER") ? "Call" : "Raise";
   let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
-  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } }
+  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post) { c.post = after.post; more = true; } }
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${note}</b></p>`);
   $("next").innerHTML = more ? "Continue hand ▸<kbd>Space</kbd>" : "Next hand <kbd>Space</kbd>";
   drawGrid(c);
@@ -916,7 +938,7 @@ function drawBrowse() {
 }
 
 // ---------- wiring ----------
-$("actions").addEventListener("click", e => { const b = e.target.closest("button"); if (b) answer(b.dataset.a); });
+$("actions").addEventListener("click", e => { const b = e.target.closest("button"); if (b) b.dataset.next !== undefined ? next() : answer(b.dataset.a); });
 $("next").onclick = next;
 const stopDrill = () => { st.drill = null; drawDrill(); };
 $("chips").onclick = e => {
@@ -924,7 +946,8 @@ $("chips").onclick = e => {
   if (!b) return;
   const g = b.parentElement.dataset.g, v = b.dataset.v;
   if (g === "pack") { pack = v; save("gto-pack", v); muted = false; $("mute").textContent = "🔊"; play("great"); return drawSettings(); }
-  if (g === "nodes" || g === "pos") cfg[g] = !v ? [] : cfg[g].includes(v) ? cfg[g].filter(x => x !== v) : [...cfg[g], v];
+  if (g === "post") cfg.toPost = !cfg.toPost;
+  else if (g === "nodes" || g === "pos") cfg[g] = !v ? [] : cfg[g].includes(v) ? cfg[g].filter(x => x !== v) : [...cfg[g], v];
   else cfg[g] = v;
   if (g === "game") { cfg.pos = []; if (!stacksOf(v).includes(cfg.stack)) cfg.stack = stacksOf(v).at(-1); }
   save("gto-cfg", JSON.stringify(cfg)); drawSettings(); stopDrill(); newHand();
@@ -965,6 +988,7 @@ document.addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   if ((k === " " || k === "enter") && st.cur?.answered) { e.preventDefault(); next(); return; }
   if (k === "m") return $("mute").click();
+  if (st.cur?.postflop) return /^[1-9]$/.test(k) && answer(+k - 1);
   const a = Object.keys(KEYS).find(x => KEYS[x] === k);
   if (a) answer(a);
 });

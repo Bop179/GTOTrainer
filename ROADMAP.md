@@ -125,16 +125,19 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
 - [x] River solver in the browser (2026-11-13). `river.js` and `river_wasm.js`: the same solver compiled to WebAssembly (1.4 MB, base64 so it loads from `file://`). Rebuild it with `solver/build_wasm.sh`.
   - A worst-case river (full preflop ranges, two bet sizes) solves in under 0.1 s to 0.8% of the pot.
   - Its result matched the native solver exactly.
-  - Not loaded by `index.html` yet; that waits for the postflop mode.
 - [ ] Shrink the turn data before shipping it to the trainer. Turn cards with the same suit pattern give the same strategy with suits swapped (checked), so store one of each and map suits in the trainer.
 - [ ] Serve the solutions to other users from a static file server on the VM (decided 2026-11-13). Set it up once the postflop mode exists; opening a port earlier only adds exposure.
   - Egress is free up to 10 TB a month. The security list needs port 443 opened.
   - Not Object Storage: its API requests are only free up to 50,000 a month, and quotas can't cap them.
   - Room to grow: with 40 flops for rare matchups, all heads-up single-raised and 3-bet pots at 6-max and 8-max 100bb come to an estimated 5,000 solves and about 25 GB. That fits the free 200 GB of block storage (47 GB is the boot disk). Solve time is the real limit: about 30 days of the VM nonstop (3-bet pots guessed at 5 minutes a solve).
   - 9-max postflop reuses the 8-max solves, as preflop already does once UTG folds (decided 2026-11-13).
-- [ ] Trainer postflop mode:
-  - Deal a spot and one of its 95 flops, ask for the action at each flop and turn node, and grade by frequency and EV lost.
-  - At the river, build both ranges from the turn reach and the strategy along the line played, call `RiverSolver.solve`, and grade the river decision the same way.
+- [x] Postflop in the live hand (2026-11-13), `postflop.js`. When preflop ends heads-up in a solved matchup, the hand goes on to the flop instead of stopping.
+  - The flop is one of that matchup's solved flops that misses your cards, with its suits randomly relabelled. The villain's hand is drawn from their range at the flop, and they play by sampling their solved strategy.
+  - Each flop, turn and river decision is graded by frequency and EV lost: right if the solver plays it 25% or more or it loses 2% of the pot or less, acceptable at 5% or 5% of the pot. The feedback lists every action's EV, the hand's mix, the whole range's mix and a 13x13 chart of the node.
+  - River: both ranges come from the turn reach times the frequency of each player's last turn action, solved live with 33%, 75% and 125% bets (about 0.1 s).
+  - **Play to postflop** setting: deals only preflop spots that lead into a solved matchup (an open from the opener's seat, or the caller facing it) with a hand that opens or calls there; the others are scripted to fold and the caller to call.
+  - Data: `solver/pull_post.sh` runs `solver/split.py` on the VM (one flop piece and one piece per turn card, gzipped and base64 inside a `<script>` so it loads from `file://`), then mirrors it into `post/` (gitignored, about 14 MB a flop).
+  - Not yet: a showdown winner (it only shows the villain's cards); hands after a raised flop end at the turn (no turn data); postflop hands aren't in the leak log or reviews.
 
 ## Out of scope for now
 
