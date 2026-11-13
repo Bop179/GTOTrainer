@@ -120,15 +120,15 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .board { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); display: flex; gap: 6px; }
 .still .card.new { animation: deal .25s ease-out both; }
 .situation div:not(:last-child) { font-size: 14px; line-height: 1.5; color: var(--muted); display: inline; margin-right: .4em; } /* narrow: earlier streets run together above the table */
-/* keep the whole table on screen: cap the felt by viewport height (2:1 felt, ~290px of header, text and buttons) */
-@media (min-width: 601px) { .felt { max-width: calc((100vh - 290px) * 2); margin-inline: auto; } }
+/* keep the whole table on screen: cap the felt by viewport height (2:1 felt, ~330px of header, text, spacing and buttons) */
+@media (min-width: 601px) { .felt { max-width: calc((100vh - 330px) * 2); margin-inline: auto; } .table { padding-top: 32px; } }
 /* wide screens: range chart | table | analysis side by side, so feedback never needs a scroll */
 @media (min-width: 1200px) {
   main { max-width: 1600px; grid-template-columns: 360px minmax(0, 1fr) 360px; grid-template-areas: "drill drill drill" "chart table hist" "chart table analysis"; grid-template-rows: auto auto 1fr; align-items: start; }
   /* the hand so far, one street per line, at the top of the right column */
   .situation { grid-area: hist; text-align: left; margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 16px; line-height: 1.5; }
   .situation div:not(:last-child) { display: block; margin: 0 0 6px; }
-  .table { padding-top: 28px; } /* room for the top seat's cards */
+  .table { padding-top: 72px; } /* sits lower, level with the panels' content, with room for the top seat's cards */
   .drillbar { grid-area: drill; } .table { grid-area: table; } .chart { grid-area: chart; } .analysis { grid-area: analysis; }
   .feedback, .feedback.show { display: contents; }
   .feedback > div { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }

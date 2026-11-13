@@ -107,7 +107,7 @@ async function postBegin(c) {
   P.hands = [];
   P.hands[me] = hero;
   P.hands[1 - me] = vr.hands[pick(vr.hands.map((h, i) => cardsOf(h).some(x => mine.includes(x)) ? 0 : vr.reach[i]))];
-  P.story.push(`Flop ${P.board.map(cardText).join(" ")}:`);
+  P.story.push("Flop:"); // the cards are on the board; the story only says who did what
   st.cur = P;
   if (!hr.hands.includes(hero)) end(`${HANDS[c.i]} isn't in the solved range at the flop (the solver doesn't play it this way preflop), so the hand ends here.`);
   postDraw(true);
@@ -132,12 +132,12 @@ async function step(i) {
   postDraw(false); await new Promise(r => setTimeout(r, 700));
   if (P.spent[0] >= P.stack - .01 && P.spent[1] >= P.stack - .01) {
     while (P.board.length < 5) P.board.push(dealOne());
-    return end(`All-in: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. Board ${P.board.map(cardText).join(" ")}.`, true);
+    return end(`All-in: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}.`, true);
   }
   if (P.street === 2) return end(`Showdown: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}.`, true);
   const c = dealOne();
   P.board.push(c); P.street++; P.put = [0, 0]; P.tag = ["", ""]; P.isNew = P.board.length - 1;
-  P.story.push(`${STREET[P.street]} ${cardText(c)}:`);
+  P.story.push(`${STREET[P.street]}:`);
   if (P.street === 1) {
     const turn = await loadPiece(`${P.scen}/${P.flop}/${c}`);
     P.nodes = { ...P.nodes, ...turn }; P.k = nk + "-" + c;
@@ -192,7 +192,7 @@ function postDraw(fresh) {
   const moved = p => P.put[p] && P.put[p] !== was.put[p], folds = p => P.tag[p] === "Fold" && was.tag[p] !== "Fold";
   if (moved(them)) play("chip");
   if (folds(them) || P.isNew < P.board.length) play("deal");
-  $("situation").innerHTML = P.story.map(s => `<div>${say0(s)}</div>`).join(""); // one street per line; the current one stands out
+  $("situation").innerHTML = P.story.filter(s => !s.endsWith(":")).map(s => `<div>${say0(s)}</div>`).join(""); // a street shows once someone acts // one street per line; the current one stands out
   const seat = (p, s) => `<div class="seat${p === me ? " hero" : ""}${P.tag[p] === "Fold" ? " folded" : ""}${p === me && mine ? " turn" : ""}${folds(p) ? " toss" : ""}" style="--c:0;--s:${s};--r:1">`
     + (p === me || P.show ? `<div class="cards">${cardsOf(P.hands[p]).map(x => cardHTML(x)).join("")}</div>`
       : `<div class="backs">${P.tag[p] !== "Fold" || folds(p) ? "<i></i><i></i>" : ""}</div>`)
