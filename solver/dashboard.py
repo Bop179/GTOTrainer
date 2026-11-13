@@ -8,6 +8,7 @@ from pathlib import Path
 
 HOME = Path.home()
 JOBS, RES = HOME / "jobs", HOME / "results"
+FAIL = re.compile(r"^(\S+) FAILED jobs/(\S+)\.json\s*(.*)")
 OK = re.compile(r"^(\S+) ok jobs/([^/]+)/(\S+)\.json solved: (\d+) iterations, exploitability ([\d.]+)% of pot, (\d+)s")
 
 
@@ -59,7 +60,7 @@ def sysinfo():
 
 
 # ---- charts: inline SVG, one accent colour, hover text via <title> ----
-CW, CH = 440, 160
+CW, CH = 620, 300
 X0, X1, Y0, Y1 = 38, CW - 10, 10, CH - 20
 nice = lambda v: f"{v:.0f}" if v >= 10 else f"{v:.1f}"
 
@@ -140,7 +141,12 @@ def page():
     job, elapsed = current_job()
     svc, load, used, total_mem = sysinfo()
     svc_color = "var(--ok)" if svc == "active" else "var(--bad)"
-    fails = "".join(f"<li><code>{html.escape(f)}</code></li>" for f in failed) or "<li>none</li>"
+    def fail_row(f):
+        m = FAIL.match(f)
+        return (f"<li><time>{html.escape(m[1][5:16].replace('T', ' '))}</time><b>{html.escape(m[2])}</b><span>{html.escape(m[3])}</span></li>"
+                if m else f"<li><span>{html.escape(f)}</span></li>")
+    fails = (f"<section class=fails><h3>Recent failures <em>{len(failed)}</em></h3><ul>{''.join(map(fail_row, failed))}</ul></section>" if failed
+             else "<section class=fails><h3>Recent failures <em class=zero>none</em></h3></section>")
     pct = 100 * tot_done / tot_all if tot_all else 0
     fpct = 100 * tot_fail / tot_all if tot_all else 0
     day_chart, counts = daily_bars(events, now)
@@ -153,15 +159,19 @@ def page():
 <meta name=viewport content="width=device-width,initial-scale=1"><title>Solver queue</title>
 <style>:root{{--bg:#fff;--fg:#111;--mut:#667;--grid:#8883;--ok:#2a9d6a;--bad:#d43}}
 @media(prefers-color-scheme:dark){{:root{{--bg:#111;--fg:#ddd;--mut:#99a;--ok:#4cc38a;--bad:#f66}}}}
-body{{font:14px system-ui;margin:16px auto;max-width:980px;padding:0 16px;background:var(--bg);color:var(--fg)}}
+body{{font:14px system-ui;margin:16px 0;padding:0 24px;background:var(--bg);color:var(--fg)}}
 h2{{margin:0 0 8px}}.hero{{height:22px;background:var(--grid);border-radius:11px;overflow:hidden;display:flex}}
 .hero i{{background:var(--ok)}}.hero u{{background:var(--bad)}}.sub{{color:var(--mut);margin:6px 0 14px}}
 .tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px}}
 .tile{{border:1px solid var(--grid);border-radius:8px;padding:8px 10px}}.tile span{{display:block;color:var(--mut);font-size:12px}}.tile b{{font-size:17px}}
-.charts{{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}}figure{{margin:0}}figcaption{{font-weight:600;margin-bottom:2px}}
-svg{{width:100%;height:auto}}svg .t{{fill:var(--mut);font:10px system-ui}}svg .ax{{stroke:var(--mut)}}svg .gr{{stroke:var(--grid)}}
+.charts{{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:12px}}figure{{margin:0}}figcaption{{font-weight:600;margin-bottom:2px}}
+svg{{width:100%;height:auto}}svg .t{{fill:var(--mut);font:13px system-ui}}svg .ax{{stroke:var(--mut)}}svg .gr{{stroke:var(--grid)}}
 svg .bar{{fill:var(--ok)}}svg .ln{{fill:none;stroke:var(--ok);stroke-width:2}}svg .proj{{stroke-dasharray:5 4;opacity:.7}}
 svg .dot{{fill:var(--ok);stroke:var(--bg);stroke-width:2}}figure small{{color:var(--mut)}}
+.fails{{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;border-left:3px solid var(--bad);padding:4px 12px;margin:0 0 14px;background:var(--grid);border-radius:0 6px 6px 0}}
+.fails h3{{margin:0;font-size:13px}}.fails em{{font-style:normal;background:var(--bad);color:#fff;border-radius:9px;padding:0 7px;font-size:11px}}.fails em.zero{{background:none;color:var(--ok);padding:0}}
+.fails ul{{list-style:none;margin:0;padding:0;flex:1 1 100%;display:grid;gap:2px}}.fails li{{display:flex;gap:10px;font:12px ui-monospace,monospace;white-space:nowrap;overflow:hidden}}
+.fails li span{{color:var(--mut);overflow:hidden;text-overflow:ellipsis}}.fails time{{color:var(--mut)}}
 table{{border-collapse:collapse;width:100%}}td,th{{padding:4px 8px;text-align:left;border-bottom:1px solid var(--grid)}}
 .track{{width:160px;height:10px;background:var(--grid);border-radius:5px;overflow:hidden}}.track i{{display:block;height:100%;background:var(--ok)}}code{{font-size:12px}}</style>
 <h2>Solver queue: {tot_done}/{tot_all} flops ({pct:.1f}%)</h2>
@@ -169,10 +179,11 @@ table{{border-collapse:collapse;width:100%}}td,th{{padding:4px 8px;text-align:le
 <p class=sub>ETA {fmt(eta) if eta else '–'}, done {finish} · gto-queue <b style="color:{svc_color}">{html.escape(svc)}</b> · now <code>{html.escape(job or 'idle')}</code>{f' ({fmt(elapsed)} in)' if job else ''} ·
 load {' '.join(load)} (4 cores) · RAM {used:.1f}/{total_mem:.1f} GB</p>
 <div class=tiles>{tiles}</div>
+{fails}
 <div class=charts>{progress_curve(events, now, tot_done, tot_all, eta)}{day_chart}{solve_times(events)}</div>
 <h3>Scenarios</h3>
 <table><tr><th>Scenario</th><th>Done</th><th></th><th>Failed</th><th>Avg</th><th>ETA</th></tr>{''.join(rows)}</table>
-<h3>Recent failures</h3><ul>{fails}</ul><p class=sub><small>{time.strftime('%F %T UTC', time.gmtime(now))} · refreshes every 30 s</small></p>"""
+<p class=sub><small>{time.strftime('%F %T UTC', time.gmtime(now))} · refreshes every 30 s</small></p>"""
 
 
 class H(BaseHTTPRequestHandler):
