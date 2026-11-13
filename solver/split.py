@@ -5,7 +5,10 @@
 # so index.html can load it with a <script> tag from file:// as well as from a server.
 import base64, collections, gzip, json, os, sys
 
-ORDER = ["SB", "BB", "UTG", "HJ", "CO", "BTN"]  # postflop action order: the later seat is in position
+ORDER = ["SB", "BB", "UTG", "UTG1", "LJ", "HJ", "CO", "BTN"]  # postflop action order (6-max and 8-max seats): the later seat is in position
+# Pot kinds postflop.js can deal (name part [5]: "" single-raised, "3bet"). Others stay in ~/results only, so ~/post (served
+# to every user, and short on disk) holds just what the trainer plays. Add a kind here when postflop.js learns it.
+TRAINER_KINDS = {"", "3bet"}
 src, out = sys.argv[1], sys.argv[2]
 index = {}
 
@@ -15,7 +18,7 @@ def write(path, key, obj):
     os.replace(path + ".tmp", path)
 
 for scen in sorted(os.listdir(src)):
-    if not os.path.isdir(os.path.join(src, scen)): continue
+    if not os.path.isdir(os.path.join(src, scen)) or (scen.split("_")[5:] or [""])[0] not in TRAINER_KINDS: continue
     opener, caller = scen.split("_")[2], scen.split("_")[4]  # 6max_100bb_BTN_v_BB
     ip_opener = ORDER.index(opener) > ORDER.index(caller)
     meta = {"oop": caller if ip_opener else opener, "ip": opener if ip_opener else caller, "flops": []}
