@@ -137,6 +137,5 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
 
 Might do these later, might never do these:
 
-- Heads-up.
 - Postflop at 200bb (decided 2026-11-13). The trees are deeper, and some may not fit in the VM's 23 GB without cutting bet sizes.
 - Postflop multiway pots.
