@@ -8,7 +8,7 @@ R = "AKQJT98765432"
 H = [R[i] + R[j] if i == j else (R[i] + R[j] + "s" if i < j else R[j] + R[i] + "o") for i in range(13) for j in range(13)]
 SRC = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data6.js")).read()
 SCENARIOS = [("BTN", "BB"), ("CO", "BB"), ("SB", "BB"), ("HJ", "BB"), ("UTG", "BB"), ("CO", "BTN"), ("HJ", "BTN"), ("UTG", "BTN")]
-SIZES = {"flop_sizes": ["33%, 75%", "2.5x"], "turn_sizes": ["75%", "2.5x"], "river_sizes": ["75%", "2.5x"]}
+SIZES = {"flop_sizes": ["33%, 75%", "2.5x"], "turn_sizes": ["75%, 125%", "2.5x"], "river_sizes": ["75%", "2.5x"]}
 N_FLOPS = 95
 
 def rows(key):
@@ -42,7 +42,7 @@ def job(opener, caller, flop):
     order = ["SB", "BB", "UTG", "HJ", "CO", "BTN"]  # postflop action order: the later seat is in position
     ip_is_opener = order.index(opener) > order.index(caller)
     return {"oop": c if ip_is_opener else o, "ip": o if ip_is_opener else c, "flop": flop,
-            "pot": pot, "stack": 100 - o_size, **SIZES, "target": 0.005, "max_iter": 1000}
+            "pot": pot, "stack": 100 - o_size, **SIZES, "target": 0.01, "max_iter": 1000}
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "jobs")
