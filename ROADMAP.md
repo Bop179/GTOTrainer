@@ -147,7 +147,7 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
     - Ranges: the 3-bettor's raise from `<opener>/<3-bettor>/FACINGRFI`, and the opener's call from `<3-bettor>/<opener>/FACING3B`. The reach column there is the opener's open frequency, so the call % times reach is the calling range.
     - Sizes from `SIZES`: CO opens 2.5 and BTN 3-bets to 8.5, so the pot is 18.5 and 91.5bb is behind.
     - The trees are small (stack-to-pot 3.3 to 5.3, at most 1.9 GB). One test solve took about 2 minutes.
-    - The trainer still needs to send 3-bet pots to the flop (`scenOf` in `postflop.js` only knows single-raised names).
+    - [x] The trainer sends 3-bet pots to the flop (2026-11-13, untested until the first one is pulled): you call a heads-up 3-bet of your open, or you 3-bet and the opener calls; "Play to postflop" deals those lines too.
   - 4-bet pots: the same pattern, one level up (`FACING4B`).
   - **Multiway preflop that ends heads-up** (added 2026-11-13):
     - Squeeze pots: open, call, squeeze, the opener folds, the caller calls. The squeezer's range is the raise in `<opener>+<caller>/<squeezer>/FACINGRFI_CALL`, and the caller's is the call in `<opener>+<squeezer>/<caller>/FACINGSQZ_CALLER`. The opener's 2.5bb is dead money.

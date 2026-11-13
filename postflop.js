@@ -6,17 +6,22 @@ window.POST = {};
 const PI = window.POST_INDEX || {};
 const SUIT = "shdc"; // SUITS order in index.html
 const UP = "23456789TJQKA";
-const scenOf = (game, stack, opener, caller) => PI[`${game}_${stack}_${opener}_v_${caller}`] && `${game}_${stack}_${opener}_v_${caller}`;
+// a solved heads-up pot: single-raised (opener v caller), or kind "_3bet" (opener v 3-bettor, the opener calls the 3-bet)
+const scenOf = (game, stack, opener, caller, kind = "") => PI[`${game}_${stack}_${opener}_v_${caller}${kind}`] && `${game}_${stack}_${opener}_v_${caller}${kind}`;
 const postGames = () => Object.keys(PI).map(s => s.split("_").slice(0, 2).join("/"));
 
-// "Play to postflop": a preflop spot that leads into a solved matchup (an open from the opener's seat, or the caller
-// facing that open), with a hand that opens or calls there. The others are scripted to let it through (see postReply).
+// "Play to postflop": a preflop spot that leads into a solved matchup, with a hand that takes the line there.
+// Single-raised: the opener's open (col 1 raise) or the caller facing it (col 2 call).
+// 3-bet pot: the opener facing the 3-bet (col 2 call), or the 3-bettor facing the open (col 1 raise).
+// The others are scripted to let it through (see postReply).
 function postDeal(g, pos) {
   const [game, stack] = g.split("/"), opts = [];
   for (const scen of Object.keys(PI)) {
-    const [gm, sk, opener, , caller] = scen.split("_");
+    const [gm, sk, opener, , caller, kind] = scen.split("_");
     if (gm !== game || sk !== stack) continue;
-    for (const [hero, key, col] of [[opener, `${g}/${opener}/RFI`, 1], [caller, `${g}/${opener}/${caller}/FACINGRFI`, 2]])
+    const ways = kind === "3bet" ? [[opener, `${g}/${caller}/${opener}/FACING3B`, 2], [caller, `${g}/${opener}/${caller}/FACINGRFI`, 1]]
+      : [[opener, `${g}/${opener}/RFI`, 1], [caller, `${g}/${opener}/${caller}/FACINGRFI`, 2]];
+    for (const [hero, key, col] of ways)
       if (SPOTS[key] && (!pos.length || pos.includes(hero))) opts.push({ scen, key, col });
   }
   if (!opts.length) return null;
@@ -26,7 +31,12 @@ function postDeal(g, pos) {
 // with "Play to postflop" on: you made the move that leads to the flop, so the scripted caller calls and the rest fold
 function postReply(c, a) {
   if (!c.scen) return null;
-  const [, , opener, , caller] = c.scen.split("_");
+  const [, , opener, , caller, kind] = c.scen.split("_");
+  if (kind === "3bet") { // the opener's open is scripted; the 3-bet gets called
+    if (c.spot.node === "FACING3B" && a === "Call") return { text: `You call ${caller}'s 3-bet: on to the flop!`, post: c.scen };
+    if (c.spot.node === "FACINGRFI" && a === "Raise" && c.z.raise < c.z.S) return { text: `${opener} calls and the rest fold: on to the flop!`, post: c.scen };
+    return null;
+  }
   if (c.spot.node === "RFI" && a === "Raise" && c.z.raise < c.z.S) return { text: `${caller} calls and the rest fold: on to the flop!`, post: c.scen };
   if (c.spot.node === "FACINGRFI" && a === "Call") return { text: `The rest fold: heads-up with ${opener} to the flop!`, post: c.scen };
   return null;
@@ -108,12 +118,15 @@ async function postBegin(c) {
   }
   let nodes;
   try { nodes = await loadPiece(`${scen}/${flop}/flop`); } catch (e) { $("situation").textContent = e.message; return; }
-  const [, , opener, , caller] = scen.split("_");
+  const [, , opener, , caller, kind] = scen.split("_"), who = (p, v1, v3) => p === c.spot.hero ? "you " + v1 : `${p} ${v3}`;
   const hero = holeStr(...mine), vr = nodes[me ? "" : "0"], hr = nodes[me ? "0" : ""]; // villain's / your range at the flop
   P = { postflop: true, scen, me, sig, seat: [m.oop, m.ip], pot0: m.pot, stack: m.stack, board: [flop.slice(0, 2), flop.slice(2, 4), flop.slice(4)],
     flop, nodes, k: "", street: 0, spent: [0, 0], put: [0, 0], tag: ["", ""], hist: [], over: false, answered: false, cards: c.cards, isNew: 3,
     // the hand so far: street names ({s}) and actions ({t, k}); a closing message ({t, end}) when it's over
-    story: [{ s: "Preflop" }, { t: `${opener === c.spot.hero ? "you open" : opener + " opens"} ${bb(100 - m.stack)}`, k: "Raise" }, { t: caller === c.spot.hero ? "you call" : caller + " calls", k: "Call" }] };
+    story: [{ s: "Preflop" }, ...(kind === "3bet"
+      ? [{ t: `${who(opener, "open", "opens")} ${bb(sizing(parse(`${c.spot.game}/${c.spot.stack}/${opener}/RFI`)).raise)}`, k: "Raise" },
+         { t: `${who(caller, "3-bet to", "3-bets to")} ${bb(100 - m.stack)}`, k: "Raise" }, { t: who(opener, "call", "calls"), k: "Call" }]
+      : [{ t: `${who(opener, "open", "opens")} ${bb(100 - m.stack)}`, k: "Raise" }, { t: who(caller, "call", "calls"), k: "Call" }])] };
   P.hands = [];
   P.hands[me] = hero;
   P.hands[1 - me] = vr.hands[pick(vr.hands.map((h, i) => cardsOf(h).some(x => mine.includes(x)) ? 0 : vr.reach[i]))];

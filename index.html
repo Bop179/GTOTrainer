@@ -651,6 +651,9 @@ function simNext(c, a, pot) {
   // heads-up in a solved single-raised pot: the hand goes on to the flop
   const sc = a === "Call" && !j && s.node === "FACINGRFI" && scenOf(s.game, s.stack, s.villain, s.hero);
   if (sc) return { text: "The rest fold: on to the flop!", post: sc };
+  // you call a heads-up 3-bet of your open: a solved 3-bet pot goes on to the flop
+  const sc3 = a === "Call" && s.node === "FACING3B" && scenOf(s.game, s.stack, s.hero, s.villain, "_3bet");
+  if (sc3) return { text: `You call ${s.villain}'s 3-bet: on to the flop!`, post: sc3 };
   if (a === "Call" && !limp) return { text: `${j ? joinText(j) + ". " : ""}You ${s.node === "FACINGLIMP" ? "check" : "call"}: on to the flop, where this preflop trainer stops.` };
   if (villains(s).length > 1) return { text: "The solver data doesn't cover the replies to your raise, so the hand ends here." };
   // a villain with no spot to respond from would otherwise "fold"
@@ -671,6 +674,9 @@ function simNext(c, a, pot) {
   }
   const sc2 = callers === 1 && !limp && s.node === "RFI" && scenOf(s.game, s.stack, s.hero, caller);
   if (sc2) return { text: `${caller} calls: on to the flop!`, post: sc2 };
+  // you 3-bet the open heads-up and the opener calls
+  const sc4 = callers === 1 && !j && !shove && s.node === "FACINGRFI" && scenOf(s.game, s.stack, caller, s.hero, "_3bet");
+  if (sc4) return { text: `${caller} calls: on to the flop!`, post: sc4 };
   return { text: caller ? `${caller} ${limp ? "checks" : "calls"}: on to the flop, where this preflop trainer stops.` : `Everyone folds. You take the ${bb(pot)} pot.` };
 }
 
