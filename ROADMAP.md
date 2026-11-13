@@ -139,9 +139,19 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
   - Data: `solver/pull_post.sh` runs `solver/split.py` on the VM (one flop piece and one piece per turn card, gzipped and base64 inside a `<script>` so it loads from `file://`), then mirrors the scenarios you name (default BTN vs BB) into `post/` (gitignored, about 14 MB a flop, so not all 15 fit on the Mac) and writes `post/index.js` listing only flops on disk.
   - Not yet: a showdown winner (it only shows the villain's cards); hands after a raised flop end at the turn (no turn data); postflop hands aren't in the leak log or reviews.
 
+- [ ] More heads-up pots, queued after the six common single-raised matchups (about 2026-11-18) and ahead of the nine rare ones. Ranked and split into 95 or 40 flops by the same frequency rule. Each needs a job-builder change; the ranges are already in `data6.js`.
+  - 3-bet pots: the 3-bettor's raise from `<opener>/<3-bettor>/FACINGRFI`, and the opener's call from `<3-bettor>/<opener>/FACING3B`. Sizes from `SIZES` (for example CO opens 2.5, BTN 3-bets to 8.5).
+  - 4-bet pots: the same pattern, one level up (`FACING4B`).
+  - **Multiway preflop that ends heads-up** (added 2026-11-13):
+    - Squeeze pots: open, call, squeeze, the opener folds, the caller calls. The squeezer's range is the raise in `<opener>+<caller>/<squeezer>/FACINGRFI_CALL`, and the caller's is the call in `<opener>+<squeezer>/<caller>/FACINGSQZ_CALLER`. The opener's 2.5bb is dead money.
+    - Cold 4-bet pots: open, 3-bet, cold 4-bet, the opener folds, the 3-bettor calls. Ranges from `FACING3B_COLD` (the raise) and `FACINGC4B_3B` (the call).
+    - Only the "opener folds" version of each line is in the data. When the opener calls the squeeze or the cold 4-bet, the other player's reply isn't, and the pot can still go 3-way, so those lines are skipped.
+    - These spots have no `SIZES`. Use the trainer's own sizing (`sizing()` in `index.html`) so the postflop pot matches what the preflop replay showed.
+  - `postflop.js` matches hands to solved scenarios by name, so new pot types need scenario names it can find from the preflop line (agree with the trainer side first).
+
 ## Out of scope for now
 
 Might do these later, might never do these:
 
 - Postflop at 200bb (decided 2026-11-13). The trees are deeper, and some may not fit in the VM's 23 GB without cutting bet sizes.
-- Postflop multiway pots.
+- Postflop multiway pots (3 or more players on the flop; decided 2026-11-13). postflop-solver is heads-up only, and 3-way trees would not fit on the VM.
