@@ -127,8 +127,9 @@ async function step(i) {
   if (k === "Fold") return end(`${say0(P.me === p ? `${P.seat[1 - p]} takes` : "you take")} the ${bb(potNow() - P.put[1 - p] + P.put[p])} pot.`); // the uncalled bet goes back
   const nk = P.k ? P.k + "-" + i : String(i);
   if (P.nodes[nk]) { P.k = nk; return; }
-  // street over: a call, or a check behind
+  // street over: a call, or a check behind. Let it land on the table before the chips go in and the next card comes
   P.story[P.story.length - 1] = P.story.at(-1).replace(/,$/, ".");
+  postDraw(false); await new Promise(r => setTimeout(r, 700));
   if (P.spent[0] >= P.stack - .01 && P.spent[1] >= P.stack - .01) {
     while (P.board.length < 5) P.board.push(dealOne());
     return end(`All-in: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. Board ${P.board.map(cardText).join(" ")}.`, true);
@@ -201,12 +202,12 @@ function postDraw(fresh) {
   $("felt").classList.toggle("still", !fresh);
   $("felt").innerHTML = seat(them, -1) + seat(me, 1)
     + `<div class="board">${P.board.map((x, j) => cardHTML(x, j >= P.isNew ? " new" : "")).join("")}</div>`
-    + `<div class="pot" style="top:64%">Pot <b>${bb(potNow() - P.put[0] - P.put[1])}</b></div>`;
+    + `<div class="pot" style="left:30%;top:64%">Pot <b>${bb(potNow() - P.put[0] - P.put[1])}</b></div>`;
   P.isNew = 9;
   postButtons(mine);
 }
 function postButtons(mine) {
-  if (!P.over && !mine) return document.querySelectorAll("#actions button").forEach(b => b.disabled = true); // their move: keep your last buttons, greyed
+  if (!P.over && (!mine || P.busy)) return document.querySelectorAll("#actions button").forEach(b => b.disabled = true); // their move: keep your last buttons, greyed
   if (P.over) { P.answered = true; $("actions").innerHTML = `<button data-next style="background:var(--panel)">Next hand<kbd>Space</kbd></button>`; return; }
   $("actions").innerHTML = cur().actions.map((a, i) => `<button data-a="${i}" style="background:${AC[kind(a)]}">${actName(a)}<kbd>${i + 1}</kbd></button>`).join("");
 }
