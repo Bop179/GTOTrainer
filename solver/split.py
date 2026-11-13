@@ -41,6 +41,7 @@ for scen in sorted(os.listdir(src)):
         print(f"{scen}/{flop}: {len(parts) - 1} turn cards", flush=True)
     if meta["flops"]: index[scen] = meta
 
-with open(os.path.join(out, "index.js"), "w") as f:
+with open(os.path.join(out, "index.js.tmp"), "w") as f:  # atomic: the VM serves this file live (Caddy)
     f.write("POST_INDEX=" + json.dumps(index, separators=(",", ":")) + ";\n")
+os.replace(os.path.join(out, "index.js.tmp"), os.path.join(out, "index.js"))
 print(f"{sum(len(m['flops']) for m in index.values())} flops in {len(index)} scenarios -> {out}/index.js")

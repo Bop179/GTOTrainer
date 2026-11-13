@@ -5,7 +5,7 @@
 # About 14 MB a flop (BTN_v_BB ~1.3 GB, all 15 scenarios ~13 GB): the Mac can't hold everything, so pull what you train.
 set -e
 cd "$(dirname "$0")"
-ssh gto-vm 'python3 -I - results post' < split.py >/dev/null
+ssh gto-vm 'flock /tmp/split.lock python3 -I - results post' < split.py >/dev/null
 mkdir -p ../post
 for s in "${@:-6max_100bb_BTN_v_BB}"; do rsync -a --delete "gto-vm:post/$s/" "../post/$s/"; done
 scp -q gto-vm:post/index.js ../post/index.vm.js

@@ -1,5 +1,5 @@
 // Postflop (ROADMAP item 9): a preflop hand that ends heads-up in a solved single-raised pot plays on to the river.
-// Flop and turn come from the VM pre-solves (post/, from solver/pull_post.sh); the river is solved live (river.js).
+// Flop and turn come from the VM pre-solves (post/ from solver/pull_post.sh, else straight from the VM's Caddy); the river is solved live (river.js).
 // Everything runs in the solver's suits: the solved flop is shown with its suits relabelled (P.sig), and your preflop
 // cards are mapped back into solver suits. Uses index.html's globals ($, st, pick, bb, play, tally, ...) at call time.
 window.POST = {};
@@ -36,7 +36,7 @@ function postReply(c, a) {
 function loadPiece(path) {
   return new Promise((ok, bad) => {
     const s = document.createElement("script");
-    s.src = `post/${path}.js`; s.onload = ok; s.onerror = () => bad(new Error(`post/${path}.js is missing (run solver/pull_post.sh)`));
+    s.src = `${POST_BASE}${path}.js`; s.onload = ok; s.onerror = () => bad(new Error(`${POST_BASE}${path}.js is missing (run solver/pull_post.sh, or the VM is down)`));
     document.head.append(s); s.remove();
   }).then(() => {
     const b = Uint8Array.from(atob(POST[path]), x => x.charCodeAt(0)); delete POST[path];

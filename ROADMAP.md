@@ -126,7 +126,10 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
   - A worst-case river (full preflop ranges, two bet sizes) solves in under 0.1 s to 0.8% of the pot.
   - Its result matched the native solver exactly.
 - [ ] Shrink the turn data before shipping it to the trainer. Turn cards with the same suit pattern give the same strategy with suits swapped (checked), so store one of each and map suits in the trainer.
-- [ ] Serve the solutions to other users from a static file server on the VM (decided 2026-11-13). Set it up once the postflop mode exists; opening a port earlier only adds exposure.
+- [ ] Serve the solutions to other users from a static file server on the VM (decided 2026-11-13).
+  - [x] Caddy on the VM (2026-11-13) serves `~/post` at `https://147-224-143-161.sslip.io/`: no directory listing, 443 only (AdGuard owns :80 on 10.8.0.1, so the cert uses the TLS-ALPN challenge). Cron re-splits `~/results` into `~/post` every 10 minutes under `flock /tmp/split.lock`, which `pull_post.sh` shares.
+  - [x] Trainer: with no local `post/index.js`, `index.html` loads the index and every piece from the VM (`POST_BASE`). Your Mac keeps using its local `post/`.
+  - [ ] Open TCP 443: ingress rule in the OCI security list, and `iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT` + `netfilter-persistent save` on the VM.
   - Egress is free up to 10 TB a month. The security list needs port 443 opened.
   - Not Object Storage: its API requests are only free up to 50,000 a month, and quotas can't cap them.
   - Room to grow: with 40 flops for rare matchups, all heads-up single-raised and 3-bet pots at 6-max and 8-max 100bb come to an estimated 5,000 solves and about 25 GB. That fits the free 200 GB of block storage (47 GB is the boot disk). Solve time is the real limit: about 30 days of the VM nonstop (3-bet pots guessed at 5 minutes a solve).
