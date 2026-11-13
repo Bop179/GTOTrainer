@@ -1,0 +1,12 @@
+[package]
+name = "gto-solve"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+postflop-solver = { git = "https://github.com/b-inary/postflop-solver", default-features = false, features = ["rayon"] }
+serde_json = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1

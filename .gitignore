@@ -2,3 +2,4 @@ SPEC.md
 .DS_Store
 .claude/
 __pycache__/
+solver/target/
