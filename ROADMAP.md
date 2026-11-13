@@ -119,7 +119,7 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
 
 - [x] Solver wrapper, job builder and queue runner, with a memory guard and a restart after a reboot.
 - [x] Oracle VM running (4 OCPU / 24 GB, Always Free). Quotas and a $0.01 budget alert keep the account at $0.
-- [ ] Pre-solve the flop and turn: 930 solves (6 × 95 + 9 × 40) at about 12 minutes each, about 8 days. Started 2026-11-13, BTN vs BB first. The six common matchups should be done about 2026-11-18.
+- [ ] Pre-solve the flop and turn: 1,530 solves, about 9 days. That's 930 single-raised (6 × 95 + 9 × 40, about 12 minutes each) and 600 3-bet (15 × 40, about 2 minutes each). Started 2026-11-13, BTN vs BB first. The six common matchups should be done about 2026-11-18.
   - Each solve saves every flop decision, and every turn decision after a flop line with no raise (check-check or bet-call). Hands below 0.1% reach are dropped. Frequencies are whole percentages and EVs are rounded to 0.01bb.
   - Turn data is about 8 MB a flop compressed (measured on an unconverged test), so about 6 GB in all. It stays on the VM, which has 41 GB free.
 - [x] River solver in the browser (2026-11-13). `river.js` and `river_wasm.js`: the same solver compiled to WebAssembly (1.4 MB, base64 so it loads from `file://`). Rebuild it with `solver/build_wasm.sh`.
@@ -142,8 +142,12 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
   - Data: `solver/pull_post.sh` runs `solver/split.py` on the VM (one flop piece and one piece per turn card, gzipped and base64 inside a `<script>` so it loads from `file://`), then mirrors the scenarios you name (default BTN vs BB) into `post/` (gitignored, about 14 MB a flop, so not all 15 fit on the Mac) and writes `post/index.js` listing only flops on disk.
   - Not yet: a showdown winner (it only shows the villain's cards); hands after a raised flop end at the turn (no turn data); postflop hands aren't in the leak log or reviews.
 
-- [ ] More heads-up pots, queued after the six common single-raised matchups (about 2026-11-18) and ahead of the nine rare ones. Ranked and split into 95 or 40 flops by the same frequency rule. Each needs a job-builder change; the ranges are already in `data6.js`.
-  - 3-bet pots: the 3-bettor's raise from `<opener>/<3-bettor>/FACINGRFI`, and the opener's call from `<3-bettor>/<opener>/FACING3B`. Sizes from `SIZES` (for example CO opens 2.5, BTN 3-bets to 8.5).
+- [ ] More heads-up pots. Each is ranked by the same frequency rule and gets 95 or 40 flops, and the queue takes all pot types in frequency order. Each type needs a job-builder change; the ranges are already in `data6.js`.
+  - [x] 3-bet pots (2026-11-13): `6max_100bb_<OPENER>_v_<3BETTOR>_3bet`, all 15 pairs, 40 flops each (all under the 5% cutoff; BTN vs SB 3-bet is the most common at 2.8%).
+    - Ranges: the 3-bettor's raise from `<opener>/<3-bettor>/FACINGRFI`, and the opener's call from `<3-bettor>/<opener>/FACING3B`. The reach column there is the opener's open frequency, so the call % times reach is the calling range.
+    - Sizes from `SIZES`: CO opens 2.5 and BTN 3-bets to 8.5, so the pot is 18.5 and 91.5bb is behind.
+    - The trees are small (stack-to-pot 3.3 to 5.3, at most 1.9 GB). One test solve took about 2 minutes.
+    - The trainer still needs to send 3-bet pots to the flop (`scenOf` in `postflop.js` only knows single-raised names).
   - 4-bet pots: the same pattern, one level up (`FACING4B`).
   - **Multiway preflop that ends heads-up** (added 2026-11-13):
     - Squeeze pots: open, call, squeeze, the opener folds, the caller calls. The squeezer's range is the raise in `<opener>+<caller>/<squeezer>/FACINGRFI_CALL`, and the caller's is the call in `<opener>+<squeezer>/<caller>/FACINGSQZ_CALLER`. The opener's 2.5bb is dead money.
