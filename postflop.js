@@ -75,6 +75,15 @@ function actName(a) { // button text
   if (k === "Allin") return `All-in ${bb(P.stack - P.spent[p] + P.put[p])}`;
   return k === "Call" ? `Call ${bb(call)}` : k;
 }
+// button: the action's name, then its amount on a second, smaller line (bets: small up to half pot, big up to pot, overbet past it)
+function btnLabel(a, i) {
+  const k = kind(a), x = amt(a), pct = Math.round(x / potNow() * 100), sub = t => `<small class="amt">${t}</small>`;
+  const key = `<kbd>${i + 1}</kbd>`;
+  if (k === "Bet") return `Bet ${pct <= 50 ? "small" : pct <= 100 ? "big" : "overbet"}${key}${sub(`${bb(x)} · ${pct}%`)}`;
+  if (k === "Raise") return `Raise${key}${sub(`to ${bb(x)}`)}`;
+  if (k === "Allin" || k === "Call") return `${k === "Call" ? "Call" : "All-in"}${key}${sub(actName(a).split(" ").at(-1))}`;
+  return k + key;
+}
 function say(p, a, add) {
   const me = p === P.me, k = kind(a), x = amt(a);
   const v = { Check: ["check", "checks"], Call: ["call", "calls"], Fold: ["fold", "folds"], Bet: ["bet", "bets"], Raise: ["raise to", "raises to"], Allin: ["go all-in", "goes all-in"] }[k][me ? 0 : 1];
@@ -213,7 +222,7 @@ function postDraw(fresh) {
 function postButtons(mine) {
   if (!P.over && (!mine || P.busy)) return document.querySelectorAll("#actions button").forEach(b => b.disabled = true); // their move: keep your last buttons, greyed
   if (P.over) { P.answered = true; $("actions").innerHTML = `<button data-next style="background:var(--panel)">Next hand<kbd>Space</kbd></button>`; return; }
-  $("actions").innerHTML = cur().actions.map((a, i) => `<button data-a="${i}" style="background:${AC[kind(a)]}">${actName(a)}<kbd>${i + 1}</kbd></button>`).join("");
+  $("actions").innerHTML = cur().actions.map((a, i) => `<button data-a="${i}" style="background:${AC[kind(a)]}">${btnLabel(a, i)}</button>`).join("");
 }
 
 // graded like preflop, plus EV: lose little EV against the best action (or pick a frequent one) and it's right.
