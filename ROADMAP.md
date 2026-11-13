@@ -127,7 +127,8 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
 - [ ] Serve the solutions to other users from a static file server on the VM (decided 2026-11-13). Set it up once the postflop mode exists; opening a port earlier only adds exposure.
   - Egress is free up to 10 TB a month. The security list needs port 443 opened.
   - Not Object Storage: its API requests are only free up to 50,000 a month, and quotas can't cap them.
-  - Room to grow: all heads-up single-raised and 3-bet pots at 6-max and 8-max, 100bb and 200bb, come to an estimated 16,000 solves and about 110 GB (9-max reusing 8-max). That fits the free 200 GB of block storage (47 GB is the boot disk). Solve time is the real limit: about 170 days of the VM nonstop. Some 200bb trees may need fewer sizes to fit in 23 GB.
+  - Room to grow: all heads-up single-raised and 3-bet pots at 6-max and 8-max 100bb come to an estimated 8,000 solves and about 40 GB. That fits the free 200 GB of block storage (47 GB is the boot disk). Solve time is the real limit: about 80 days of the VM nonstop.
+  - 9-max postflop reuses the 8-max solves, as preflop already does once UTG folds (decided 2026-11-13).
 - [ ] Trainer postflop mode:
   - Deal a spot and one of its 95 flops, ask for the action at each flop and turn node, and grade by frequency and EV lost.
   - At the river, build both ranges from the turn reach and the strategy along the line played, call `RiverSolver.solve`, and grade the river decision the same way.
@@ -137,4 +138,5 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
 Might do these later, might never do these:
 
 - Heads-up.
-- Postflop beyond heads-up single-raised pots at 6-max 100bb (3-bet pots, multiway, other formats and depths).
+- Postflop at 200bb (decided 2026-11-13). The trees are deeper, and some may not fit in the VM's 23 GB without cutting bet sizes.
+- Postflop multiway pots.
