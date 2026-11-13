@@ -24,6 +24,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SEATS = {"6max": ["UTG", "HJ", "CO", "BTN", "SB", "BB"], "8max": ["UTG", "UTG1", "LJ", "HJ", "CO", "BTN", "SB", "BB"]}
 FILES = {"6max": "data6.js", "8max": "data8.js"}
 SIZES = {"flop_sizes": ["33%, 75%", "2.5x"], "turn_sizes": ["75%, 125%", "2.5x"], "river_sizes": ["75%", "2.5x"]}
+# Limped pots (2bb pot, 99bb behind) with SIZES need 62 GB; this needs 26 GB (13 GB compressed, so it fits the VM):
+# no turn overbet, and 3x raises so the stacks go in after fewer raises.
+LIMP_SIZES = {"flop_sizes": ["33%, 75%", "3x"], "turn_sizes": ["75%", "3x"], "river_sizes": ["75%", "3x"]}
+FIRST = ["6max_100bb_BTN_v_BB"]  # already solving when the order was last changed: finish it before anything else
 N_FLOPS, N_FLOPS_RARE = 95, 40
 RARE = 0.05  # pots rarer than 5% of the game's heads-up single-raised pots get the smaller flop set
 STACK = 100
@@ -132,8 +136,8 @@ def flops(n):
 def job(g, a, b, size, dead, flop):
     """a, b = (seat, rows, col) for the pot's two players; each has put in size bb, and dead bb came from the others."""
     o, i = (b, a) if ip(g, a[0], b[0]) else (a, b)
-    return {"oop": rng(o[1], o[2]), "ip": rng(i[1], i[2]), "flop": flop,
-            "pot": 2 * size + dead, "stack": STACK - size, **SIZES, "target": 0.01, "max_iter": 1000}
+    return {"oop": rng(o[1], o[2]), "ip": rng(i[1], i[2]), "flop": flop, "pot": 2 * size + dead, "stack": STACK - size,
+            **(LIMP_SIZES if size == 1 else SIZES), "target": 0.01, "max_iter": 1000}
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "jobs")
@@ -153,6 +157,7 @@ if __name__ == "__main__":
     t = j("6max_100bb_CO_v_BTN_4bet")  # CO 4-bets to 23 and BTN calls: CO OOP with its 4-bets
     assert (t["pot"], t["stack"]) == (47.5, 77) and t["oop"] == rng(R6("BTN", "CO", "FACING3B"), 1)
     assert (j("6max_100bb_SB_v_BB_limp")["pot"], j("6max_100bb_SB_v_BB_limpraise")["pot"]) == (2, 7)
+    assert j("6max_100bb_SB_v_BB_limp")["turn_sizes"] == LIMP_SIZES["turn_sizes"] and j("6max_100bb_SB_v_BB_limpraise")["turn_sizes"] == SIZES["turn_sizes"]
     t = j("6max_100bb_HJ_v_CO_sqz_UTG")  # UTG opens 2.5, HJ flats, CO squeezes in position to 7.5, UTG folds, HJ calls
     assert (t["pot"], t["stack"]) == (2 * 7.5 + 2.5 + 1.5, 92.5) and t["ip"] == rng(R6("UTG+HJ", "CO", "FACINGRFI_CALL"), 1)
     t = j("6max_100bb_HJ_v_BB_sqz_UTG")  # the BB squeezes out of position: 2.5 x 4 = 10
@@ -163,7 +168,7 @@ if __name__ == "__main__":
     for n, f in sets.items(): json.dump(f, open(os.path.join(out, f"flops_{n}.json"), "w"))
     cut = {g: RARE * sum(f for f, gg, name, *_ in sc if gg == g and name.count("_") == 4) for g in SEATS}  # single-raised total
     order = []
-    for f, g, name, *_ in sorted(sc, key=lambda x: -x[0] / cut[x[1]]):
+    for f, g, name, *_ in sorted(sc, key=lambda x: (x[2] not in FIRST, -x[0] / cut[x[1]])):
         fl = sets[N_FLOPS if f >= cut[g] else N_FLOPS_RARE]
         d = os.path.join(out, name); os.makedirs(d, exist_ok=True)
         for x in fl: json.dump(J[name](x), open(os.path.join(d, x + ".json"), "w"))
