@@ -6,40 +6,51 @@ window.POST = {};
 const PI = window.POST_INDEX || {};
 const SUIT = "shdc"; // SUITS order in index.html
 const UP = "23456789TJQKA";
-// a solved heads-up pot: single-raised (opener v caller), or kind "_3bet" (opener v 3-bettor, the opener calls the 3-bet)
-const scenOf = (game, stack, opener, caller, kind = "") => PI[`${game}_${stack}_${opener}_v_${caller}${kind}`] && `${game}_${stack}_${opener}_v_${caller}${kind}`;
+// The two players' last preflop decisions into a solved pot, as [seat, spot key, column: 1 raise, 2 call]; the second one
+// is the call (or the BB's check) that closes preflop. Scenario names are solver/make_jobs.py's: seats are parts [2] and [4],
+// the kind is [5], and squeezes and cold 4-bets name the opener (who folds) in [6].
+function ways(scen) {
+  const [g, sk, a, , b, kind = "", o] = scen.split("_"), K = (...p) => [g, sk, ...p].join("/");
+  return {
+    "": [[a, K(a, "RFI"), 1], [b, K(a, b, "FACINGRFI"), 2]],
+    "3bet": [[b, K(a, b, "FACINGRFI"), 1], [a, K(b, a, "FACING3B"), 2]],
+    "4bet": [[a, K(b, a, "FACING3B"), 1], [b, K(a, b, "FACING4B"), 2]],
+    limp: [[a, K(a, "RFI"), 2], [b, K(a, b, "FACINGLIMP"), 2]],
+    limpraise: [[b, K(a, b, "FACINGLIMP"), 1], [a, K(b, a, "LIMP_FACING2B"), 2]],
+    sqz: [[b, K(`${o}+${a}`, b, "FACINGRFI_CALL"), 1], [a, K(`${o}+${b}`, a, "FACINGSQZ_CALLER"), 2]],
+    c4b: [[b, K(`${o}+${a}`, b, "FACING3B_COLD"), 1], [a, K(`${o}+${b}`, a, "FACINGC4B_3B"), 2]],
+  }[kind];
+}
+const colOf = a => a === "Raise" ? 1 : a === "Call" ? 2 : 0;
+// the solved pot that action a at spot s leads to, when `closer` makes the closing call (you, unless someone calls you)
+const postScen = (s, a, closer = s.hero) => Object.keys(PI).find(scen => {
+  const w = ways(scen);
+  return w && w[1][0] === closer && w.some(([, key, col]) => key === s.key && col === colOf(a));
+});
 const postGames = () => Object.keys(PI).map(s => s.split("_").slice(0, 2).join("/"));
 
-// "Play to postflop": a preflop spot that leads into a solved matchup, with a hand that takes the line there.
-// Single-raised: the opener's open (col 1 raise) or the caller facing it (col 2 call).
-// 3-bet pot: the opener facing the 3-bet (col 2 call), or the 3-bettor facing the open (col 1 raise).
+// "Play to postflop": a preflop spot that leads into a solved pot, with a hand that takes the line there (see ways).
 // The others are scripted to let it through (see postReply).
 function postDeal(g, pos) {
   const [game, stack] = g.split("/"), opts = [];
   for (const scen of Object.keys(PI)) {
-    const [gm, sk, opener, , caller, kind] = scen.split("_");
+    const [gm, sk] = scen.split("_");
     if (gm !== game || sk !== stack) continue;
-    const ways = kind === "3bet" ? [[opener, `${g}/${caller}/${opener}/FACING3B`, 2], [caller, `${g}/${opener}/${caller}/FACINGRFI`, 1]]
-      : [[opener, `${g}/${opener}/RFI`, 1], [caller, `${g}/${opener}/${caller}/FACINGRFI`, 2]];
-    for (const [hero, key, col] of ways)
+    for (const [hero, key, col] of ways(scen) || [])
       if (SPOTS[key] && (!pos.length || pos.includes(hero))) opts.push({ scen, key, col });
   }
   if (!opts.length) return null;
   const o = opts[Math.floor(Math.random() * opts.length)], rows = SPOTS[o.key];
   return { spot: parse(o.key), i: pick(rows.map((r, k) => COMBOS(HANDS[k]) * r[4] * r[o.col])), scen: o.scen };
 }
-// with "Play to postflop" on: you made the move that leads to the flop, so the scripted caller calls and the rest fold
+// with "Play to postflop" on: you made the move that leads to the flop, so the scripted closer calls and the rest fold
 function postReply(c, a) {
   if (!c.scen) return null;
-  const [, , opener, , caller, kind] = c.scen.split("_");
-  if (kind === "3bet") { // the opener's open is scripted; the 3-bet gets called
-    if (c.spot.node === "FACING3B" && a === "Call") return { text: `You call ${caller}'s 3-bet: on to the flop!`, post: c.scen };
-    if (c.spot.node === "FACINGRFI" && a === "Raise" && c.z.raise < c.z.S) return { text: `${opener} calls and the rest fold: on to the flop!`, post: c.scen };
-    return null;
-  }
-  if (c.spot.node === "RFI" && a === "Raise" && c.z.raise < c.z.S) return { text: `${caller} calls and the rest fold: on to the flop!`, post: c.scen };
-  if (c.spot.node === "FACINGRFI" && a === "Call") return { text: `The rest fold: heads-up with ${opener} to the flop!`, post: c.scen };
-  return null;
+  const w = ways(c.scen), mine = w.find(([, key]) => key === c.spot.key);
+  if (!mine || colOf(a) !== mine[2] || a === "Raise" && c.z.raise >= c.z.S) return null;
+  const o = c.scen.split("_")[6], [p, key] = w[1], v = key.endsWith("FACINGLIMP") ? "check" : "call";
+  const text = mine === w[1] ? `You ${v}: on to the flop!` : `${o ? o + " folds, " : "The rest fold, "}${p} ${v}s: on to the flop!`;
+  return { text, post: c.scen };
 }
 
 // ---------- data: each piece is a script setting POST[path] to base64 gzipped JSON ----------
@@ -118,15 +129,17 @@ async function postBegin(c) {
   }
   let nodes;
   try { nodes = await loadPiece(`${scen}/${flop}/flop`); } catch (e) { $("situation").textContent = e.message; return; }
-  const [, , opener, , caller, kind] = scen.split("_"), who = (p, v1, v3) => p === c.spot.hero ? "you " + v1 : `${p} ${v3}`;
+  const [p0, key0] = ways(scen)[1], z0 = sizing(parse(key0)), who = (p, v1, v3) => p === c.spot.hero ? "you " + v1 : `${p} ${v3}`;
+  const VERB = { Limp: ["limp", "limps"], Call: ["call", "calls"], Check: ["check", "checks"], Fold: ["fold", "folds"], Open: ["open", "opens"] };
+  const told = ([p, to, tag]) => { // a preflop bet from sizing()'s line, as a story entry
+    const [v1, v3] = VERB[tag] || [`${tag.toLowerCase()} to`, `${tag.toLowerCase()}s to`];
+    return { t: who(p, v1, v3) + (VERB[tag] && tag !== "Open" ? "" : " " + bb(to)), k: tag === "Fold" ? "Fold" : ["Limp", "Call", "Check"].includes(tag) ? "Call" : "Raise" };
+  };
   const hero = holeStr(...mine), vr = nodes[me ? "" : "0"], hr = nodes[me ? "0" : ""]; // villain's / your range at the flop
   P = { postflop: true, scen, me, sig, seat: [m.oop, m.ip], pot0: m.pot, stack: m.stack, board: [flop.slice(0, 2), flop.slice(2, 4), flop.slice(4)],
     flop, nodes, k: "", street: 0, spent: [0, 0], put: [0, 0], tag: ["", ""], hist: [], over: false, answered: false, cards: c.cards, isNew: 3,
     // the hand so far: street names ({s}) and actions ({t, k}); a closing message ({t, end}) when it's over
-    story: [{ s: "Preflop" }, ...(kind === "3bet"
-      ? [{ t: `${who(opener, "open", "opens")} ${bb(sizing(parse(`${c.spot.game}/${c.spot.stack}/${opener}/RFI`)).raise)}`, k: "Raise" },
-         { t: `${who(caller, "3-bet to", "3-bets to")} ${bb(100 - m.stack)}`, k: "Raise" }, { t: who(opener, "call", "calls"), k: "Call" }]
-      : [{ t: `${who(opener, "open", "opens")} ${bb(100 - m.stack)}`, k: "Raise" }, { t: who(caller, "call", "calls"), k: "Call" }])] };
+    story: [{ s: "Preflop" }, ...[...z0.line, [p0, 0, key0.endsWith("FACINGLIMP") ? "Check" : "Call"]].map(told)] };
   P.hands = [];
   P.hands[me] = hero;
   P.hands[1 - me] = vr.hands[pick(vr.hands.map((h, i) => cardsOf(h).some(x => mine.includes(x)) ? 0 : vr.reach[i]))];

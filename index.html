@@ -626,7 +626,10 @@ function simNext(c, a, pot) {
     : { text: `${text}. ${SPOTS[key] ? "The solver never gets here with your hand" : "No solver data past this point"}, so the hand ends.` };
   // facing a squeeze or cold 4-bet as the opener, the caller or 3-bettor is still behind you; once the opener folds it's heads-up
   if (s.node === "FACINGSQZ" || s.node === "FACINGC4B") return { text: a === "Call" ? `You call, and ${o} still has to act. ${END}` : NOREPLY };
-  if (s.node === "FACINGSQZ_CALLER" || s.node === "FACINGC4B_3B") return { text: a === "Call" ? "You call: on to the flop, where this preflop trainer stops." : NOREPLY };
+  if (s.node === "FACINGSQZ_CALLER" || s.node === "FACINGC4B_3B") {
+    const sc = a === "Call" && postScen(s, a);
+    return sc ? { text: "You call: on to the flop!", post: sc } : { text: a === "Call" ? "You call: on to the flop, where this preflop trainer stops." : NOREPLY };
+  }
   // you squeezed or cold 4-bet: the opener answers first, then (if the opener folds) the caller or 3-bettor
   // ponytail: the players behind you are assumed to fold (the data covers only that line), and an all-in gets the same answers as the solver's raise
   if (REPLY[s.node]) {
@@ -638,6 +641,8 @@ function simNext(c, a, pot) {
     const b2 = sampleAct(k2);
     if (b2 === "Fold") return { text: `${o} and ${w} fold. You take the ${bb(pot)} pot.` };
     if (shove) return { text: `${o} folds, ${w} calls your all-in. Cards on their backs!` };
+    const sc = b2 === "Call" && postScen(s, a, w);
+    if (sc) return { text: `${o} folds, ${w} calls: on to the flop!`, post: sc };
     return { text: b2 === "Call" ? `${o} folds, ${w} calls: on to the flop, where this preflop trainer stops.` : `${o} folds, ${w} ${what(b2, n2)}. ${END}` };
   }
   // calling or 3-betting an open: the players behind you act first, from the multiway spot (where the data has one)
@@ -648,12 +653,9 @@ function simNext(c, a, pot) {
     if (b1 !== "Fold") return { text: `${joinText(j, jn)}, ${o} ${what(b1, n1)}. ${END}` };
     return reach(`${joinText(j, jn)}, ${o} folds`, K(`${o}+${j[0]}`, s.hero, n2));
   }
-  // heads-up in a solved single-raised pot: the hand goes on to the flop
-  const sc = a === "Call" && !j && s.node === "FACINGRFI" && scenOf(s.game, s.stack, s.villain, s.hero);
-  if (sc) return { text: "The rest fold: on to the flop!", post: sc };
-  // you call a heads-up 3-bet of your open: a solved 3-bet pot goes on to the flop
-  const sc3 = a === "Call" && s.node === "FACING3B" && scenOf(s.game, s.stack, s.hero, s.villain, "_3bet");
-  if (sc3) return { text: `You call ${s.villain}'s 3-bet: on to the flop!`, post: sc3 };
+  // your call (or check) closes preflop heads-up in a solved pot: the hand goes on to the flop
+  const sc = a === "Call" && !j && postScen(s, a);
+  if (sc) return { text: `You ${s.node === "FACINGLIMP" ? "check" : "call"}${s.node === "FACINGRFI" ? " and the rest fold" : ""}: on to the flop!`, post: sc };
   if (a === "Call" && !limp) return { text: `${j ? joinText(j) + ". " : ""}You ${s.node === "FACINGLIMP" ? "check" : "call"}: on to the flop, where this preflop trainer stops.` };
   if (villains(s).length > 1) return { text: "The solver data doesn't cover the replies to your raise, so the hand ends here." };
   // a villain with no spot to respond from would otherwise "fold"
@@ -672,11 +674,9 @@ function simNext(c, a, pot) {
     if (cold) return reach(`${p} 3-bets, ${joinText(cold, "FACING3B_COLD")}`, K(`${p}+${cold[0]}`, s.hero, "FACINGC4B"));
     return reach(`${p} ${what(b, node)}`, nodeKey(s, s.hero, p, NEXT[node]));
   }
-  const sc2 = callers === 1 && !limp && s.node === "RFI" && scenOf(s.game, s.stack, s.hero, caller);
-  if (sc2) return { text: `${caller} calls: on to the flop!`, post: sc2 };
-  // you 3-bet the open heads-up and the opener calls
-  const sc4 = callers === 1 && !j && !shove && s.node === "FACINGRFI" && scenOf(s.game, s.stack, caller, s.hero, "_3bet");
-  if (sc4) return { text: `${caller} calls: on to the flop!`, post: sc4 };
+  // you bet (or limp) and one player calls (or checks), heads-up in a solved pot
+  const sc2 = callers === 1 && !j && !shove && postScen(s, a, caller);
+  if (sc2) return { text: `${caller} ${limp ? "checks" : "calls"}: on to the flop!`, post: sc2 };
   return { text: caller ? `${caller} ${limp ? "checks" : "calls"}: on to the flop, where this preflop trainer stops.` : `Everyone folds. You take the ${bb(pot)} pot.` };
 }
 

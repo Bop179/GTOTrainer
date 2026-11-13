@@ -155,9 +155,10 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
     - Squeeze pots, `..._<CALLER>_v_<SQUEEZER>_sqz_<OPENER>`: open, flat, squeeze, the opener folds, the caller calls. Ranges from `FACINGRFI_CALL` (the squeeze) and `FACINGSQZ_CALLER` (the call); the opener's fold from `FACINGSQZ` sets the frequency.
     - Cold 4-bet pots, `..._<3BETTOR>_v_<C4BETTOR>_c4b_<OPENER>`: open, 3-bet, cold 4-bet, the opener folds, the 3-bettor calls. Ranges from `FACING3B_COLD` and `FACINGC4B_3B`.
     - The opener's money is dead in the pot.
-    - These spots have no `SIZES`, so they copy `sizing()` in `index.html`: open 2.5 (3 from the SB), the first raise x3 in position or x4 out of position, the next raise x2.3, rounded to 0.5 with halves up, and all-in once a raise passes 55% of the stack. The postflop pot then matches the preflop replay.
+    - Sizes come from the closing caller's `SIZES` (GTO Wizard's, e.g. UTG 2.5, CO squeezes to 11), as `sizing()` in `index.html` reads them, so the postflop pot matches the preflop replay. Fixed 2026-11-13: the first queue used `sizing()`'s fallback (a squeeze to 7.5) for all 150 of these; none had been solved, and the VM's jobs were replaced. `solver/test_postways.js` now checks every scenario's pot against the trainer's line.
     - Only the "opener folds" line is in the data. When the opener calls, the other player's reply isn't, and the pot could go 3-way, so those lines are skipped.
-- [ ] Trainer: send limped, 4-bet, squeeze and cold-4-bet pots, and 8-max hands, to the flop. 3-bet pots are done. `split.py` needs no change, since parts [2] and [4] of every name are the two seats.
+- [x] Trainer: every queued pot type goes to the flop (2026-11-13), at 6-max and 8-max: `ways()` in `postflop.js` lists each player's last preflop spot into each kind, and both live play and "Play to postflop" use it. `split.py`'s `TRAINER_KINDS` now passes all of them to `~/post`. Untested in the browser until each kind's first flop is pulled.
+  - Check: `node solver/test_postways.js` (each scenario's spots exist, are found from the preflop line, and put in the solved pot).
 - [ ] Disk: about 90 GB of results and trainer pieces at the end against 40 GB free on the VM, full in about 2 weeks. Add a block volume (about 150 GB is left in the free 200 GB) and move `~/results` and `~/post` onto it.
   - `postflop.js` matches hands to solved scenarios by name, so new pot types need scenario names it can find from the preflop line (agree with the trainer side first).
 

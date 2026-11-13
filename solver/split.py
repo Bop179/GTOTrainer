@@ -6,9 +6,9 @@
 import base64, collections, gzip, json, os, sys
 
 ORDER = ["SB", "BB", "UTG", "UTG1", "LJ", "HJ", "CO", "BTN"]  # postflop action order (6-max and 8-max seats): the later seat is in position
-# Pot kinds postflop.js can deal (name part [5]: "" single-raised, "3bet"). Others stay in ~/results only, so ~/post (served
+# Pot kinds postflop.js can deal (name part [5], see ways() there). Others stay in ~/results only, so ~/post (served
 # to every user, and short on disk) holds just what the trainer plays. Add a kind here when postflop.js learns it.
-TRAINER_KINDS = {"", "3bet"}
+TRAINER_KINDS = {"", "3bet", "4bet", "limp", "limpraise", "sqz", "c4b"}
 src, out = sys.argv[1], sys.argv[2]
 index = {}
 

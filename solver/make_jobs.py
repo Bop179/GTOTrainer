@@ -12,8 +12,9 @@
 #   <game>_100bb_SB_v_BB_limpraise               BB's raises over the limp (FACINGLIMP), SB's calls (LIMP_FACING2B)
 #   <game>_100bb_<CALLER>_v_<SQUEEZER>_sqz_<OPENER>   open, flat, squeeze, opener folds, caller calls
 #   <game>_100bb_<3BETTOR>_v_<C4BETTOR>_c4b_<OPENER>  open, 3-bet, cold 4-bet, opener folds, 3-bettor calls
-# Squeeze and cold 4-bet spots have no SIZES; they use index.html's sizing() fallback (open 2.5, or 3 from the SB;
-# first raise x3 in position / x4 out of position; next raise x2.3; rounded to 0.5) so the pot matches the preflop replay.
+# Squeeze and cold 4-bet sizes come from the closing caller's SIZES (GTO Wizard: [open, 3-bet or squeeze, cold 4-bet, ...]),
+# as index.html's sizing() reads them, so the pot matches the preflop replay. Spots without SIZES use sizing()'s fallback
+# (open 2.5, or 3 from the SB; first raise x3 in position / x4 out of position; next raise x2.3; rounded to 0.5).
 # ponytail: everyone else is assumed to fold; the opener-calls versions of squeezes and cold 4-bets aren't in the data.
 import itertools, json, math, os, re, sys
 
@@ -102,7 +103,8 @@ def scenarios():
             if not (has(sq) and has(fold)): continue
             sq, call = rows(sq), rows(key)
             open_ = 3 if o == "SB" else 2.5
-            size = half(open_ * (3 if ip(g, s_, c) else 4))
+            size = SZ[key][1] if key in SZ else half(open_ * (3 if ip(g, s_, c) else 4))
+            open_ = SZ[key][0] if key in SZ else open_
             add(freq(rows(fold), 3) * freq(call, 2) * freq(sq, 1), g, n(c, "v", s_, "sqz", o), (c, call, 2), (s_, sq, 1), size,
                 open_ + blinds_dead((o, c, s_)))
         for key in multi(g, "FACINGC4B_3B"):
@@ -111,7 +113,8 @@ def scenarios():
             if not (has(c4) and has(fold)): continue
             c4, call = rows(c4), rows(key)
             open_ = 3 if o == "SB" else 2.5
-            size = half(half(open_ * (3 if ip(g, t, o) else 4)) * 2.3)
+            size = SZ[key][2] if key in SZ else half(half(open_ * (3 if ip(g, t, o) else 4)) * 2.3)
+            open_ = SZ[key][0] if key in SZ else open_
             add(freq(rows(fold), 3) * freq(call, 2) * freq(c4, 1), g, n(t, "v", f_, "c4b", o), (t, call, 2), (f_, c4, 1), size,
                 open_ + blinds_dead((o, t, f_)))
     return out
@@ -158,12 +161,13 @@ if __name__ == "__main__":
     assert (t["pot"], t["stack"]) == (47.5, 77) and t["oop"] == rng(R6("BTN", "CO", "FACING3B"), 1)
     assert (j("6max_100bb_SB_v_BB_limp")["pot"], j("6max_100bb_SB_v_BB_limpraise")["pot"]) == (2, 7)
     assert j("6max_100bb_SB_v_BB_limp")["turn_sizes"] == LIMP_SIZES["turn_sizes"] and j("6max_100bb_SB_v_BB_limpraise")["turn_sizes"] == SIZES["turn_sizes"]
-    t = j("6max_100bb_HJ_v_CO_sqz_UTG")  # UTG opens 2.5, HJ flats, CO squeezes in position to 7.5, UTG folds, HJ calls
-    assert (t["pot"], t["stack"]) == (2 * 7.5 + 2.5 + 1.5, 92.5) and t["ip"] == rng(R6("UTG+HJ", "CO", "FACINGRFI_CALL"), 1)
-    t = j("6max_100bb_HJ_v_BB_sqz_UTG")  # the BB squeezes out of position: 2.5 x 4 = 10
-    assert (t["pot"], t["stack"]) == (2 * 10 + 2.5 + 0.5, 90)
-    t = j("6max_100bb_HJ_v_CO_c4b_UTG")  # UTG 2.5, HJ 3-bets in position to 7.5, CO cold 4-bets to 17.5, UTG folds, HJ calls
-    assert (t["pot"], t["stack"]) == (2 * 17.5 + 2.5 + 1.5, 82.5)
+    sz = lambda *p: SZ[K("6max", *p)]
+    t = j("6max_100bb_HJ_v_CO_sqz_UTG")  # UTG opens 2.5, HJ flats, CO squeezes (to 11 in GTO Wizard's sizes), UTG folds, HJ calls
+    q = sz("UTG+CO", "HJ", "FACINGSQZ_CALLER")[1]
+    assert (t["pot"], t["stack"]) == (2 * q + 2.5 + 1.5, 100 - q) and t["ip"] == rng(R6("UTG+HJ", "CO", "FACINGRFI_CALL"), 1)
+    t = j("6max_100bb_HJ_v_CO_c4b_UTG")  # UTG 2.5, HJ 3-bets, CO cold 4-bets, UTG folds, HJ calls
+    q = sz("UTG+CO", "HJ", "FACINGC4B_3B")[2]
+    assert (t["pot"], t["stack"]) == (2 * q + 2.5 + 1.5, 100 - q)
     os.makedirs(out, exist_ok=True)
     for n, f in sets.items(): json.dump(f, open(os.path.join(out, f"flops_{n}.json"), "w"))
     cut = {g: RARE * sum(f for f, gg, name, *_ in sc if gg == g and name.count("_") == 4) for g in SEATS}  # single-raised total
