@@ -93,9 +93,47 @@ Grading now goes by how often the solver plays your action. Grading by EV loss w
   - 8-max 100bb: 97 of 470 (2026-11-13).
 - [ ] Trainer: add the EV to each spot's rows and grade by EV lost against the best action (thresholds to pick). The feedback lists every action available with its EV in bb, signed (+ is a gain, - a loss, fold is 0), marks the best one, and shows your pick's EV and its gap to the best ("Call +1.2bb, 0.4bb less than 3-bet +1.6bb").
 
+### 9. Postflop: heads-up single-raised pots at 6-max 100bb (started 2026-11-13)
+
+Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only. The flop and turn are solved ahead of time on a free Oracle Cloud VM; the river is solved live in the browser.
+
+- **Spots:** 8 heads-up single-raised pots at 6-max 100bb: BTN, CO, SB, HJ and UTG opening against a BB call, and CO, HJ and UTG opening against a BTN call. Ranges and open sizes come from `data6.js` (GTO Wizard). Each spot assumes the players behind fold.
+- **Flops:** 95 of the 1,755 distinct flops, sampled so each texture shows up about as often as it's dealt (5 monotone, 16 paired). The trainer deals only these.
+- **Bet sizes:**
+  - Flop: 33% and 75% of the pot.
+  - Turn: 75% and a 125% overbet.
+  - River: 75% (the pre-solve's tree); the live river solve can use any sizes.
+  - Raises: 2.5x the bet. Re-raises go on until someone is all-in.
+  - All-in: offered once the stack is 1.5x the pot or less.
+- **Accuracy:** each solve stops at 1% of the pot exploitability (about 0.05bb a hand in a single-raised pot) or 1,000 iterations.
+- **Code:** `solver/`, Rust on b-inary's `postflop-solver` (AGPL-3.0).
+  - `make_jobs.py` builds the 760 jobs.
+  - `run_queue.sh` solves them on the VM.
+  - `src/lib.rs` holds the solve and node dump, shared by the VM binary and the browser build.
+- **Rules:**
+  - Big solves run on the VM only, never on the 8 GB Mac. The largest tree is 19.4 GB; trees over 16 GB are compressed automatically.
+  - River solves in the browser are small (one test took about 0.1 s and under 150 MB), so they're fine anywhere.
+
+- [x] Solver wrapper, job builder and queue runner, with a memory guard and a restart after a reboot.
+- [x] Oracle VM running (4 OCPU / 24 GB, Always Free). Quotas and a $0.01 budget alert keep the account at $0.
+- [ ] Pre-solve the flop and turn: 760 solves, about 2 to 3 weeks. Started 2026-11-13, BTN vs BB first.
+  - Each solve saves every flop decision, and every turn decision after a flop line with no raise (check-check or bet-call). Hands below 0.1% reach are dropped. Frequencies are whole percentages and EVs are rounded to 0.01bb.
+  - Turn data is about 8 MB a flop compressed (measured on an unconverged test), so about 6 GB in all. It stays on the VM, which has 41 GB free.
+- [x] River solver in the browser (2026-11-13). `river.js` and `river_wasm.js`: the same solver compiled to WebAssembly (1.4 MB, base64 so it loads from `file://`). Rebuild it with `solver/build_wasm.sh`.
+  - A worst-case river (full preflop ranges, two bet sizes) solves in under 0.1 s to 0.8% of the pot.
+  - Its result matched the native solver exactly.
+  - Not loaded by `index.html` yet; that waits for the postflop mode.
+- [ ] Shrink the turn data before shipping it to the trainer. Turn cards with the same suit pattern give the same strategy with suits swapped (checked), so store one of each and map suits in the trainer.
+- [ ] Decide where the solutions live for other users. They're too big for git: a few GB once deduplicated.
+  - Option: a static file server on the VM. Egress is free up to 10 TB a month, and the security list needs port 443 opened.
+  - Option: Oracle Object Storage, 20 GB free. Its API requests are only free up to 50,000 a month, and quotas can't cap them.
+- [ ] Trainer postflop mode:
+  - Deal a spot and one of its 95 flops, ask for the action at each flop and turn node, and grade by frequency and EV lost.
+  - At the river, build both ranges from the turn reach and the strategy along the line played, call `RiverSolver.solve`, and grade the river decision the same way.
+
 ## Out of scope for now
 
 Might do these later, might never do these:
 
 - Heads-up.
-- Postflop.
+- Postflop beyond heads-up single-raised pots at 6-max 100bb (3-bet pots, multiway, other formats and depths).

@@ -4,9 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-postflop-solver = { git = "https://github.com/b-inary/postflop-solver", default-features = false, features = ["rayon"] }
+postflop-solver = { git = "https://github.com/b-inary/postflop-solver", default-features = false }
 serde_json = "1"
+
+[lib]
+crate-type = ["cdylib", "rlib"] # cdylib = river.wasm for the browser
+
+[features]
+default = ["rayon"] # multithreaded on the VM; the wasm build uses --no-default-features
+rayon = ["postflop-solver/rayon"]
 
 [profile.release]
 lto = true
 codegen-units = 1
+strip = true
