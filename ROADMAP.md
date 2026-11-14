@@ -119,7 +119,7 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
 
 - [x] Solver wrapper, job builder and queue runner, with a memory guard and a restart after a reboot.
 - [x] Oracle VM running (4 OCPU / 24 GB, Always Free). Quotas and a $0.01 budget alert keep the account at $0.
-- [ ] Pre-solve the flop and turn for every heads-up pot at 6-max and 8-max 100bb (2026-11-13): 285 scenarios, 12,225 solves, about 32 days of the VM (rough: only the 6-max single-raised and 3-bet times are measured). Started 2026-11-13. The queue finishes 6-max BTN vs BB first, then goes strictly by frequency (`jobs/order.txt`).
+- [ ] Pre-solve the flop and turn for every heads-up pot at 6-max and 8-max 100bb (2026-11-13): 285 scenarios, 12,225 solves, about 32 days of the VM (rough: only the 6-max single-raised and 3-bet times are measured). Started 2026-11-13. The queue finishes 6-max BTN vs BB first, then every 6-max pot by frequency (3,920 solves: single-raised, 3-bet, limped and the rest), then 8-max last, also by frequency (`jobs/order.txt`; reordered 2026-11-13).
   - Each solve saves every flop decision, and every turn decision after a flop line with no raise (check-check or bet-call). Hands below 0.1% reach are dropped. Frequencies are whole percentages and EVs are rounded to 0.01bb.
   - Turn data is about 8 MB a flop compressed (measured on an unconverged test), so about 6 GB in all. It stays on the VM, which has 41 GB free.
 - [x] River solver in the browser (2026-11-13). `river.js` and `river_wasm.js`: the same solver compiled to WebAssembly (1.4 MB, base64 so it loads from `file://`). Rebuild it with `solver/build_wasm.sh`.
