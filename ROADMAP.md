@@ -90,7 +90,7 @@ Grading now goes by how often the solver plays your action. Grading by EV loss w
 - GTO Wizard's free tier shows EV (checked 2026-11-06): the grid's display menu has Strategy, Strategy + EV, EV, Compare EV, Range and All, and the Hands panel lists each action's EV per combo.
 - [x] Find the cheapest way to read per-action EV for all 169 hands. Done 2026-11-13: the page's own store already holds every action's strategy and EV for all 169 hands, one view per node, whatever the grid display mode. It matched the Hands panel and the old grid reads (within 0.05pp).
 - [ ] Re-read every node with EV: 1,352 nodes (8-max 100bb 470, 8-max 200bb 488, 6-max 100bb 190, 6-max 200bb 204), about 15 days of the free quota. Daily pull started 2026-11-12, in that order.
-  - 8-max 100bb: 97 of 470 (2026-11-13).
+  - 8-max 100bb: 196 of 470 (2026-11-14).
 - [ ] Trainer: add the EV to each spot's rows and grade by EV lost against the best action (thresholds to pick). The feedback lists every action available with its EV in bb, signed (+ is a gain, - a loss, fold is 0), marks the best one, and shows your pick's EV and its gap to the best ("Call +1.2bb, 0.4bb less than 3-bet +1.6bb").
 
 ### 9. Postflop: heads-up single-raised pots at 6-max 100bb (started 2026-11-13)
