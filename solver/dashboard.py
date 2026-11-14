@@ -3,7 +3,7 @@
    ssh -N -L 8080:localhost:8080 gto-vm   then open http://localhost:8080
 Reads ~/jobs, ~/results and ~/results/queue.log (written by run_queue.sh) plus /proc, and ~/.worker_status while the
 trial-credit worker exists (gto-vm's cron writes it every minute; older than 3 minutes = worker gone, shown as absent)."""
-import calendar, html, os, re, subprocess, sys, time
+import calendar, collections, html, os, re, subprocess, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -149,6 +149,7 @@ def page():
     for sc, v in secs.items(): kavg.setdefault(kind(sc), []).extend(v)
     worker = worker_status()
     running = [("gto-vm", j, e) for j, e in current_jobs()] + [("worker", j, e) for j, e in (worker[2] if worker else [])]
+    solving = collections.Counter(j.split("/")[1] for _, j, _ in running)
     par = max(1, len(running))  # ponytail: ETA = queued solve time / solves running now, ignores per-machine speed
     since = (RES / ".since").stat().st_mtime if (RES / ".since").exists() else 0  # older results get re-solved (run_queue.sh)
     count = lambda sc, pat: sum(p.stat().st_mtime > since for p in (RES / sc).glob(pat)) if (RES / sc).is_dir() else 0
@@ -162,7 +163,9 @@ def page():
         eta += left * avg / par
         tot_done, tot_all, tot_fail = tot_done + done, tot_all + total, tot_fail + nfail
         pct = 100 * done / total if total else 0
-        rows.append(f"<tr><td>{html.escape(sc)}</td><td>{done}/{total}</td><td><div class=track><i style='width:{pct:.1f}%'></i></div></td>"
+        sp = 100 * solving[sc] / total if total else 0
+        rows.append(f"<tr><td>{html.escape(sc)}</td><td>{done}/{total}{f' <small>+{solving[sc]} solving</small>' if solving[sc] else ''}</td>"
+                    f"<td><div class=track><i style='width:{pct:.1f}%'></i><s style='width:{sp:.1f}%'></s></div></td>"
                     f"<td>{nfail or ''}</td><td>{fmt(avg) if avg else '–'}</td><td>{fmt(left * avg / par) if avg and left else '–'}</td></tr>")
     run_list = "".join(f"<li><b>{m}</b><span>{html.escape(j.removeprefix('jobs/').removesuffix('.json'))}</span><time>{fmt(e)}</time></li>"
                        for m, j, e in sorted(running, key=lambda r: -r[2]))
@@ -178,6 +181,7 @@ def page():
              else "<section class=fails><h3>Recent failures <em class=zero>none</em></h3></section>")
     pct = 100 * tot_done / tot_all if tot_all else 0
     fpct = 100 * tot_fail / tot_all if tot_all else 0
+    spct = 100 * len(running) / tot_all if tot_all else 0
     day_chart, counts = daily_bars(events, now)
     last24 = sum(1 for e in events if e[0] > now - 86400)
     finish = time.strftime("%a %b %d, %H:%M UTC", time.gmtime(now + eta)) if eta else "–"
@@ -190,7 +194,7 @@ def page():
 @media(prefers-color-scheme:dark){{:root{{--bg:#111;--fg:#ddd;--mut:#99a;--ok:#4cc38a;--bad:#f66}}}}
 body{{font:14px system-ui;margin:16px 0;padding:0 24px;background:var(--bg);color:var(--fg)}}
 h2{{margin:0 0 8px}}.hero{{height:22px;background:var(--grid);border-radius:11px;overflow:hidden;display:flex}}
-.hero i{{background:var(--ok)}}.hero u{{background:var(--bad)}}.sub{{color:var(--mut);margin:6px 0 14px}}
+.hero i{{background:var(--ok)}}.hero s,.track s{{background:var(--ok);opacity:.35}}.hero u{{background:var(--bad)}}.sub{{color:var(--mut);margin:6px 0 14px}}
 .tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px}}
 .tile{{border:1px solid var(--grid);border-radius:8px;padding:8px 10px}}.tile span{{display:block;color:var(--mut);font-size:12px}}.tile b{{font-size:17px}}
 .charts{{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:12px}}figure{{margin:0}}figcaption{{font-weight:600;margin-bottom:2px}}
@@ -206,9 +210,9 @@ svg .dot{{fill:var(--ok);stroke:var(--bg);stroke-width:2}}figure small{{color:va
 .running li{{display:flex;gap:8px;font:12px ui-monospace,monospace;white-space:nowrap}}.running li b{{width:52px;color:var(--mut);font-weight:400}}
 .running li span{{flex:1;overflow:hidden;text-overflow:ellipsis}}.running time{{color:var(--mut)}}
 table{{border-collapse:collapse;width:100%}}td,th{{padding:4px 8px;text-align:left;border-bottom:1px solid var(--grid)}}
-.track{{width:160px;height:10px;background:var(--grid);border-radius:5px;overflow:hidden}}.track i{{display:block;height:100%;background:var(--ok)}}code{{font-size:12px}}</style>
+.track{{width:160px;height:10px;background:var(--grid);border-radius:5px;overflow:hidden;display:flex}}.track i{{height:100%;background:var(--ok)}}td small{{color:var(--mut)}}code{{font-size:12px}}</style>
 <h2>Solver queue: {tot_done}/{tot_all} flops ({pct:.1f}%)</h2>
-<div class=hero role=progressbar aria-valuenow={pct:.1f} aria-valuemin=0 aria-valuemax=100 title="{pct:.1f}% done, {fpct:.1f}% failed"><i style="width:{pct:.2f}%"></i><u style="width:{fpct:.2f}%"></u></div>
+<div class=hero role=progressbar aria-valuenow={pct:.1f} aria-valuemin=0 aria-valuemax=100 title="{pct:.1f}% done, {len(running)} solving, {fpct:.1f}% failed"><i style="width:{pct:.2f}%"></i><s style="width:{spct:.2f}%"></s><u style="width:{fpct:.2f}%"></u></div>
 <p class=sub>ETA {fmt(eta) if eta else '–'}, done {finish} · gto-queue <b style="color:{svc_color}">{html.escape(svc)}</b> · gto-vm load {' '.join(load)} (4 cores), RAM {used:.1f}/{total_mem:.1f} GB{wk}</p>
 <div class=tiles>{tiles}</div>
 {fails}
