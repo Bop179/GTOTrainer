@@ -237,8 +237,7 @@ function postDraw(fresh) {
   const rows = []; // one row per street, shown once someone acts on it
   for (const x of P.story) if (x.s) rows.push([x.s]); else if (!x.end) rows.at(-1).push(x);
   $("situation").innerHTML = `<div class="hist">${rows.filter(r => r.length > 1).map(([s, ...xs]) =>
-    `<b>${s}</b><div>${xs.map(x => `<span style="--c:${AC[x.k]}">${say0(x.t)}</span>`).join("")}</div>`).join("")}</div>`
-    + P.story.filter(x => x.end).map(x => `<div class="end">${x.t}</div>`).join("");
+    `<b>${s}</b><div>${xs.map(x => `<span style="--c:${AC[x.k]}">${say0(x.t)}</span>`).join("")}</div>`).join("")}</div>`;
   const seat = (p, s) => `<div class="seat${p === me ? " hero" : ""}${P.tag[p] === "Fold" ? " folded" : ""}${p === me && mine ? " turn" : ""}${folds(p) ? " toss" : ""}" style="--c:0;--s:${s};--r:1">`
     + (p === me || P.show ? `<div class="cards">${cardsOf(P.hands[p]).map(x => cardHTML(x)).join("")}</div>`
       : `<div class="backs">${P.tag[p] !== "Fold" || folds(p) ? "<i></i><i></i>" : ""}</div>`)
@@ -254,7 +253,7 @@ function postDraw(fresh) {
 }
 function postButtons(mine) {
   if (!P.over && (!mine || P.busy)) return document.querySelectorAll("#actions button").forEach(b => b.disabled = true); // their move: keep your last buttons, greyed
-  if (P.over) { P.answered = true; $("actions").innerHTML = `<button data-next style="background:var(--panel)">Next hand<kbd>Space</kbd></button>`; return; }
+  if (P.over) { P.answered = true; $("actions").innerHTML = P.story.filter(x => x.end).map(x => `<div class="end">${x.t}</div>`).join("") + `<button data-next style="background:var(--panel)">Next hand<kbd>Space</kbd></button>`; return; }
   $("actions").innerHTML = cur().actions.map((a, i) => `<button data-a="${i}" style="background:${AC[kind(a)]}">${btnLabel(a, i)}</button>`).join("");
 }
 

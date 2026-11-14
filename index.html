@@ -56,7 +56,7 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
 .hist div { display: flex; gap: 4px; }
 .hist span { padding: 1px 9px; border-radius: 999px; white-space: nowrap; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 25%, transparent); }
 @media (max-width: 600px) { .hist div { flex-wrap: wrap; } }
-.situation .end { margin-top: 6px; font-size: 15px; font-weight: 700; }
+.actions .end { align-self: center; font-size: 15px; font-weight: 700; } /* postflop: how the hand ended, beside Next hand (shown cards would cover it up top) */
 /* seats sit on an ellipse: --c/--s are cos/sin of the seat angle, --r scales toward the centre (bets, dealer button) */
 .felt { --rx: 46%; --ry: 41%; position: relative; aspect-ratio: 2 / 1; margin: 12px 2% 64px; font-variant-numeric: tabular-nums; }
 .felt::before { content: ""; position: absolute; inset: 4% 3%; border-radius: 50%; background: radial-gradient(ellipse at center, #1f5e42, var(--felt) 55%, var(--felt2)); border: 12px solid #4a2c18; box-shadow: inset 0 0 50px #000a, 0 0 0 2px #6b4527, 0 14px 40px #000a; }
