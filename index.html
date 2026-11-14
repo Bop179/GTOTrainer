@@ -193,6 +193,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 <script src="data200.js"></script>
 <script src="data8.js"></script>
 <script src="data6.js"></script>
+<script src="ev.js"></script>
 <script src="river_wasm.js"></script>
 <script src="river.js"></script>
 <script>window.POST_BASE = "https://147-224-143-161.sslip.io/";</script><!-- postflop solves live on the VM only; VM down = no postflop -->
@@ -782,7 +783,11 @@ function answer(a) {
   c.answered = true; c.shown = c.E.length + 1; // the next decision replays from after your action
   document.querySelector(".seat.hero").classList.remove("turn");
   const mix = mixOf(c.rows[c.i]), f = mix[a], best = Math.max(...Object.values(mix));
-  const grade = f >= best - 5 || f >= 50 ? "great" : f >= 15 ? "ok" : "bad";
+  // grade by bb lost against the best action where the spot has GTO Wizard's EV (ev.js), by frequency elsewhere
+  const row = c.rows.ev?.[c.i], evs = row && c.avail.every(x => row[ACTS.indexOf(x)] != null) && Object.fromEntries(c.avail.map(x => [x, row[ACTS.indexOf(x)]]));
+  const top = evs && c.avail.reduce((x, y) => evs[y] > evs[x] ? y : x), loss = evs && evs[top] - evs[a];
+  const grade = evs ? (loss < 0.05 ? "great" : loss < 0.5 ? "ok" : "bad")
+    : f >= best - 5 || f >= 50 ? "great" : f >= 15 ? "ok" : "bad";
   tally(grade);
   prog.n++;
   prog.log.push([c.spot.key, c.hand, grade, a, ACTS.reduce((x, y) => mix[y] > mix[x] ? y : x)]);
@@ -792,7 +797,7 @@ function answer(a) {
   play(a === "Fold" ? "deal" : "chip");
   if (st.drill) { st.drill.n++; if (grade !== "bad") st.drill.right++; drawDrill(); }
 
-  stamp(a, x => mix[x]);
+  stamp(a, x => mix[x], evs && (x => sbb(evs[x])));
   // show your action on the table: fold mucks your cards, anything else moves chips in
   const z = c.z, put = { Fold: z.heroIn, Call: z.heroIn + z.toCall, Raise: z.raise, Allin: z.S }[a];
   Object.assign($("heroTag"), { hidden: false, textContent: a === "Raise" && z.raise >= z.S ? "All-in" : label(a, c.spot.node) }).style.background = COLOR[a];
@@ -813,12 +818,16 @@ function answer(a) {
   let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
   if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post) { c.post = after.post; more = true; } }
+  if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
+    : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${note}</b></p>`);
   $("next").innerHTML = more ? "Continue hand ▸<kbd>Space</kbd>" : "Next hand <kbd>Space</kbd>";
   drawGrid(c);
   $("feedback").classList.add("show");
 }
 
+const sbb = v => (v > 0 ? "+" : "") + v.toFixed(2) + "bb";
+const evEl = (x, c, evs) => `${label(x, c.spot.node)} <b style="color:var(--${evs[x] < 0 ? "bad" : evs[x] > 0 ? "great" : "muted"})">${sbb(evs[x])}</b>`;
 // after you answer: every action button shows how often the solver takes it, plus its EV when given; yours is ringed
 function stamp(picked, pct, ev) {
   document.querySelectorAll("#actions button").forEach(b => {
