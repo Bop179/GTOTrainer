@@ -5,7 +5,9 @@
 # Pay As You Go card would be charged. Safe to run twice.
 export SUPPRESS_LABEL_WARNING=True PATH=/opt/homebrew/bin:$PATH
 C=$(grep -m1 '^tenancy' ~/.oci/config | cut -d= -f2 | tr -d ' ')
-ssh -o ConnectTimeout=10 gto-vm '~/worker_sync.sh; crontab -l | grep -v worker_sync | crontab -'
+# gto-vm walked the queue backwards (jobs/vm_order.txt) while the worker walked it forwards; put it back to order.txt
+ssh -o ConnectTimeout=10 gto-vm '~/worker_sync.sh; crontab -l | grep -v worker_sync | sed "s|^@reboot ORDER=jobs/vm_order.txt |@reboot |" | crontab -
+  sudo systemctl stop gto-queue; sudo systemd-run --unit gto-queue --uid ubuntu -p WorkingDirectory=/home/ubuntu -p Environment=HOME=/home/ubuntu /bin/bash /home/ubuntu/solver/run_queue.sh'
 for id in $(oci compute instance list -c "$C" --display-name gto-worker --query "data[?\"lifecycle-state\"!='TERMINATED'].id" --raw-output | tr -d '[]",'); do
   oci compute instance terminate --instance-id "$id" --preserve-boot-volume false --force && echo "terminated $id"
 done
