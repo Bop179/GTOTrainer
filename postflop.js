@@ -173,7 +173,13 @@ async function step(i, hold) {
 async function closeStreet() {
   const nk = P.nk; P.closing = false;
   if (P.spent[0] >= P.stack - .01 && P.spent[1] >= P.stack - .01) {
-    while (P.board.length < 5) P.board.push(dealOne());
+    // cards face up and chips into the pot, then the runout one card at a time
+    P.show = true; P.put = [0, 0]; postDraw(false);
+    while (P.board.length < 5) {
+      await new Promise(r => setTimeout(r, 1000));
+      P.board.push(dealOne()); P.isNew = P.board.length - 1; postDraw(false);
+    }
+    await new Promise(r => setTimeout(r, 600));
     return end(`All-in: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}.`, true);
   }
   if (P.street === 2) return end(`Showdown: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}.`, true);
