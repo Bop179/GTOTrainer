@@ -127,10 +127,12 @@ def page():
     allsecs = [s for v in secs.values() for s in v]
     overall = sum(allsecs[-20:]) / len(allsecs[-20:]) if allsecs else 0
     rows, eta, tot_done, tot_all, tot_fail = [], 0, 0, 0, 0
+    since = (RES / ".since").stat().st_mtime if (RES / ".since").exists() else 0  # older results get re-solved (run_queue.sh)
+    count = lambda sc, pat: sum(p.stat().st_mtime > since for p in (RES / sc).glob(pat)) if (RES / sc).is_dir() else 0
     for sc in sorted(d.name for d in JOBS.iterdir() if d.is_dir()):
         total = len(list((JOBS / sc).glob("*.json")))
-        done = len(list((RES / sc).glob("*.json.gz"))) if (RES / sc).is_dir() else 0
-        nfail = len(list((RES / sc).glob("*.failed"))) if (RES / sc).is_dir() else 0
+        done = count(sc, "*.json.gz")
+        nfail = count(sc, "*.failed")
         avg = sum(secs[sc]) / len(secs[sc]) if secs.get(sc) else overall
         left = total - done - nfail
         eta += left * avg

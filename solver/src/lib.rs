@@ -75,23 +75,23 @@ fn act(a: &Action) -> String {
     }
 }
 
-/// Every decision node of the starting street, plus the turn after unraised flop lines (check-check, bet-call) when
-/// starting on the flop. Trimmed for size: hands with reach < 0.001 dropped, strategy as whole %, EV to 0.01 bb.
+/// Every decision node of the starting street, plus every turn (after any flop line that
+/// reaches one, raised or not) when starting on the flop. Trimmed for size: hands with reach < 0.001 dropped, strategy as whole %, EV to 0.01 bb.
 pub fn dump(g: &mut PostFlopGame) -> Map<String, Value> {
     g.back_to_root(); g.cache_normalized_weights();
     let mut out = Map::new();
-    walk(g, &mut vec![], &mut vec![], 0, false, &mut out);
+    walk(g, &mut vec![], &mut vec![], 0, &mut out);
     out
 }
 
-fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, street: u8, raised: bool, out: &mut Map<String, Value>) {
+fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, street: u8, out: &mut Map<String, Value>) {
     if g.is_terminal_node() { return; }
     if g.is_chance_node() {
-        if street > 0 || raised || g.current_board().len() > 3 { return; }
+        if street > 0 || g.current_board().len() > 3 { return; }
         let cards = g.possible_cards();
         for c in (0..52u8).filter(|c| cards >> c & 1 == 1) {
             g.play(c as usize); g.cache_normalized_weights(); hist.push(c as usize); key.push(card_to_string(c).unwrap());
-            walk(g, hist, key, 1, false, out);
+            walk(g, hist, key, 1, out);
             hist.pop(); key.pop(); g.apply_history(hist); g.cache_normalized_weights();
         }
         return;
@@ -113,9 +113,8 @@ fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, stre
         "ev": per(&ev, 100.0, 1.0 / CHIPS),
     }));
     for i in 0..acts.len() {
-        let rz = matches!(acts[i], Action::Raise(_) | Action::AllIn(_));
         g.play(i); g.cache_normalized_weights(); hist.push(i); key.push(i.to_string());
-        walk(g, hist, key, street, raised || (street == 0 && rz), out);
+        walk(g, hist, key, street, out);
         hist.pop(); key.pop(); g.apply_history(hist); g.cache_normalized_weights();
     }
 }
