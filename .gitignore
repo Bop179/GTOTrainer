@@ -4,4 +4,3 @@ SPEC.md
 __pycache__/
 solver/target/
 solver/jobs/
-post/

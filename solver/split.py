@@ -1,4 +1,4 @@
-# python3 -I split.py results_dir out_dir   (run on the VM by pull_post.sh)
+# python3 -I split.py results_dir out_dir   (run on the VM by cron every 10 minutes)
 # Splits each results/<scenario>/<flop>.json.gz (gto-solve output) into the pieces the trainer's postflop mode loads one at a
 # time: out/<scenario>/<flop>/flop.js (flop nodes) and out/<scenario>/<flop>/<turn card>.js (that turn's nodes), plus
 # out/index.js listing what's there. Each piece is a script, POST["<scenario>/<flop>/<piece>"] = "<base64 of gzipped JSON>",
