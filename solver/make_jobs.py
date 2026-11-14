@@ -172,8 +172,9 @@ if __name__ == "__main__":
     for n, f in sets.items(): json.dump(f, open(os.path.join(out, f"flops_{n}.json"), "w"))
     cut = {g: RARE * sum(f for f, gg, name, *_ in sc if gg == g and name.count("_") == 4) for g in SEATS}  # single-raised total
     order = []
-    # 6-max first (every pot kind, most common first), 8-max last (decided 2026-11-13)
-    for f, g, name, *_ in sorted(sc, key=lambda x: (x[2] not in FIRST, x[1] != "6max", -x[0] / cut[x[1]])):
+    # 6-max first, 8-max last; within each, the common single-raised pots, then the rest (limped first), most common first (2026-11-13)
+    common_srp = lambda x: x[2].count("_") == 4 and x[0] >= cut[x[1]]
+    for f, g, name, *_ in sorted(sc, key=lambda x: (x[2] not in FIRST, x[1] != "6max", not common_srp(x), -x[0] / cut[x[1]])):
         fl = sets[N_FLOPS if f >= cut[g] else N_FLOPS_RARE]
         d = os.path.join(out, name); os.makedirs(d, exist_ok=True)
         for x in fl: json.dump(J[name](x), open(os.path.join(d, x + ".json"), "w"))
