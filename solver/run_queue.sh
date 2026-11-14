@@ -5,6 +5,8 @@
 # Run on the VM only:  sudo systemd-run --unit gto-queue --uid ubuntu -p WorkingDirectory=/home/ubuntu -p Environment=HOME=/home/ubuntu /bin/bash /home/ubuntu/solver/run_queue.sh
 # Progress: tail ~/results/queue.log   Stop: sudo systemctl stop gto-queue
 # Parallel (trial worker): ORDER=jobs/worker_order.txt RAYON_NUM_THREADS=4 run_queue.sh 5   (5 solves x 4 threads)
+# REVERSE=1 takes each scenario's flops last-first: gto-vm does that while the worker goes first-first, so both follow
+# the scenario priority without solving the same flop.
 cd ~ || exit 1
 BIN=~/solver/target/release/gto-solve
 ORDER=${ORDER:-jobs/order.txt}
@@ -15,7 +17,7 @@ mkdir -p results
 next() {
   local d j
   for d in $(cat "$ORDER"); do
-    for j in jobs/$d/*.json; do
+    for j in $(ls ${REVERSE:+-r} jobs/$d/*.json); do
       [ -e "results/${j#jobs/}.gz" ] || [ -e "results/${j#jobs/}.gz.failed" ] || ! mkdir "$CLAIMS/${j//\//_}" 2>/dev/null || { echo "$j"; return 0; }
     done
   done
