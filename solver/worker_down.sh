@@ -6,7 +6,7 @@
 export SUPPRESS_LABEL_WARNING=True PATH=/opt/homebrew/bin:$PATH
 C=$(grep -m1 '^tenancy' ~/.oci/config | cut -d= -f2 | tr -d ' ')
 # gto-vm took each scenario's flops last-first (REVERSE=1) while the worker went first-first; put it back to normal
-ssh -o ConnectTimeout=10 gto-vm '~/worker_sync.sh; crontab -l | grep -v worker_sync | sed "s|^@reboot REVERSE=1 |@reboot |" | crontab -
+ssh -o ConnectTimeout=10 gto-vm '~/worker_sync.sh; rm -f ~/.worker_status; crontab -l | grep -v -e worker_sync -e worker_status | sed "s|^@reboot REVERSE=1 |@reboot |" | crontab -
   sudo systemctl stop gto-queue; sudo systemd-run --unit gto-queue --uid ubuntu -p WorkingDirectory=/home/ubuntu -p Environment=HOME=/home/ubuntu /bin/bash /home/ubuntu/solver/run_queue.sh'
 for id in $(oci compute instance list -c "$C" --display-name gto-worker --query "data[?\"lifecycle-state\"!='TERMINATED'].id" --raw-output | tr -d '[]",'); do
   oci compute instance terminate --instance-id "$id" --preserve-boot-volume false --force && echo "terminated $id"

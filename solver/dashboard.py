@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Queue dashboard for the solver VM. Binds 127.0.0.1 only; view from the Mac with
    ssh -N -L 8080:localhost:8080 gto-vm   then open http://localhost:8080
-Reads ~/jobs, ~/results and ~/results/queue.log (written by run_queue.sh) plus /proc."""
+Reads ~/jobs, ~/results and ~/results/queue.log (written by run_queue.sh) plus /proc, and ~/.worker_status while the
+trial-credit worker exists (gto-vm's cron writes it every minute; older than 3 minutes = worker gone, shown as absent)."""
 import calendar, html, os, re, subprocess, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 HOME = Path.home()
 JOBS, RES = HOME / "jobs", HOME / "results"
+WSTAT = HOME / ".worker_status"
 FAIL = re.compile(r"^(\S+) FAILED jobs/(\S+)\.json\s*(.*)")
 OK = re.compile(r"^(\S+) ok jobs/([^/]+)/(\S+)\.json solved: (\d+) iterations, exploitability ([\d.]+)% of pot, (\d+)s")
 
@@ -33,15 +35,30 @@ def fmt(s):
     return f"{s // 86400}d {s % 86400 // 3600}h" if s >= 86400 else f"{s // 3600}h {s % 3600 // 60}m"
 
 
-def current_job():
+def current_jobs():
+    """-> [(job, seconds running)] for this machine's gto-solve processes."""
+    out = []
     for p in Path("/proc").glob("[0-9]*"):
         try:
             args = (p / "cmdline").read_bytes().split(b"\0")
+            if args[0].endswith(b"gto-solve") and len(args) > 1 and args[1].startswith(b"jobs/"):
+                out.append((args[1].decode(), time.time() - p.stat().st_ctime))
         except OSError:
             continue
-        if args[0].endswith(b"gto-solve") and len(args) > 1 and args[1].startswith(b"jobs/"):
-            return args[1].decode(), time.time() - p.stat().st_ctime
-    return None, 0
+    return out
+
+
+def worker_status():
+    """-> (cores, [load x3], [(job, seconds running)]) from ~/.worker_status, or None once it is 3 minutes stale."""
+    try:
+        age = time.time() - WSTAT.stat().st_mtime
+        lines = WSTAT.read_text().splitlines()
+    except OSError:
+        return None
+    if age > 180 or len(lines) < 2:
+        return None
+    jobs = [(f[2], int(f[0]) + age) for f in map(str.split, lines[2:]) if len(f) > 2 and f[0].isdigit()]
+    return lines[0].strip(), lines[1].split()[:3], jobs
 
 
 def sysinfo():
@@ -124,23 +141,33 @@ def page():
         log = []
     now = time.time()
     secs, failed, events = parse_log(log)
-    allsecs = [s for v in secs.values() for s in v]
+    allsecs = [e[2] for e in events]  # in log order, so [-20:] is the latest 20
     overall = sum(allsecs[-20:]) / len(allsecs[-20:]) if allsecs else 0
     rows, eta, tot_done, tot_all, tot_fail = [], 0, 0, 0, 0
+    kind = lambda sc: "_".join(sc.split("_")[5:6])  # "" single-raised, "3bet", "sqz", ...: an unsolved scenario uses its kind's average
+    kavg = {}
+    for sc, v in secs.items(): kavg.setdefault(kind(sc), []).extend(v)
+    worker = worker_status()
+    running = [("gto-vm", j, e) for j, e in current_jobs()] + [("worker", j, e) for j, e in (worker[2] if worker else [])]
+    par = max(1, len(running))  # ponytail: ETA = queued solve time / solves running now, ignores per-machine speed
     since = (RES / ".since").stat().st_mtime if (RES / ".since").exists() else 0  # older results get re-solved (run_queue.sh)
     count = lambda sc, pat: sum(p.stat().st_mtime > since for p in (RES / sc).glob(pat)) if (RES / sc).is_dir() else 0
     for sc in sorted(d.name for d in JOBS.iterdir() if d.is_dir()):
         total = len(list((JOBS / sc).glob("*.json")))
         done = count(sc, "*.json.gz")
         nfail = count(sc, "*.failed")
-        avg = sum(secs[sc]) / len(secs[sc]) if secs.get(sc) else overall
+        k = kavg.get(kind(sc))
+        avg = sum(secs[sc]) / len(secs[sc]) if secs.get(sc) else sum(k) / len(k) if k else overall
         left = total - done - nfail
-        eta += left * avg
+        eta += left * avg / par
         tot_done, tot_all, tot_fail = tot_done + done, tot_all + total, tot_fail + nfail
         pct = 100 * done / total if total else 0
         rows.append(f"<tr><td>{html.escape(sc)}</td><td>{done}/{total}</td><td><div class=track><i style='width:{pct:.1f}%'></i></div></td>"
-                    f"<td>{nfail or ''}</td><td>{fmt(avg) if avg else '–'}</td><td>{fmt(left * avg) if avg and left else '–'}</td></tr>")
-    job, elapsed = current_job()
+                    f"<td>{nfail or ''}</td><td>{fmt(avg) if avg else '–'}</td><td>{fmt(left * avg / par) if avg and left else '–'}</td></tr>")
+    run_list = "".join(f"<li><b>{m}</b><span>{html.escape(j.removeprefix('jobs/').removesuffix('.json'))}</span><time>{fmt(e)}</time></li>"
+                       for m, j, e in sorted(running, key=lambda r: -r[2]))
+    wk = (f" · worker <b style='color:var(--ok)'>{len(worker[2])} solving</b>, load {' '.join(worker[1])} ({worker[0]} cores)" if worker
+          else "")
     svc, load, used, total_mem = sysinfo()
     svc_color = "var(--ok)" if svc == "active" else "var(--bad)"
     def fail_row(f):
@@ -174,14 +201,18 @@ svg .dot{{fill:var(--ok);stroke:var(--bg);stroke-width:2}}figure small{{color:va
 .fails h3{{margin:0;font-size:13px}}.fails em{{font-style:normal;background:var(--bad);color:#fff;border-radius:9px;padding:0 7px;font-size:11px}}.fails em.zero{{background:none;color:var(--ok);padding:0}}
 .fails ul{{list-style:none;margin:0;padding:0;flex:1 1 100%;display:grid;gap:2px}}.fails li{{display:flex;gap:10px;font:12px ui-monospace,monospace;white-space:nowrap;overflow:hidden}}
 .fails li span{{color:var(--mut);overflow:hidden;text-overflow:ellipsis}}.fails time{{color:var(--mut)}}
+.running{{margin:0 0 14px}}.running h3{{margin:0 0 4px;font-size:13px}}.running em{{font-style:normal;color:var(--mut)}}
+.running ul{{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:2px 16px}}
+.running li{{display:flex;gap:8px;font:12px ui-monospace,monospace;white-space:nowrap}}.running li b{{width:52px;color:var(--mut);font-weight:400}}
+.running li span{{flex:1;overflow:hidden;text-overflow:ellipsis}}.running time{{color:var(--mut)}}
 table{{border-collapse:collapse;width:100%}}td,th{{padding:4px 8px;text-align:left;border-bottom:1px solid var(--grid)}}
 .track{{width:160px;height:10px;background:var(--grid);border-radius:5px;overflow:hidden}}.track i{{display:block;height:100%;background:var(--ok)}}code{{font-size:12px}}</style>
 <h2>Solver queue: {tot_done}/{tot_all} flops ({pct:.1f}%)</h2>
 <div class=hero role=progressbar aria-valuenow={pct:.1f} aria-valuemin=0 aria-valuemax=100 title="{pct:.1f}% done, {fpct:.1f}% failed"><i style="width:{pct:.2f}%"></i><u style="width:{fpct:.2f}%"></u></div>
-<p class=sub>ETA {fmt(eta) if eta else '–'}, done {finish} · gto-queue <b style="color:{svc_color}">{html.escape(svc)}</b> · now <code>{html.escape(job or 'idle')}</code>{f' ({fmt(elapsed)} in)' if job else ''} ·
-load {' '.join(load)} (4 cores) · RAM {used:.1f}/{total_mem:.1f} GB</p>
+<p class=sub>ETA {fmt(eta) if eta else '–'}, done {finish} · gto-queue <b style="color:{svc_color}">{html.escape(svc)}</b> · gto-vm load {' '.join(load)} (4 cores), RAM {used:.1f}/{total_mem:.1f} GB{wk}</p>
 <div class=tiles>{tiles}</div>
 {fails}
+<section class=running><h3>Solving now <em>{len(running)}</em></h3><ul>{run_list or '<li><span>idle</span></li>'}</ul></section>
 <div class=charts>{progress_curve(events, now, tot_done, tot_all, eta)}{day_chart}{solve_times(events)}</div>
 <h3>Scenarios</h3>
 <table><tr><th>Scenario</th><th>Done</th><th></th><th>Failed</th><th>Avg</th><th>ETA</th></tr>{''.join(rows)}</table>
