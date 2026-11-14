@@ -2,6 +2,7 @@
 # Bring the VM's finished flop+turn solves to the trainer: split them on the VM (~/post), then mirror the chosen scenarios
 # into ../post and write ../post/index.js listing only what's on this disk (so the trainer never deals a missing flop).
 # Usage: solver/pull_post.sh [scenario ...]   default 6max_100bb_BTN_v_BB; already split flops are skipped.
+# Only for offline use: once ../post/index.js exists the trainer reads ONLY these flops, not the VM; delete ../post to stream from the VM again.
 # About 14 MB a flop (BTN_v_BB ~1.3 GB, all 15 scenarios ~13 GB): the Mac can't hold everything, so pull what you train.
 set -e
 cd "$(dirname "$0")"
