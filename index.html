@@ -975,7 +975,7 @@ function answer(a) {
   $("verdict").textContent = { great: "✓ Correct", ok: "≈ Mixed", bad: "✗ Mistake", "": "Ungraded" }[grade];
   $("range").innerHTML = rangeHTML(c.spot);
   $("why").innerHTML = (off ? [`<b>${c.hand}</b> is ${describe(c.hand)}.`, "Not graded: earlier in the hand you made a move the solver never makes with this hand, so it has no strategy for it here. The % on each button is what its whole range does in this spot."]
-    : explain(c, mix, a, grade)).map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
+    : withRare(explain(c, mix, a, grade), c, mix, a, grade, evs, top, loss)).map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
   // scripted steps continue down the line whatever you picked; after them the other players respond live
   // the scripted line raises at every step, except the SB's limp that starts a limped pot and the call that gets squeezed
   let more = c.k + 1 < c.steps.length, nx = more && c.steps[c.k + 1].node;
@@ -1020,6 +1020,15 @@ function rangeMix(rows) {
 const vsFull = spot => { const [o, w] = villains(spot); return w ? `${o}'s ${MW[spot.node][0]} and ${w}'s ${MW[spot.node][1]}` : `${o}'s ${faced(spot.node)}`; };
 
 // ---------- local, rule-based explanation ----------
+// correct though the solver mostly plays something else (EV-graded spots only): say why right under the hand line
+function withRare(out, c, mix, a, grade, evs, top, loss) {
+  const fav = ACTS.reduce((x, y) => mix[y] > mix[x] ? y : x), L = x => label(x, c.spot.node);
+  if (grade !== "great" || !evs || mix[fav] - mix[a] < 20 || evs[fav] == null) return out;
+  out.splice(1, 0, `<b>Why ${Math.round(mix[a])}% is still correct:</b> the solver prefers ${L(fav)} (${Math.round(mix[fav])}%), but the EVs are nearly equal `
+    + `(${sbb(evs[a])} vs ${sbb(evs[fav])}${a === top ? ", yours higher" : `, ${Math.abs(evs[fav] - evs[a]).toFixed(2)}bb apart`}). `
+    + "When actions are worth about the same, the solver mixes them to stay unreadable, and either one is a fine play.");
+  return out;
+}
 function explain(c, mix, picked, grade) {
   const { spot, rows, hand } = c, node = spot.node, L = a => label(a, node);
   const sorted = ACTS.filter(a => mix[a] > 0).sort((x, y) => mix[y] - mix[x]), best = sorted[0], second = sorted[1];
