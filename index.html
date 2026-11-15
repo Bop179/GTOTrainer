@@ -873,7 +873,7 @@ function drawTable(spot, z, heroCards, deal, from = 0) {
   const show = (e) => {
     const seat = el(".seat", e.p), t = seat.querySelector(".tag");
     Object.assign(t, { hidden: false, textContent: e.tag }).style.background = tagBg(e.tag);
-    if (e.tag === "Fold") { seat.classList.add("toss", "folded"); play("deal"); toss(seat, ".backs i"); replayTimers.push(setTimeout(() => seat.querySelectorAll(".backs i").forEach(i => i.remove()), 650)); return; }
+    if (e.tag === "Fold") return muck(seat);
     inv[e.p] = e.to; play("chip");
     fly(Object.assign(el(".bet", e.p), { hidden: false, textContent: bb(e.to) }));
     seat.querySelector(".plate span").textContent = bb(z.S - e.to);
@@ -890,6 +890,19 @@ function drawTable(spot, z, heroCards, deal, from = 0) {
   return E;
 }
 // the deal leaves a start delay on each card; clear it so the throw starts now, second card just behind the first
+// a villain folds: tag it, throw its cards in
+function muck(seat) {
+  Object.assign(seat.querySelector(".tag"), { hidden: false, textContent: "Fold" }).style.background = tagBg("Fold");
+  seat.classList.add("toss", "folded"); play("deal"); toss(seat, ".backs i");
+  replayTimers.push(setTimeout(() => seat.querySelectorAll(".backs i").forEach(i => i.remove()), 650));
+}
+// the hand ends on the others' replies: muck the seats the reply names ("BB folds", "UTG and HJ fold", "Everyone folds")
+function foldOut(text) {
+  const seats = [...document.querySelectorAll("#felt .seat:not(.hero):not(.folded)")];
+  const names = /^Everyone folds/.test(text) ? seats.map(x => x.dataset.p)
+    : [...text.matchAll(/\b([A-Z][A-Z0-9+]*)(?: and ([A-Z][A-Z0-9+]*))? folds?\b/g)].flatMap(m => [m[1], m[2]]);
+  seats.filter(x => names.includes(x.dataset.p)).forEach((x, j) => replayTimers.push(setTimeout(() => muck(x), 450 + j * 320)));
+}
 const toss = (seat, sel) => seat.querySelectorAll(sel).forEach((x, j) => x.style.animationDelay = j * .07 + "s");
 const fly = b => { b.classList.remove("fly"); void b.offsetWidth; b.classList.add("fly"); }; // restart the slide-in
 
@@ -928,8 +941,8 @@ function tally(grade, quiet) {
 // then a strip of your decisions, first to last and coloured by grade, opens each one's analysis and chart ----------
 let rev = []; // this hand's decisions: { name, grade, verdict class/text, why, grid, range, graded buttons }
 const atEnd = () => cfg.later === "hand" && !st.drill;
-// short action names for the decision chips: Check X, Call C, Bet B (3-bet 3B), Fold F, Raise R, All-in AI
-const abbr = t => t.replace(/(\d)-bet/g, "$1B").replace(/\b(Check|Call|Bet|Fold|Raise)\b/g, w => ({ Check: "X", Call: "C", Bet: "B", Fold: "F", Raise: "R" })[w]).replace("All-in", "AI");
+// short action names for the decision chips: Check X, Call C, Bet B (3-bet 3B), Fold F, Raise R, All-in AI, Squeeze Sqz
+const abbr = t => t.replace(/(\d)-bet/g, "$1B").replace(/\b(Check|Call|Bet|Fold|Raise)\b/g, w => ({ Check: "X", Call: "C", Bet: "B", Fold: "F", Raise: "R" })[w]).replace("All-in", "AI").replace("Squeeze", "Sqz");
 function keep(name, grade, btns, pre = "") {
   rev.push({ name, grade, vc: $("verdict").className, vt: $("verdict").textContent, why: pre + $("why").innerHTML, grid: $("grid").innerHTML, range: $("range").innerHTML, btns });
 }
@@ -999,7 +1012,7 @@ function answer(a) {
   let want = more && (c.spot.node === "RFI" && isLimp(nx) || nx === "FACINGSQZ_CALLER") ? "Call" : "Raise";
   let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
-  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); }
+  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); else if (!more) foldOut(after.text); }
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
     : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p id="note"><b>▸ ${note}</b></p>`);
