@@ -212,7 +212,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 <dialog id="leaks">
   <h2>Your leaks<small id="leakStats"></small></h2><button class="dlg-x" id="closeLeaks" autofocus>Close</button>
   <div id="leakBody"></div>
-  <div class="dlg-btns"><button id="resetProg">Reset progress</button></div>
+  <div class="dlg-btns"><span><button id="exportProg">Export</button> <button id="importProg">Import</button><input type="file" id="importFile" accept=".json,application/json" hidden></span><button id="resetProg">Reset progress</button></div>
 </dialog>
 <script src="data.js"></script>
 <script src="data200.js"></script>
@@ -1241,6 +1241,24 @@ $("closeLeaks").onclick = () => $("leaks").close();
 $("browseBtn").onclick = openBrowse;
 $("bPick").onclick = e => { const v = e.target.closest("button")?.dataset.v; if (v) { bKey = v; drawBrowse(); } };
 $("closeBrowse").onclick = () => $("browse").close();
+// export / import: the whole progress (hand logs, reviews) as a JSON file; importing replaces what this browser has
+$("exportProg").onclick = () => {
+  const a = Object.assign(document.createElement("a"), { download: `gto-leaks-${new Date().toISOString().slice(0, 10)}.json`,
+    href: URL.createObjectURL(new Blob([JSON.stringify(prog)], { type: "application/json" })) });
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$("importProg").onclick = () => $("importFile").click();
+$("importFile").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!Array.isArray(d.log) || typeof d.srs !== "object" || !Number.isFinite(d.n)) throw 0;
+    prog = { n: d.n, log: d.log, srs: d.srs, plog: Array.isArray(d.plog) ? d.plog : [] }; saveProg(); renderLeaks();
+    $("importProg").textContent = `Imported ${prog.log.length + prog.plog.length} decisions`;
+  } catch { $("importProg").textContent = "Not a leaks file"; }
+  setTimeout(() => $("importProg").textContent = "Import", 3000);
+};
 $("resetProg").onclick = () => { // two clicks so one stray click can't wipe your history
   if ($("resetProg").textContent !== "Click again to erase") return $("resetProg").textContent = "Click again to erase";
   prog = { n: 0, log: [], srs: {}, plog: [] }; saveProg(); renderLeaks(); $("resetProg").textContent = "Reset progress";
