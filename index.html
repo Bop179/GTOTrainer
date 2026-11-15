@@ -85,7 +85,7 @@ dialog td:last-child, dialog th:last-child { text-align: right; white-space: now
 .drillbar[hidden] { display: none; }
 .drill { padding: 3px 10px; font-size: 13px; font-weight: 400; }
 .stats { margin-left: auto; display: flex; gap: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.stats b { color: var(--text); } .stats .sess { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; align-self: center; }
+.stats b { color: var(--text); }
 main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
 .table { text-align: center; }
 /* fixed height: four street rows plus the result line, so the table never jumps as the hand grows; margin = room for the top seat's cards */
@@ -205,7 +205,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
   </details>
   <button id="leakBtn">Leaks</button>
   <button id="browseBtn">Ranges</button>
-  <div class="stats" title="Since you opened the page; Leaks has your whole history"><span class="sess">This session</span><span>Hands <b id="sHands">0</b></span><span>Accuracy <b id="sAcc">–</b></span><span>Streak <b id="sStreak">0</b></span></div>
+  <div class="stats" title="Since you opened the page; Leaks has your whole history"><span>This session:</span><span>Hands <b id="sHands">0</b></span><span>Accuracy <b id="sAcc">–</b></span><span>Streak <b id="sStreak">0</b></span></div>
 </header>
 <main>
   <div class="drillbar" id="drillBar" hidden><span id="drillText"></span><button id="stopDrill">Stop drilling</button></div>
