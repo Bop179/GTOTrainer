@@ -374,6 +374,8 @@ function dealSounds(n) {
 // ---------- hand helpers ----------
 const COMBOS = h => h.length === 2 ? 6 : h[2] === "s" ? 4 : 12;
 const rv = c => ({ A: 10, K: 8, Q: 7, J: 6 })[c] ?? (RANKS.length - RANKS.indexOf(c) + 1) / 2;
+// % of the hands in your range here (combos × reach) that rank above a hand of Chen score me
+const topOf = (rows, me) => { let t = 0, a = 0; rows.forEach((r, i) => { const w = COMBOS(HANDS[i]) * r[4]; t += w; if (chen(HANDS[i]) > me) a += w; }); return a / (t || 1) * 100; };
 function chen(h) { // Chen formula: a rough static hand-strength score, only used to rank hands
   const [a, b] = [h[0], h[1]], gap = RANKS.indexOf(b) - RANKS.indexOf(a) - 1;
   if (gap < 0) return Math.max(5, rv(a) * 2);
@@ -1190,6 +1192,8 @@ function explain(c, mix, picked, grade) {
         ? `Checking sees the flop for free, and you'll have position on the SB. ${hand} doesn't gain enough from a raise to build a bigger pot.`
         : spot.hero === "BB" && node === "FACINGRFI"
         ? `In the BB you already have 1bb invested, so you're getting a good price. ${hand} has enough equity to defend, but raising would mostly fold out worse hands and get called by better ones.`
+        : topOf(rows, me) <= 10 // the top of your range (AA, KK...): nothing better calls a raise, so the reason is the trap
+        ? `${hand} is near the top of your range here, so a raise isn't about running into better hands: it would fold out the weaker hands and bluffs you're beating, leaving mostly strong hands to continue. Calling keeps those weaker hands in, so they keep putting money in later (a slow-play).`
         : `${hand} is too good to fold but not the right hand to raise: calling keeps villain's weaker hands and bluffs in, while a raise would mostly get called by better.`);
       if (hand.length === 2 && RANKS.indexOf(hand[0]) > 7) out.push(`Small pairs mostly play for set value: they want to see a flop cheaply and hit a set about 12% of the time.`);
       else if (/s$/.test(hand) && /connector|one-gapper/.test(describe(hand))) out.push(`Suited connectors and one-gappers play well after the flop thanks to straight and flush draws.`);
