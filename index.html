@@ -31,6 +31,7 @@ button { cursor: pointer; }
 .menu summary::-webkit-details-marker { display: none; }
 .menu[open] summary { border-color: var(--ok); }
 .menu > div { position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; width: min(460px, calc(100vw - 32px)); display: grid; gap: 10px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px #000a; }
+#resetCfg { position: absolute; top: 12px; right: 14px; padding: 2px 10px; font-size: 13px; } /* on the Game row, right */
 .menu label { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
 .menu h4, #bPick h4 { margin: 6px 0; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
 .menu h4 small, #bPick h4 small { text-transform: none; letter-spacing: 0; }
@@ -185,7 +186,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
   <h1>♠ GTO Trainer</h1>
   <details class="menu" id="settings"><summary id="setSum">⚙ Settings</summary>
     <div>
-      <button id="resetCfg" style="justify-self:start">↺ Reset settings</button>
+      <button id="resetCfg" title="Back to the default settings">↺ Reset</button>
       <div id="chips"></div>
     </div>
   </details>
