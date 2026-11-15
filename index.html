@@ -670,6 +670,17 @@ function simNext(c, a, pot) {
   // facing a squeeze or cold 4-bet as the opener, the caller or 3-bettor is still behind you; once the opener folds it's heads-up
   if (s.node === "FACINGSQZ" || s.node === "FACINGC4B") return { text: a === "Call" ? `You call, and ${o} still has to act. ${END}` : NOREPLY };
   if (s.node === "FACINGSQZ_CALLER" || s.node === "FACINGC4B_3B") {
+    // you re-raise the squeezer (or cold 4-bettor) heads-up: the data has no reply to that, so they answer from the nearest
+    // plain raise war between the same two seats: a 3-bet of your open facing your 4-bet (the cold 4-bettor sits after you,
+    // so it never opened in a 5-bet war; this is the deepest spot the data has for it).
+    // ponytail: their range there comes from a 3-bet of your open, not from this squeeze or cold 4-bet (which is stronger)
+    const ak = a !== "Call" && nodeKey(s, w, s.hero, "FACING4B");
+    if (SPOTS[ak]) {
+      const b = sampleAct(ak);
+      if (b === "Fold") return { text: `${w} folds. You take the ${bb(pot)} pot.` };
+      if (shove) return allinCalled(c, w, ak);
+      return { text: b === "Call" ? `${w} calls: on to the flop, where this preflop trainer stops (this pot isn't solved).` : `${w} ${what(b, ak.split("/").pop())}. ${END}` };
+    }
     const sc = a === "Call" && postScen(s, a);
     return sc ? { text: "You call: on to the flop!", post: sc } : { text: a === "Call" ? "You call: on to the flop, where this preflop trainer stops." : NOREPLY };
   }
