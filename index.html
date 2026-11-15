@@ -478,8 +478,9 @@ function actionText(a, s, z) {
   if (a === "Call") return z.toCall ? `${L} ${bb(z.toCall)}` : L;
   return z.raise >= z.S ? `${L} (all-in ${bb(z.S)})` : `${L} to ${bb(z.raise)}`;
 }
-// a preflop raise as a pot-sized-raise fraction: what it adds beyond the call, over the pot once you've called (3-bet 3.5 → 14 into 4.5 = 1.5× pot)
-const raiseFrac = (a, z) => a === "Raise" && z.raise < z.S ? `<small class="amt">${fracText((z.raise - z.heroIn - z.toCall) / (z.pot + z.toCall))}</small>` : "";
+// a preflop raise as a multiple of the bet you face, then as a pot-sized-raise fraction: what it adds beyond the call,
+// over the pot once you've called (3-bet 3.5 → 14 into 4.5 = 4x · 1.5× pot)
+const raiseFrac = (a, z) => a === "Raise" && z.raise < z.S ? `<small class="amt">${+(z.raise / (z.heroIn + z.toCall)).toFixed(1)}x · ${fracText((z.raise - z.heroIn - z.toCall) / (z.pot + z.toCall))}</small>` : "";
 function mixOf(row) { // normalize (some source rows don't sum to exactly 100)
   const t = row[0] + row[1] + row[2] + row[3] || 1;
   return Object.fromEntries(ACTS.map((a, i) => [a, row[i] / t * 100]));

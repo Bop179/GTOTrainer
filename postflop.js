@@ -404,7 +404,12 @@ async function postAnswer(i) {
     <div class="mix">${rm.map((v, j) => v >= .5 ? `<div style="background:${AC[kind(node.actions[j])]};width:${v}%"></div>` : "").join("")}</div>
     <div class="pills">${rm.map((v, j) => v >= .5 ? pill(j, v) : "").join("")}</div>`;
   $("grid").innerHTML = gridHTML(classRows(node), "POST", HANDS.indexOf(classOf(P.hands[P.me])));
-  const why = [`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}, pot ${bb(pot)}, ${P.me ? "in" : "out of"} position.`, ...postExplain(node, h),
+  // correct though the solver mostly plays something else: say why right under the spot line
+  const top = mix.indexOf(Math.max(...mix)), gap = Math.abs(ev[top] - ev[i]);
+  const rare = grade === "great" && mix[top] - f >= 20 && `<b>Why ${Math.round(f)}% is still correct:</b> the solver prefers ${names[top]} (${Math.round(mix[top])}%), `
+    + `but the EVs are nearly equal (${ev[i].toFixed(2)} vs ${ev[top].toFixed(2)}bb${i === best ? ", yours higher" : `, ${gap.toFixed(2)}bb apart`}). `
+    + "When actions are worth about the same, the solver mixes them to stay unreadable, and either one is a fine play.";
+  const why = [`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}, pot ${bb(pot)}, ${P.me ? "in" : "out of"} position.`, ...(rare ? [rare] : []), ...postExplain(node, h),
     off && P.inRange ? "Not graded: this flop was solved before every hand was kept, and the solver gets here with your hand so rarely (under 0.1%) that it was left out of this spot. It will be graded once this flop is re-solved. The % on each button is what its whole range does in this spot." // TEMPORARY, see P.inRange
     : off ? "Not graded: your preflop play with this hand isn't in the solver's range, so it has no strategy for it here. The % on each button is what its whole range does in this spot."
     : i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`,
