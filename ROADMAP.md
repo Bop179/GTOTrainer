@@ -167,5 +167,5 @@ Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only.
 
 Might do these later, might never do these:
 
-- Postflop at 200bb (decided 2026-11-13, confirmed 2026-11-14). The trees are deeper, and disk is the limit: after all 100bb work, about 23 GB is left on /data plus 40 GB on the boot disk, and 200bb would need an estimated 60–120 GB.
+- (Moved in 2026-11-15: 6-max and 8-max 200bb postflop are queued after all of 100bb; make_jobs.py writes both stacks.)
 - Postflop multiway pots (3 or more players on the flop; decided 2026-11-13). postflop-solver is heads-up only, and 3-way trees would not fit on the VM.

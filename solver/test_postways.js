@@ -2,7 +2,7 @@
 // preflop spot exists, postScen() finds the scenario from it, and the closer's preflop line puts in the solved pot's size.
 const fs = require("fs"), vm = require("vm"), path = require("path"), D = path.join(__dirname, "..");
 const sizes = JSON.parse(require("child_process").execFileSync("python3", ["-I", "-c",
-  "import sys,json; sys.path.insert(0, sys.argv[1]); import make_jobs as m; print(json.dumps({n: z for _, g, n, a, b, z, d in m.scenarios()}))", __dirname]));
+  "import sys,json; sys.path.insert(0, sys.argv[1]); import make_jobs as m; out = {}; [(m.use(k), out.update({n: z for _, g, n, a, b, z, d in m.scenarios()})) for k in (100, 200)]; print(json.dumps(out))", __dirname]));
 const html = fs.readFileSync(path.join(D, "index.html"), "utf8");
 const cut = (from, to) => { const i = html.indexOf(from), j = html.indexOf(to, i); if (i < 0 || j < 0) throw from; return html.slice(i, j); };
 const ctx = vm.createContext({ window: {} }); ctx.window = ctx;

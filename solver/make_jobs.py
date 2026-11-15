@@ -1,17 +1,17 @@
 # python3 -I solver/make_jobs.py [outdir]   -> outdir/<scenario>/<flop>.json (default solver/jobs), outdir/order.txt
 # (scenarios, most common first: the queue's order) and outdir/flops_<n>.json (each flop subset).
-# Every heads-up postflop pot at 6-max and 8-max 100bb (9-max reuses 8-max), from the trainer's preflop SPOTS rows
+# Every heads-up postflop pot at 6-max and 8-max, 100bb then 200bb (9-max reuses 8-max), from the trainer's preflop SPOTS rows
 # ([allin, raise, call, fold, reach], percentages, 169 hands in grid order; reach = how often the hand got to that spot,
 # as a fraction). Spot keys are <villain>/<hero>/<node>, e.g. BTN/CO/FACING3B = CO (the opener) facing BTN's 3-bet;
 # multiway keys join the earlier players with +, e.g. UTG+CO/HJ/FACINGSQZ_CALLER = HJ, who flatted UTG, facing CO's squeeze.
-# Scenario names (seats are parts [2] and [4], which split.py and postflop.js rely on):
-#   <game>_100bb_<OPENER>_v_<CALLER>             single-raised: opener's raises (RFI), caller's flats (FACINGRFI)
-#   <game>_100bb_<OPENER>_v_<3BETTOR>_3bet       3-bettor's raises (FACINGRFI), opener's calls (FACING3B)
-#   <game>_100bb_<OPENER>_v_<3BETTOR>_4bet       opener's 4-bets (FACING3B), 3-bettor's calls (FACING4B)
-#   <game>_100bb_SB_v_BB_limp                    SB's limps (RFI call), BB's checks (FACINGLIMP call)
-#   <game>_100bb_SB_v_BB_limpraise               BB's raises over the limp (FACINGLIMP), SB's calls (LIMP_FACING2B)
-#   <game>_100bb_<CALLER>_v_<SQUEEZER>_sqz_<OPENER>   open, flat, squeeze, opener folds, caller calls
-#   <game>_100bb_<3BETTOR>_v_<C4BETTOR>_c4b_<OPENER>  open, 3-bet, cold 4-bet, opener folds, 3-bettor calls
+# Scenario names (seats are parts [2] and [4], which split.py and postflop.js rely on; <stack> is 100bb or 200bb):
+#   <game>_<stack>_<OPENER>_v_<CALLER>             single-raised: opener's raises (RFI), caller's flats (FACINGRFI)
+#   <game>_<stack>_<OPENER>_v_<3BETTOR>_3bet       3-bettor's raises (FACINGRFI), opener's calls (FACING3B)
+#   <game>_<stack>_<OPENER>_v_<3BETTOR>_4bet       opener's 4-bets (FACING3B), 3-bettor's calls (FACING4B)
+#   <game>_<stack>_SB_v_BB_limp                    SB's limps (RFI call), BB's checks (FACINGLIMP call)
+#   <game>_<stack>_SB_v_BB_limpraise               BB's raises over the limp (FACINGLIMP), SB's calls (LIMP_FACING2B)
+#   <game>_<stack>_<CALLER>_v_<SQUEEZER>_sqz_<OPENER>   open, flat, squeeze, opener folds, caller calls
+#   <game>_<stack>_<3BETTOR>_v_<C4BETTOR>_c4b_<OPENER>  open, 3-bet, cold 4-bet, opener folds, 3-bettor calls
 # Squeeze and cold 4-bet sizes come from the closing caller's SIZES (GTO Wizard: [open, 3-bet or squeeze, cold 4-bet, ...]),
 # as index.html's sizing() reads them, so the pot matches the preflop replay. Spots without SIZES use sizing()'s fallback
 # (open 2.5, or 3 from the SB; first raise x3 in position / x4 out of position; next raise x2.3; rounded to 0.5).
@@ -23,7 +23,7 @@ H = [R[i] + R[j] if i == j else (R[i] + R[j] + "s" if i < j else R[j] + R[i] + "
 COMBOS = [6 if h[0] == h[1] else 4 if h.endswith("s") else 12 for h in H]
 HERE = os.path.dirname(os.path.abspath(__file__))
 SEATS = {"6max": ["UTG", "HJ", "CO", "BTN", "SB", "BB"], "8max": ["UTG", "UTG1", "LJ", "HJ", "CO", "BTN", "SB", "BB"]}
-FILES = {"6max": "data6.js", "8max": "data8.js"}
+FILES = {(100, "6max"): "data6.js", (100, "8max"): "data8.js", (200, "6max"): "data200.js", (200, "8max"): "data8.js"}
 SIZES = {"flop_sizes": ["33%, 75%", "2.5x"], "turn_sizes": ["75%, 125%", "2.5x"], "river_sizes": ["75%", "2.5x"]}
 # Limped pots (2bb pot, 99bb behind) with SIZES need 62 GB; this needs 26 GB (13 GB compressed, so it fits the VM):
 # no turn overbet, and 3x raises so the stacks go in after fewer raises.
@@ -31,17 +31,26 @@ LIMP_SIZES = {"flop_sizes": ["33%, 75%", "3x"], "turn_sizes": ["75%", "3x"], "ri
 FIRST = ["6max_100bb_BTN_v_BB"]  # already solving when the order was last changed: finish it before anything else
 N_FLOPS, N_FLOPS_RARE = 95, 40
 RARE = 0.05  # pots rarer than 5% of the game's heads-up single-raised pots get the smaller flop set
-# ...except 6-max re-raised pots: they solve in seconds (low SPR), so they also get flops(55), which shares no flop with
-# flops(40): 95 flops in all, like the common pots, without re-solving the 40 already done (2026-11-14)
+# ...except re-raised pots: they solve in seconds (low SPR), so they also get flops(55), which shares no flop with
+# flops(40): 95 flops in all, like the common pots, without re-solving the 40 already done (6-max 2026-11-14, 8-max 11-15)
 CHEAP, N_FLOPS_MORE = {"3bet", "4bet", "sqz", "c4b"}, N_FLOPS - N_FLOPS_RARE
-STACK = 100
+# the common 6-max single-raised pots add flops(93), 5 of which are already in flops(95): 183 flops (2026-11-15)
+N_FLOPS_SRP6 = 93
+STACK, SK = 100, "100bb"  # the stack being written; use() switches it
 
-SRC = {g: open(os.path.join(HERE, "..", f)).read() for g, f in FILES.items()}
-SZ = {}  # preflop raise-to sizes per spot, in bb
-for s in SRC.values():
+ALL_SRC = {k: open(os.path.join(HERE, "..", f)).read() for k, f in FILES.items()}
+SZ = {}  # preflop raise-to sizes per spot, in bb (every stack: the keys say which)
+for s in ALL_SRC.values():
     for m in re.finditer(r'(?:Object\.assign\(window\.SIZES(?:\|\|\{\})?,|window\.SIZES=)\s*(?=\{")', s):
         SZ.update(json.JSONDecoder().raw_decode(s[m.end():])[0])
-K = lambda g, *p: f"{g}/100bb/" + "/".join(p)
+K = lambda g, *p: f"{g}/{SK}/" + "/".join(p)
+
+def use(stack):
+    """Write jobs for this stack depth (100 or 200): the preflop data, the stack and the names all follow it."""
+    global STACK, SK, SRC
+    STACK, SK = stack, f"{stack}bb"
+    SRC = {g: ALL_SRC[stack, g] for g in SEATS}
+use(100)
 
 def rows(key):
     s = SRC[key.split("/")[0]]
@@ -79,10 +88,10 @@ def scenarios():
     out = []
     def add(f, g, name, a, b, size, dead):
         if size < STACK * 0.9: out.append((f, g, name, a, b, size, dead))  # an all-in preflop has no postflop
-    multi = lambda g, node: re.findall(r'"(' + g + r'/100bb/[A-Z0-9]+\+[A-Z0-9]+/[A-Z0-9]+/' + node + r')":\[\[', SRC[g])
+    multi = lambda g, node: re.findall(r'"(' + g + "/" + SK + r'/[A-Z0-9]+\+[A-Z0-9]+/[A-Z0-9]+/' + node + r')":\[\[', SRC[g])
     seats3 = lambda key: re.match(r".*/([A-Z0-9]+)\+([A-Z0-9]+)/([A-Z0-9]+)/", key).groups()
     for g, seats in SEATS.items():
-        n = lambda *p: f"{g}_100bb_" + "_".join(p)
+        n = lambda *p: f"{g}_{SK}_" + "_".join(p)
         for i, o in enumerate(seats[:-1]):
             for c in seats[i + 1:]:
                 if not has(K(g, o, c, "FACINGRFI")): continue
@@ -148,7 +157,7 @@ def job(g, a, b, size, dead, flop):
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "jobs")
-    sets = {n: flops(n) for n in (N_FLOPS, N_FLOPS_RARE, N_FLOPS_MORE)}
+    sets = {n: flops(n) for n in (N_FLOPS, N_FLOPS_RARE, N_FLOPS_MORE, N_FLOPS_SRP6)}
     assert all(len(f) == n and len(set(f)) == n for n, f in sets.items())
     sc = scenarios()
     J = {name: (lambda f, g=g, a=a, b=b, z=z, d=d: job(g, a, b, z, d, f)) for _, g, name, a, b, z, d in sc}
@@ -174,15 +183,23 @@ if __name__ == "__main__":
     assert (t["pot"], t["stack"]) == (2 * q + 2.5 + 1.5, 100 - q)
     os.makedirs(out, exist_ok=True)
     for n, f in sets.items(): json.dump(f, open(os.path.join(out, f"flops_{n}.json"), "w"))
-    cut = {g: RARE * sum(f for f, gg, name, *_ in sc if gg == g and name.count("_") == 4) for g in SEATS}  # single-raised total
     order = []
-    # 6-max first, 8-max last; within each, the common single-raised pots, then the rest (limped first), most common first (2026-11-13)
-    common_srp = lambda x: x[2].count("_") == 4 and x[0] >= cut[x[1]]
-    for f, g, name, *_ in sorted(sc, key=lambda x: (x[2] not in FIRST, x[1] != "6max", not common_srp(x), -x[0] / cut[x[1]])):
-        fl = sets[N_FLOPS] if f >= cut[g] else sets[N_FLOPS_RARE] + (sets[N_FLOPS_MORE] if g == "6max" and name.split("_")[5:6] and name.split("_")[5] in CHEAP else [])
-        assert len(set(fl)) == len(fl)
-        d = os.path.join(out, name); os.makedirs(d, exist_ok=True)
-        for x in fl: json.dump(J[name](x), open(os.path.join(d, x + ".json"), "w"))
-        order.append(name); print(f"{name:<34} {f / cut[g] * RARE:7.2%}  {len(fl)} flops")
+    for stack in (100, 200):  # all of 100bb first, then 200bb (2026-11-15)
+        use(stack); sc = scenarios()
+        J = {name: (lambda f, g=g, a=a, b=b, z=z, d=d: job(g, a, b, z, d, f)) for _, g, name, a, b, z, d in sc}
+        cut = {g: RARE * sum(f for f, gg, name, *_ in sc if gg == g and name.count("_") == 4) for g in SEATS}  # single-raised total
+        # 6-max first, 8-max last; within each, the common single-raised pots, then the rest (limped first), most common first (2026-11-13)
+        common_srp = lambda x: x[2].count("_") == 4 and x[0] >= cut[x[1]]
+        for f, g, name, *_ in sorted(sc, key=lambda x: (x[2] not in FIRST, x[1] != "6max", not common_srp(x), -x[0] / cut[x[1]])):
+            kind = (name.split("_")[5:6] or [""])[0]
+            # 200bb: no extra single-raised flops, and 8-max's re-raised pots stay at 40 flops, to fit the disk
+            more_srp = stack == 100 and g == "6max" and kind == ""
+            more_cheap = kind in CHEAP and (stack == 100 or g == "6max")
+            fl = (sets[N_FLOPS] + ([x for x in sets[N_FLOPS_SRP6] if x not in sets[N_FLOPS]] if more_srp else [])
+                  if f >= cut[g] else sets[N_FLOPS_RARE] + (sets[N_FLOPS_MORE] if more_cheap else []))
+            assert len(set(fl)) == len(fl)
+            d = os.path.join(out, name); os.makedirs(d, exist_ok=True)
+            for x in fl: json.dump(J[name](x), open(os.path.join(d, x + ".json"), "w"))
+            order.append(name); print(f"{name:<34} {f / cut[g] * RARE:7.2%}  {len(fl)} flops")
     open(os.path.join(out, "order.txt"), "w").write("\n".join(order) + "\n")
     print(f"{len(order)} scenarios, {sum(len(os.listdir(os.path.join(out, d))) for d in order)} jobs -> {out}")

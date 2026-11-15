@@ -1,8 +1,11 @@
 #!/bin/bash
 # End the trial-credit worker: terminate gto-worker (its boot volume goes with it), stop gto-vm's sync cron, and put
 # the quota back to free-tier only (A1 4/24, 200 GB). Run from the Mac by hand once the worker's queue is done;
-# launchd (com.gtotrainer.worker-down) also runs it on 2026-12-10, before the $300 credits end (~2026-12-13) and the
+# launchd (com.gtotrainer.worker-down) also runs it on 2026-11-30, before the $300 credits end (~2026-12-13) and the
 # Pay As You Go card would be charged. Safe to run twice.
+# 2026-11-15: moved to Nov 30 (launchd 13:00 EST; the worker powers itself off at 17:00 UTC): A1 hours come out of one free
+# allowance per calendar month (3,000 OCPU-h, 18,000 GB-h), which gto-vm alone nearly uses up, so worker hours in December
+# would push gto-vm past it after the credits end.
 export SUPPRESS_LABEL_WARNING=True PATH=/opt/homebrew/bin:$PATH
 C=$(grep -m1 '^tenancy' ~/.oci/config | cut -d= -f2 | tr -d ' ')
 # gto-vm took each scenario's flops last-first (REVERSE=1) while the worker went first-first; put it back to normal
