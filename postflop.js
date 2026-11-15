@@ -128,7 +128,12 @@ async function postBegin(c) {
   const scen = c.post, m = PI[scen], me = m.oop === c.spot.hero ? 0 : 1;
   c.post = null; c.busy = true; // a second Space while the flop loads doesn't deal twice, and undo waits for it
   $("feedback").classList.remove("show");
-  $("actions").innerHTML = ""; $("situation").textContent = "Dealing the flop…";
+  const from = FROM[cfg.postFrom] || 0;
+  $("actions").innerHTML = "";
+  // starting on the turn or river: the streets before it play out unseen (fast), and a line that ends early is replayed on
+  // the same flop, so you only ever see a hand that gets to your street
+  if (from) { $("felt").innerHTML = ""; $("situation").innerHTML = `<span class="spin"></span>Finding a hand that reaches the ${STREET[from].toLowerCase()}…`; }
+  else $("situation").textContent = "Dealing the flop…";
   // random suit relabel (solver suit -> table suit), then a solved flop that misses your cards in solver suits
   let sig, mine, flop;
   for (let t = 0; t < 24 && !flop; t++) {
@@ -139,6 +144,7 @@ async function postBegin(c) {
   }
   let nodes;
   try { nodes = await loadPiece(`${scen}/${flop}/flop`); } catch (e) { c.busy = false; $("situation").textContent = e.message; return; }
+  if (st.cur !== c) return; // a new hand was dealt while this flop loaded (a settings change)
   const [p0, key0] = ways(scen)[1], z0 = sizing(parse(key0)), who = (p, v1, v3) => p === c.spot.hero ? "you " + v1 : `${p} ${v3}`;
   const VERB = { Limp: ["limp", "limps"], Call: ["call", "calls"], Check: ["check", "checks"], Fold: ["fold", "folds"], Open: ["open", "opens"] };
   const told = ([p, to, tag]) => { // a preflop bet from sizing()'s line, as a story entry
@@ -159,15 +165,29 @@ async function postBegin(c) {
   P.story.push({ s: "Flop" }); // the cards are on the board; the story only says who did what
   st.cur = P;
   // not in the solved range (the solver doesn't play it this way preflop): it still plays on, ungraded (see postAnswer)
-  postDraw(true);
-  if (!P.over) { P.busy = true; await run(); P.busy = false; postDraw(false); }
-  // it ended (a fold, or an all-in runout) while playing itself toward your starting street: no decision for you, so deal again
-  if (P.over && P.street < (FROM[cfg.postFrom] || 0)) newHand();
+  P.quiet = from > 0;
+  if (!P.quiet) postDraw(true);
+  P.busy = true;
+  const start = copyP(P);
+  // an all-in runout (or an unsolved turn) before your first decision: replay the line, then try another flop
+  for (let t = 0; t < 30 && (!t || from && P.over && !P.err); t++) {
+    if (t) P = st.cur = copyP(start);
+    const h = P; await run(); if (P !== h) return;
+  }
+  P.busy = false;
+  if (P.over && !P.err && from) return newHand();
+  reveal(); postDraw(false);
 }
+// the hand was playing out unseen (P.quiet) and reached your street: show the table, every board card dealing in
+function reveal() { if (P.quiet && P.street >= (FROM[cfg.postFrom] || 0)) { P.quiet = false; P.isNew = 0; postDraw(true); } }
 
 // apply action i at the current node, for whoever is to act; deals the next card when a street closes
 // hold: your own action closed the street; the next card waits until you continue (closeStreet from postNext)
+// P is global: a new hand can be dealt while this one awaits (a settings change), so after every wait the old hand
+// checks it's still the one on the table, and stops (throws STALE) if not
+const STALE = new Error("stale"), live = h => { if (P !== h) throw STALE; };
 async function step(i, hold) {
+  const h = P;
   const node = cur(), p = node.player, a = node.actions[i], k = kind(a);
   let add = 0;
   if (k === "Call") add = P.put[1 - p] - P.put[p];
@@ -182,19 +202,21 @@ async function step(i, hold) {
   // street over: a call, or a check behind. Let it land on the table before the chips go in and the next card comes
   P.nk = nk; P.closing = true;
   if (hold) return;
-  postDraw(false); await new Promise(r => setTimeout(r, 700));
+  if (!P.quiet) { postDraw(false); await new Promise(r => setTimeout(r, 700)); live(h); }
   return closeStreet();
 }
 async function closeStreet() {
+  const h = P;
   const nk = P.nk; P.closing = false;
   if (P.spent[0] >= P.stack - .01 && P.spent[1] >= P.stack - .01) {
     // cards face up and chips into the pot, then the runout one card at a time
+    if (P.quiet) return end("All-in before your street."); // replayed unseen (postBegin)
     P.show = true; P.put = [0, 0]; postDraw(false);
     while (P.board.length < 5) {
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 1000)); live(h);
       P.board.push(dealOne()); P.isNew = P.board.length - 1; postDraw(false);
     }
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 600)); live(h);
     return end(`All-in: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. ${winner()}`, true);
   }
   if (P.street === 2) return end(`Showdown: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. ${winner()}`, true);
@@ -204,14 +226,16 @@ async function closeStreet() {
   if (P.street === 1) {
     const absent = [...SUIT].filter(x => ![1, 3, 5].some(i => P.flop[i] === x)), swap = absent.indexOf(c[1]) > 0 ? [absent[0], c[1]] : null;
     const turn = await loadPiece(`${P.scen}/${P.flop}/${swap ? c[0] + absent[0] : c}`, swap);
+    live(h);
     P.nodes = { ...P.nodes, ...turn }; P.k = nk + "-" + c;
     // TEMPORARY until the 2026-11-15 re-solve finishes: solves since 2026-11-13 keep the turn after a raised flop too;
     // after that this only fires if a piece is missing
     if (!P.nodes[P.k]) return end("The flop was raised, and turns after a raised flop aren't solved yet, so the hand ends here.");
   } else {
-    $("situation").textContent = "Solving the river…";
+    if (!P.quiet) $("situation").innerHTML = '<span class="spin"></span>Solving the river…';
     await new Promise(r => setTimeout(r, 30)); // let the text paint: the solve blocks the page
-    P.nodes = (await RiverSolver.solve(riverJob())).nodes; P.k = "";
+    const r = await RiverSolver.solve(riverJob()); live(h);
+    P.nodes = r.nodes; P.k = "";
   }
 }
 // each player's river range: reach × the frequency of the action they took at their last turn decision, scaled to 0..1.
@@ -237,18 +261,20 @@ const strat = (node, hand) => {
 // the villain acts until it's your turn or the hand ends
 // one action at a time, like preflop: a beat, then the action lands on the table
 // "Start deciding on" the flop, turn or river (cfg.postFrom): preflop is skipped (newHand), and your earlier postflop decisions play themselves the solver's way,
-// skipping its fold when it has another line, so more hands get there
+// and before your street nobody folds when they have another line (a fold would end the hand before you decide)
 const FROM = { flop: 0, turn: 1, river: 2 };
 async function run() {
+  const from = FROM[cfg.postFrom] || 0, h = P;
   try {
-    for (let p; !P.over && ((p = cur().player) !== P.me || P.street < (FROM[cfg.postFrom] || 0)); postDraw(false)) {
-      await new Promise(r => setTimeout(r, 650));
+    for (let p; !P.over && ((p = cur().player) !== P.me || P.street < from); P.quiet || postDraw(false)) {
+      reveal();
+      if (!P.quiet) { await new Promise(r => setTimeout(r, 650)); live(h); }
       let s = strat(cur(), P.hands[p]);
-      const f = p === P.me ? cur().actions.indexOf("Fold") : -1;
+      const f = P.street < from ? cur().actions.indexOf("Fold") : -1;
       if (f >= 0 && s.some((x, j) => j !== f && x >= 1)) s = s.map((x, j) => j === f ? 0 : x);
       await step(pick(s));
     }
-  } catch (e) { return end(e.message); }
+  } catch (e) { if (e === STALE) return; P.err = true; return end(e.message); }
 }
 // the villain's range now: reach × how often they took the action they took at their last decision (all of it before one)
 function villainRange() {
@@ -396,8 +422,10 @@ async function postNext() {
   if (P.over || P.busy) return P.busy || newHand();
   $("feedback").classList.remove("show");
   P.busy = true;
-  if (P.closing) { try { await closeStreet(); } catch (e) { end(e.message); } postDraw(false); }
-  await run(); P.busy = false; P.answered = false;
+  const h = P;
+  if (P.closing) { try { await closeStreet(); } catch (e) { if (e === STALE) return; end(e.message); } postDraw(false); }
+  await run(); if (P !== h) return;
+  P.busy = false; P.answered = false;
   postDraw(false);
 }
 // the node's strategy folded into the 13×13 chart: [all-in, bet/raise, check/call, fold, reach 0..1] per hand class

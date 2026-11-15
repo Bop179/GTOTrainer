@@ -166,7 +166,7 @@ Postflop covers heads-up pots only; 9-max reuses the 8-max solves. The flop and 
     - where your hand ranks in your range;
     - the mix for hands like yours;
     - every action's EV, the whole range's mix, and a 13x13 chart.
-  - **Play to postflop** deals only spots that lead into a solved pot. **Start deciding on** Preflop / Flop / Turn / River: from the flop on, preflop is skipped (the hand is dealt one that takes the line) and your earlier postflop streets play by the solver's strategy, skipping its fold when it has another line; a hand that ends before your street is redealt.
+  - **Play to postflop, deciding from** Off / Preflop / Flop / Turn / River (one settings row) deals only spots that lead into a solved pot. From the flop on, preflop is skipped (the hand is dealt one that takes the line); the streets before yours play by the solver's strategy with nobody folding when they have another line, unseen behind a "Finding a hand…" spinner, and a line that still ends early (an all-in) is replayed on the same flop (30 tries, then another flop).
   - A hand off the solver's line plays on ungraded (whole-range mix on the buttons) instead of ending. Once the re-solve is done, only a hand that was never in the flop range stays ungraded until the river.
   - Showdowns name the winner. Every ending other than your fold says why (multiway, unsolved pot, game or stack without postflop).
   - Check: `node solver/test_postways.js` (every scenario's spots exist, are found from the preflop line, and put in the solved pot).
