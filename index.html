@@ -666,7 +666,7 @@ function leakSection(log, o) {
     <div class="lhead"><div class="big">${acc}%</div><div>right, over ${log.length} ${o.unit}${o.extra || ""}</div></div>
     <p class="lsum">${sum}</p>
     <h3>Your style <small>· how often you do it, against the solver with the same hands${sN < log.length ? ` (${sN} ${o.unit} with the solver's mix saved)` : ""}</small></h3>
-    ${meter("fold", fold.you, fold.sol, sN, "Looser", "Tighter", "How often you fold, against how often the solver folds the same hands in the same spots.")}
+    ${meter("play on", 100 - fold.you, 100 - fold.sol, sN, "Tighter", "Looser", "How often you play on (call, bet or raise rather than fold), against the solver with the same hands in the same spots.")}
     ${meter("bet or raise", agg.you, agg.sol, agg.n, "More passive", "More aggressive", "When you play on: how often you bet or raise rather than check or call, against the solver with the same hands.")}
     ${costs.length ? `<h3>Cost of your mistakes <small>· ${per100(cost)}bb per 100 ${o.unit} · how often you make each when the spot comes up</small></h3>${costs.map(([t, c, k, n, fav]) =>
       barRow(`${t} <small>· ${pctOf(k, n)}% of the time</small>`, c / costs[0][1], `${per100(c)}bb`, "var(--bad)",
