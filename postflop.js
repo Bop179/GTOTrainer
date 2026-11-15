@@ -2,7 +2,6 @@
 // Flop and turn come from the VM pre-solves (loaded one piece at a time from the VM's Caddy); the river is solved live (river.js).
 // Everything runs in the solver's suits: the solved flop is shown with its suits relabelled (P.sig), and your preflop
 // cards are mapped back into solver suits. Uses index.html's globals ($, st, pick, bb, play, tally, ...) at call time.
-window.POST = {};
 const PI = window.POST_INDEX || {};
 const SUIT = "shdc"; // SUITS order in index.html
 const UP = "23456789TJQKA";
@@ -53,16 +52,27 @@ function postReply(c, a) {
   return { text, post: c.scen };
 }
 
-// ---------- data: each piece is a script setting POST[path] to base64 gzipped JSON ----------
-function loadPiece(path) {
-  return new Promise((ok, bad) => {
-    const s = document.createElement("script");
-    s.src = `${POST_BASE}${path}.js`; s.onload = ok; s.onerror = () => bad(new Error(`${POST_BASE}${path}.js didn't load (the VM is down, or that flop isn't solved yet)`));
-    document.head.append(s); s.remove();
-  }).then(() => {
-    const b = Uint8Array.from(atob(POST[path]), x => x.charCodeAt(0)); delete POST[path];
-    return new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream("gzip"))).json();
-  });
+// ---------- data: each piece is a gzipped binary file on the VM (format in solver/split.py) ----------
+// swap: [a, b] reads a piece stored for suit a as suit b (turns in suits the flop lacks are stored once, see split.py)
+async function loadPiece(path, swap) {
+  const url = `${POST_BASE}${path}.bin`, r = await fetch(url).catch(() => null);
+  if (!r || !r.ok) throw new Error(`${url} didn't load (the VM is down, or that flop isn't solved yet)`);
+  return decodePiece(await new Response(r.body.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer(), swap);
+}
+function decodePiece(buf, swap) {
+  const v = new DataView(buf), hl = v.getUint32(0, true), head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, hl)));
+  const sx = x => !swap ? x : x[0] + (x[1] === swap[0] ? swap[1] : x[1] === swap[1] ? swap[0] : x[1]);
+  const c52 = i => sx(UP[i >> 2] + SUIT[i & 3]), out = {};
+  let o = 4 + hl;
+  for (const [k, player, actions, h] of head) {
+    const hands = [], reach = [], strat = [], ev = [];
+    for (let i = 0; i < h; i++, o += 2) { const c = v.getUint16(o, true); hands.push(holeStr(c52(Math.floor(c / 52)), c52(c % 52))); }
+    for (let i = 0; i < h; i++, o += 4) reach.push(v.getUint32(o, true) / 1000);
+    for (const _ of actions) { strat.push(Array.from(new Uint8Array(buf, o, h))); o += h; }
+    for (const _ of actions) { const row = []; for (let i = 0; i < h; i++, o += 4) row.push(v.getInt32(o, true) / 100); ev.push(row); }
+    out[k.split("-").map(t => t.length === 2 && SUIT.includes(t[1]) ? sx(t) : t).join("-")] = { player, actions, hands, reach, strat, ev };
+  }
+  return out;
 }
 
 // ---------- cards (solver spelling: "Ah"; a hand is the higher card first, as the solver writes it) ----------
@@ -187,7 +197,8 @@ async function closeStreet() {
   P.board.push(c); P.street++; P.put = [0, 0]; P.tag = ["", ""]; P.isNew = P.board.length - 1;
   P.story.push({ s: STREET[P.street] });
   if (P.street === 1) {
-    const turn = await loadPiece(`${P.scen}/${P.flop}/${c}`);
+    const absent = [...SUIT].filter(x => ![1, 3, 5].some(i => P.flop[i] === x)), swap = absent.indexOf(c[1]) > 0 ? [absent[0], c[1]] : null;
+    const turn = await loadPiece(`${P.scen}/${P.flop}/${swap ? c[0] + absent[0] : c}`, swap);
     P.nodes = { ...P.nodes, ...turn }; P.k = nk + "-" + c;
     // ponytail: the pre-solve keeps turns only after an unraised flop; a live turn solve would cover the rest
     if (!P.nodes[P.k]) return end("The flop was raised, and turns after a raised flop aren't solved yet, so the hand ends here.");

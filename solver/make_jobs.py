@@ -143,7 +143,8 @@ def job(g, a, b, size, dead, flop):
     """a, b = (seat, rows, col) for the pot's two players; each has put in size bb, and dead bb came from the others."""
     o, i = (b, a) if ip(g, a[0], b[0]) else (a, b)
     return {"oop": rng(o[1], o[2]), "ip": rng(i[1], i[2]), "flop": flop, "pot": 2 * size + dead, "stack": STACK - size,
-            **(LIMP_SIZES if size == 1 else SIZES), "target": 0.01, "max_iter": 1000}
+            **(LIMP_SIZES if size == 1 else SIZES), "target": 0.01, "max_iter": 1000,
+            "min_reach": 0}  # keep every hand at every node, so a hand that left the solver's line is still graded (2026-11-15)
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "jobs")
