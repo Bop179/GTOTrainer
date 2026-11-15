@@ -388,6 +388,15 @@ async function postAnswer(i) {
   const best = ev.indexOf(Math.max(...ev)), loss = ev[best] - ev[i], pot = potNow();
   const grade = off ? "" : f >= 25 || f >= 5 && loss <= .02 * pot ? "great" : f >= 5 || f >= 1 && loss <= .05 * pot || loss <= .01 * pot ? "ok" : "bad";
   if (grade && !atEnd()) tally(grade);
+  if (grade) { // the Leaks log, grouped loosely: street, position and what you face; made hand, or the draw when there's nothing better
+    const me = P.me, face = P.put[1 - me] > P.put[me] ? (P.put[me] > 0 ? "facing a raise" : "facing a bet") : me ? "checked to you" : "first to act";
+    const hc = handClass(cardsOf(P.hands[me]), P.board), made = hc.made.replace(/^an? /, "");
+    const fav = node.strat.reduce((b, s, j) => s[h] > node.strat[b][h] ? j : b, 0);
+    prog.plog ||= []; prog.plog.push([`${STREET[P.board.length - 3]} · ${me ? "IP" : "OOP"} ${face}`, hc.draw && /no pair|ace high/.test(made) ? hc.draw.replace(/\ban? /g, "") : made,
+      grade, kind(node.actions[i]), kind(node.actions[fav])]);
+    if (prog.plog.length > 3000) prog.plog.shift();
+    saveProg();
+  }
   play(kind(node.actions[i]) === "Fold" ? "deal" : "chip");
   const short = `${STREET[P.board.length - 3][0]} · ${abbr({ Bet: `Bet ${potFrac(amt(node.actions[i])).replace(/ pot$/, "")}`, Allin: "All-in" }[kind(node.actions[i])] || kind(node.actions[i]))}`;
   const plain = $("actions").innerHTML;
