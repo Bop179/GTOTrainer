@@ -185,6 +185,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
   <h1>♠ GTO Trainer</h1>
   <details class="menu" id="settings"><summary id="setSum">⚙ Settings</summary>
     <div>
+      <button id="resetCfg" style="justify-self:start">↺ Reset settings</button>
       <div id="chips"></div>
     </div>
   </details>
@@ -523,7 +524,9 @@ const SPOT_ROWS = [
   ["Limped pots", { "FACINGLIMP|LIMP_FACING2B|LIMP_FACING3B|LIMP_FACING4B|LIMP_FACING5B|LIMP_FACING6B": "Limped pot" }]];
 const SPOT_TYPES = Object.assign({}, ...SPOT_ROWS.map(r => r[1]));
 const stacksOf = game => [...new Set(ALL.filter(s => s.game === game).map(s => s.stack))].sort((a, b) => parseInt(a) - parseInt(b));
-let cfg = { game: "6max", stack: "100bb", nodes: [], pos: [], hands: [] };
+// defaults: 6-max 100bb, all spots, any seat, preflop and postflop, feedback after each decision (the unset flags)
+const defCfg = () => ({ game: "6max", stack: "100bb", nodes: [], pos: [], hands: [] });
+let cfg = defCfg();
 try { cfg = { ...cfg, ...JSON.parse(localStorage.getItem("gto-cfg")) }; } catch {}
 // "Your hand": AKs, 88, AQo, or AQ for both; 10 for T; anything else is dropped
 const parseHands = t => [...new Set(t.toUpperCase().replace(/10/g, "T").split(/[\s,;]+/).flatMap(x => {
@@ -534,7 +537,7 @@ const parseHands = t => [...new Set(t.toUpperCase().replace(/10/g, "T").split(/[
 }).filter(h => HANDS.includes(h)))];
 const handOk = h => !cfg.hands.length || cfg.hands.includes(h); // the Your hand filter
 const hasHand = key => SPOTS[key].some((r, k) => r[4] && handOk(HANDS[k])); // a spot your filtered hands reach
-if (!stacksOf(cfg.game).length) cfg = { game: "6max", stack: "100bb", nodes: [], pos: [], hands: [] };
+if (!stacksOf(cfg.game).length) cfg = defCfg();
 if (!stacksOf(cfg.game).includes(cfg.stack)) cfg.stack = stacksOf(cfg.game).at(-1);
 const toPost = () => cfg.toPost && postGames().includes(cfg.game + "/" + cfg.stack);
 const group = (g, title, items, on) => `<h4>${title}</h4><div class="chips" data-g="${g}">`
@@ -1281,6 +1284,7 @@ $("chips").addEventListener("change", e => {
   cfg.hands = parseHands(e.target.value);
   save("gto-cfg", JSON.stringify(cfg)); drawSettings(); stopDrill(); newHand();
 });
+$("resetCfg").onclick = () => { cfg = defCfg(); save("gto-cfg", JSON.stringify(cfg)); drawSettings(); stopDrill(); newHand(); };
 $("stopDrill").onclick = () => { stopDrill(); newHand(); };
 $("leakBody").onclick = e => {
   const b = e.target.dataset.b;
