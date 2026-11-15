@@ -643,7 +643,9 @@ function runout(sd) {
   later(500, () => {
     const backs = felt.querySelector(`.seat[data-p="${sd.p}"] .backs`);
     if (backs) backs.outerHTML = `<div class="cards">${sd.theirs.map(card).join("")}</div>`;
-    Object.assign($("pot").style, { left: "74%", top: "64%" }); // out from under the board, as postflop
+    // chips into the pot, as postflop; the pot takes your bet's spot below the board (off to the side it covered a seat's bet)
+    felt.querySelectorAll(".bet").forEach(b => b.hidden = true);
+    Object.assign($("pot").style, { left: "50%", top: "calc(50% + .36 * var(--ry))" });
     felt.insertAdjacentHTML("beforeend", '<div class="board"></div>'); play("deal");
   });
   [[0, 3], [3, 4], [4, 5]].forEach(([i, j], k) => later(1500 + k * 1000, () => { felt.querySelector(".board").insertAdjacentHTML("beforeend", sd.board.slice(i, j).map(card).join("")); play("deal"); }));
