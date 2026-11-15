@@ -641,7 +641,8 @@ function leakSection(log, o) {
   const seen = countBy(log, o.group), missed = countBy(bad, o.group);
   const top = Object.entries(missed).filter(([k]) => seen[k] >= 3).sort((x, y) => y[1] - x[1] || y[1] / seen[y[0]] - x[1] / seen[x[0]]).slice(0, 8);
   if (o.drill) leakTop = top;
-  const n = k => bad.filter(e => k(e[3], e[4])).length;
+  // meters weigh each mistake by its EV grade: a big one (bad) counts 1, a small one (ok) a quarter
+  const n = k => Math.round(log.reduce((s, e) => s + (k(e[3], e[4]) ? { bad: 1, ok: .25 }[e[2]] || 0 : 0), 0) * 10) / 10;
   const tight = n((p, f) => p === "Fold" && f !== "Fold"), loose = n((p, f) => f === "Fold" && p !== "Fold");
   const passive = n((p, f) => p !== "Fold" && !AGG(p) && AGG(f)), aggro = n((p, f) => AGG(p) && f !== "Fold" && !AGG(f));
   const sum = !bad.length ? "No mistakes yet." : `Your most common mistake is <b>${types[0][0].toLowerCase()}</b> (${pctOf(types[0][1], bad.length)}% of your mistakes)`
@@ -654,8 +655,8 @@ function leakSection(log, o) {
     <div class="lhead"><div class="big">${acc}%</div><div>right, over ${log.length} ${o.unit}${o.extra || ""}</div></div>
     <p class="lsum">${sum}</p>
     <h3>Your tendencies <small>· which way your mistakes lean</small></h3>
-    ${meter("Too tight", tight, "Too loose", loose, "Too tight: you folded where the solver plays on. Too loose: you played on where the solver folds.")}
-    ${meter("Too passive", passive, "Too aggressive", aggro, "Too passive: you checked or called where the solver bets or raises. Too aggressive: you bet or raised where the solver checks or calls.")}
+    ${meter("Too tight", tight, "Too loose", loose, "Too tight: you folded where the solver plays on. Too loose: you played on where the solver folds. A big mistake counts 1, a small one ¼.")}
+    ${meter("Too passive", passive, "Too aggressive", aggro, "Too passive: you checked or called where the solver bets or raises. Too aggressive: you bet or raised where the solver checks or calls. A big mistake counts 1, a small one ¼.")}
     ${types.length ? `<h3>Mistake types</h3>${types.map(([t, c]) => barRow(t, c / tmax, `${c} (${pctOf(c, bad.length)}%)`, "var(--bad)")).join("")}` : ""}
     <h3>${o.by[0]} <small>· worst first</small></h3>${buckets.map(([k, t, r]) => barRow(k, r / t, `${pctOf(r, t)}% · ${t}`, "var(--great)", `${r} of ${t} right`)).join("")}
     ${o.grid ? o.grid(log, bad) : ""}
