@@ -120,6 +120,9 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .feedback { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: none; gap: 16px; grid-template-columns: 1fr auto; }
 .feedback.show { display: grid; }
 .verdict { font-size: 20px; font-weight: 700; }
+/* verdict, Continue and Undo on one line: the shortcuts (Space, Z) move into the buttons' tooltips to make room */
+.vrow { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; } .vrow .verdict { margin-right: auto; font-size: 18px; white-space: nowrap; }
+.vrow .next { margin: 0; padding: 5px 9px; font-size: 14px; white-space: nowrap; } .vrow kbd { display: none; }
 .verdict.great { color: var(--great); } .verdict.ok { color: var(--ok); } .verdict.bad { color: var(--bad); }
 .mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 8px 0; }
 .pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
@@ -176,9 +179,9 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
   <section class="feedback" id="feedback">
     <div class="analysis">
       <div class="revlist" id="revlist"></div>
-      <div class="verdict" id="verdict"></div>
-      <button class="next" id="next">Next hand <kbd>Space</kbd></button>
-      <button class="next undo" title="Take back this decision (Z)" disabled>↶ Undo <kbd>Z</kbd></button>
+      <div class="vrow"><div class="verdict" id="verdict"></div>
+        <button class="next" id="next" title="Space">Next hand <kbd>Space</kbd></button>
+        <button class="next undo" title="Take back this decision (Z)" disabled>↶ Undo <kbd>Z</kbd></button></div>
       <div class="why" id="why"></div>
     </div>
     <div class="chart">
@@ -502,7 +505,7 @@ function drawSettings() {
       .filter(([, items]) => items.length).map(([t, items]) => group("nodes", `<small>${t}</small>`, items, v => many("nodes", v))).join("")
     + group("pos", "Your position <small>· pick several</small>", [["", "Any"], ...ORDER[cfg.game].map(p => [p, p])], v => many("pos", v))
     + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Postflop <small>· deal only hands that reach a solved heads-up pot (overrides Spots)</small>", [["on", "Play to postflop"]], () => cfg.toPost)
-      + (cfg.toPost ? group("postFrom", "<small>Start deciding on · your earlier streets play themselves, the solver's way</small>", [["", "Flop"], ["turn", "Turn"], ["river", "River"]], v => (cfg.postFrom || "") === v) : "") : "")
+      + (cfg.toPost ? group("postFrom", "<small>Start deciding on · your earlier streets play themselves, the solver's way</small>", [["", "Preflop"], ["flop", "Flop"], ["turn", "Turn"], ["river", "River"]], v => (cfg.postFrom || "") === v) : "") : "")
     + group("later", "Feedback <small>· after the hand: no grades until it's played out, then each decision's analysis</small>", [["", "After each decision"], ["hand", "After the hand"]], v => (cfg.later || "") === v)
     + group("pack", "Sound pack", Object.entries(PACKS).map(([k, p]) => [k, p.name]), v => v === pack);
   $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}${toPost() ? " · to postflop" + (cfg.postFrom ? ", from the " + cfg.postFrom : "") : ""}`;
@@ -584,6 +587,8 @@ function newHand() {
   // drills stay on the drilled spot; otherwise replay the hand from your first decision on this line
   const steps = st.drill ? [spot] : chainOf(spot, i);
   st.cur = { steps, k: 0, i, hand: HANDS[i], cards: dealCards(HANDS[i]), rid, scen: pd && pd.scen };
+  // starting on the flop or later: preflop is already played (postDeal picked a hand that takes the line), straight to the flop
+  if (pd && cfg.postFrom) { Object.assign(st.cur, { spot, post: pd.scen }); play("deal"); return postBegin(st.cur); }
   showStep(true);
 }
 

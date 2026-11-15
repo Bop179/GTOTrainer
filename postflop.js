@@ -161,6 +161,8 @@ async function postBegin(c) {
   // not in the solved range (the solver doesn't play it this way preflop): it still plays on, ungraded (see postAnswer)
   postDraw(true);
   if (!P.over) { P.busy = true; await run(); P.busy = false; postDraw(false); }
+  // it ended (a fold, or an all-in runout) while playing itself toward your starting street: no decision for you, so deal again
+  if (P.over && P.street < (FROM[cfg.postFrom] || 0)) newHand();
 }
 
 // apply action i at the current node, for whoever is to act; deals the next card when a street closes
@@ -234,9 +236,9 @@ const strat = (node, hand) => {
 };
 // the villain acts until it's your turn or the hand ends
 // one action at a time, like preflop: a beat, then the action lands on the table
-// "Start deciding on" the turn or river (cfg.postFrom): your earlier decisions play themselves the solver's way,
+// "Start deciding on" the flop, turn or river (cfg.postFrom): preflop is skipped (newHand), and your earlier postflop decisions play themselves the solver's way,
 // skipping its fold when it has another line, so more hands get there
-const FROM = { turn: 1, river: 2 };
+const FROM = { flop: 0, turn: 1, river: 2 };
 async function run() {
   try {
     for (let p; !P.over && ((p = cur().player) !== P.me || P.street < (FROM[cfg.postFrom] || 0)); postDraw(false)) {
