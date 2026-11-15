@@ -590,14 +590,15 @@ const wideFlats = key => /\/FACINGRFI(_CALL)?$/.test(key);
 const RK = "23456789TJQKA", SU = "shdc"; // SU in SUITS order; card ids match handclass.js's strength()
 const cid52 = x => RK.indexOf(x[0]) * 4 + SU.indexOf(x[1]);
 const combosOf = h => { const o = []; for (const x of SU) for (const y of SU) if (h.length === 2 ? x < y : h[2] === "s" ? x === y : x !== y) o.push([h[0] + x, h[1] + y]); return o; };
-function allinCalled(c, p, key, pre = "") {
+// wt: how much of each hand's strategy at `key` got it here (default: it calls your shove); head: the opening line
+function allinCalled(c, p, key, pre = "", wt = null, head = `${pre}${p} calls your all-in. Cards up!`) {
   const mine = c.cards.map(([r, [sym]]) => r + SU[SUITS.findIndex(x => x[0] === sym)]);
   const range = []; // [[cards], weight] for every combo that continues and misses your cards
   SPOTS[key].forEach((r, k) => {
-    const m = mixOf(r), w = COMBOS(HANDS[k]) * r[4] * (wideFlats(key) ? m.Allin + m.Raise : 100 - m.Fold) / 100;
+    const m = mixOf(r), w = COMBOS(HANDS[k]) * r[4] * (wt ? wt(m) : wideFlats(key) ? m.Allin + m.Raise : 100 - m.Fold) / 100;
     if (w > 0) combosOf(HANDS[k]).filter(cs => !cs.some(x => mine.includes(x))).forEach(cs => range.push([cs, w / COMBOS(HANDS[k])]));
   });
-  if (!range.length) return { text: `${pre}${p} calls your all-in.` };
+  if (!range.length) return { text: head.replace(" Cards up!", "") };
   const w = range.map(x => x[1]), theirs = range[pick(w)][0], rest = n => [...RK].flatMap(r => [...SU].map(s => r + s)).filter(x => !n.includes(x));
   const board = shuffle(rest([...mine, ...theirs])).slice(0, 5), str = cs => strength(cs.map(cid52));
   const me = str([...mine, ...board]), them = str([...theirs, ...board]);
@@ -607,7 +608,8 @@ function allinCalled(c, p, key, pre = "") {
     won += x > y ? 1 : x === y ? .5 : 0;
   }
   const res = me > them ? "You win the pot." : me < them ? `${p} wins the pot.` : "Split pot.";
-  return { text: `${pre}${p} calls your all-in. Cards up!`, sd: { p, theirs, board, end: `${res} Your equity against everything ${p} calls with: about ${Math.round(won / 30)}%.` } };
+  const vs = wt ? `everything ${p} shoves with here` : `everything ${p} calls with`;
+  return { text: head, sd: { p, theirs, board, end: `${res} Your equity against ${vs}: about ${Math.round(won / 30)}%.` } };
 }
 // show the caller's cards, then the flop, turn and river a beat apart, then the result
 function runout(sd) {
@@ -624,6 +626,7 @@ function runout(sd) {
 }
 const NEXT = { RFI: "FACINGRFI", FACINGRFI: "FACING3B", FACING3B: "FACING4B", FACING4B: "FACING5B", FACING5B: "FACING6B",
   FACINGLIMP: "LIMP_FACING2B", LIMP_FACING2B: "LIMP_FACING3B", LIMP_FACING3B: "LIMP_FACING4B", LIMP_FACING4B: "LIMP_FACING5B", LIMP_FACING5B: "LIMP_FACING6B" };
+const PREV_V = Object.fromEntries(Object.entries(NEXT).map(([v, h]) => [h, v])); // your spot -> the spot the villain bet from
 const nodeKey = (s, decider, aggressor, node) => [s.game, s.stack, ...(node === "RFI" ? [decider] : [aggressor, decider]), node].join("/");
 // Live table: players before you act first, each from the spot they face, so you open, face an open, or face an open plus a call or 3-bet.
 // Any line the data has no spot for (a third player in, a non-SB limp, the BB getting a walk) redeals.
@@ -685,6 +688,10 @@ function simNext(c, a, pot) {
     if (sc) return { text: `${o} folds, ${w} calls: on to the flop!`, post: sc };
     return { text: b2 === "Call" ? `${o} folds, ${w} calls: on to the flop, where this preflop trainer stops.` : `${o} folds, ${w} ${what(b2, n2)}. ${END}` };
   }
+  // you call an all-in heads-up: no flop to play, straight to the showdown against the range that bet it (raise or all-in
+  // at the villain's spot before yours: the line's raise is the all-in once it passes 55% of the stack, see sizing)
+  const vk = s.villain && !s.villain.includes("+") && PREV_V[s.node] && nodeKey(s, s.villain, s.hero, PREV_V[s.node]);
+  if (a === "Call" && c.z.toCall >= c.z.heroBehind && SPOTS[vk]) return allinCalled(c, s.villain, vk, "", m => m.Allin + m.Raise, `You call ${s.villain}'s all-in. Cards up!`);
   // calling or 3-betting an open: the players behind you act first, from the multiway spot (where the data has one)
   const jn = a === "Call" ? "FACINGRFI_CALL" : "FACING3B_COLD", j = s.node === "FACINGRFI" && !shove && joiner(s, s.villain, s.hero, jn);
   if (j && j[1] !== "Call") { // squeezed or cold 4-bet behind you: the opener answers first
