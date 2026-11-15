@@ -46,6 +46,8 @@ button { cursor: pointer; }
 .previews { display: flex; flex-wrap: wrap; gap: 6px; }
 .previews button { padding: 4px 8px; font-size: 13px; }
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; width: min(640px, calc(100% - 32px)); padding: 20px; }
+#leaks { width: min(1320px, calc(100% - 32px)); }
+#leakBody { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(520px, 100%), 1fr)); gap: 16px 32px; align-items: start; } /* preflop | postflop */
 dialog::backdrop { background: #000a; }
 #browse { width: min(1100px, calc(100% - 32px)); }
 .bwrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; } .bwrap > div:first-child { flex: 1; min-width: 300px; }
@@ -601,14 +603,14 @@ function renderLeaks() {
   const plog = prog.plog, pbad = plog.filter(e => e[2] === "bad"), pkey = e => e[0] + " · " + e[1];
   const ptypes = Object.entries(tally(pbad, e => postLeakType(e[3], e[4]))).sort((a, b) => b[1] - a[1]);
   const pseen = tally(plog, pkey), ptop = Object.entries(tally(pbad, pkey)).filter(([b]) => pseen[b] >= 3).sort((a, b) => b[1] - a[1] || b[1] / pseen[b[0]] - a[1] / pseen[a[0]]).slice(0, 10);
-  const post = !plog.length ? "" : `<h2 style="margin-top:24px">Postflop <small>${plog.length} decisions · ${Math.round((1 - pbad.length / plog.length) * 100)}% right</small></h2>
+  const post = !plog.length ? "" : `<section><h2>Postflop <small>${plog.length} decisions · ${Math.round((1 - pbad.length / plog.length) * 100)}% right</small></h2>
     <h3>Mistake types</h3>${ptypes.length ? `<table>${ptypes.map(([t, n]) => `<tr><td>${t}</td><td>${n} (${Math.round(n / pbad.length * 100)}%)</td></tr>`).join("")}</table>` : "<p>No mistakes yet.</p>"}
     <h3>Biggest leaks</h3>${ptop.length ? `<table><tr><th>Street · spot · hand</th><th>Mistakes</th></tr>${ptop.map(([b, n]) => `<tr><td>${b}</td><td>${n} of ${pseen[b]} (${Math.round(n / pseen[b] * 100)}%)</td></tr>`).join("")}</table>`
-      : "<p>Not enough data yet: a spot and hand needs at least 3 decisions.</p>"}`;
-  $("leakBody").innerHTML = (!log.length ? plog.length ? "" : "<p>Play some hands first.</p>" : `<h2>Preflop</h2>
+      : "<p>Not enough data yet: a spot and hand needs at least 3 decisions.</p>"}</section>`;
+  $("leakBody").innerHTML = (!log.length ? plog.length ? "" : "<p>Play some hands first.</p>" : `<section><h2>Preflop</h2>
     <h3>Mistake types</h3>${types.length ? `<table>${types.map(([t, n]) => `<tr><td>${t}</td><td>${n} (${Math.round(n / bad.length * 100)}%)</td></tr>`).join("")}</table>` : "<p>No mistakes yet.</p>"}
     <h3>Biggest leaks</h3>${top.length ? `<table><tr><th>Spot · hand type</th><th>Mistakes</th><th>${top.length > 1 ? `<button class="drill" data-b="all">Drill all</button>` : ""}</th></tr>${top.map(([b, n]) => `<tr><td>${b}</td><td>${n} of ${seen[b]} hands (${Math.round(n / seen[b] * 100)}%)</td><td><button class="drill" data-b="${b}">Drill</button></td></tr>`).join("")}</table>`
-      : "<p>Not enough data yet: a spot and hand type needs at least 3 hands.</p>"}`) + post;
+      : "<p>Not enough data yet: a spot and hand type needs at least 3 hands.</p>"}</section>`) + post;
 }
 
 function newHand() {
