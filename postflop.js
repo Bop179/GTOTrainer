@@ -137,7 +137,7 @@ async function postBegin(c) {
   };
   const hero = holeStr(...mine), vr = nodes[me ? "" : "0"], hr = nodes[me ? "0" : ""]; // villain's / your range at the flop
   P = { postflop: true, scen, me, sig, seat: [m.oop, m.ip], pot0: m.pot, stack: m.stack, board: [flop.slice(0, 2), flop.slice(2, 4), flop.slice(4)],
-    flop, nodes, k: "", street: 0, spent: [0, 0], put: [0, 0], tag: ["", ""], hist: [], over: false, answered: false, cards: c.cards, isNew: 3,
+    flop, nodes, vr, k: "", street: 0, spent: [0, 0], put: [0, 0], tag: ["", ""], hist: [], over: false, answered: false, cards: c.cards, isNew: 3,
     // the hand so far: street names ({s}) and actions ({t, k}); a closing message ({t, end}) when it's over
     story: [{ s: "Preflop" }, ...[...z0.line, [p0, 0, key0.endsWith("FACINGLIMP") ? "Check" : "Call"]].map(told)] };
   P.hands = [];
@@ -219,15 +219,26 @@ const strat = (node, hand) => {
 };
 // the villain acts until it's your turn or the hand ends
 // one action at a time, like preflop: a beat, then the action lands on the table
+// "Start deciding on" the turn or river (cfg.postFrom): your earlier decisions play themselves the solver's way,
+// skipping its fold when it has another line, so more hands get there
+const FROM = { turn: 1, river: 2 };
 async function run() {
   try {
-    while (!P.over && cur().player !== P.me) {
+    for (let p; !P.over && ((p = cur().player) !== P.me || P.street < (FROM[cfg.postFrom] || 0)); postDraw(false)) {
       await new Promise(r => setTimeout(r, 650));
-      await step(pick(strat(cur(), P.hands[1 - P.me])));
-      postDraw(false);
+      let s = strat(cur(), P.hands[p]);
+      const f = p === P.me ? cur().actions.indexOf("Fold") : -1;
+      if (f >= 0 && s.some((x, j) => j !== f && x >= 1)) s = s.map((x, j) => j === f ? 0 : x);
+      await step(pick(s));
     }
   } catch (e) { return end(e.message); }
   if (!P.over && !cur().hands.includes(P.hands[P.me])) end("The solver never gets here with your hand, so the hand ends.");
+}
+// the villain's range now: reach × how often they took the action they took at their last decision (all of it before one)
+function villainRange() {
+  const h = P.hist.filter(x => x.p !== P.me).at(-1), n = h ? h.node : P.vr, w = {};
+  n.hands.forEach((x, j) => w[x] = n.reach[j] * (h ? n.strat[h.i][j] : 1));
+  return w;
 }
 function end(text, show) { P.over = true; P.show = show; P.story.push({ t: text, end: true }); }
 
@@ -271,6 +282,9 @@ function postExplain(node, h) {
   // the maths: equity needed to call, and a draw's outs by the rule of 2 and 4
   const call = P.put[1 - me] - P.put[me], need = call / (potNow() + call) * 100, f1 = x => +x.toFixed(1);
   if (call > 0) out.push(`Equity needed to call = call ÷ (pot + call) = ${f1(call)} ÷ (${f1(potNow())} + ${f1(call)}) = ${f1(call)} ÷ ${f1(potNow() + call)} = <b>${f1(need)}%</b>.`);
+  const eq = equity(cardsOf(P.hands[me]), board, villainRange()) * 100;
+  if (!isNaN(eq)) out.push(`Your equity against ${P.seat[1 - me]}'s range here: <b>${f1(eq)}%</b>${call > 0 ? ` (${eq >= need ? "≥" : "<"} the ${f1(need)}% a call needs)` : ""}, `
+    + "if the hand checked down from here; the solver's EV also counts the betting still to come.");
   if (hc.draw) {
     const hole = cardsOf(P.hands[me]), used = new Set([...hole, ...board]), left = 52 - used.size;
     const BIG = ["a straight", "a flush", "a full house", "quads"];

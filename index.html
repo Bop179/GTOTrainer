@@ -492,9 +492,10 @@ function drawSettings() {
     + SPOT_ROWS.map(([t, row]) => [t, Object.entries(row).filter(([n]) => ALL.some(s => s.game === cfg.game && s.stack === cfg.stack && n.split("|").includes(s.node)))])
       .filter(([, items]) => items.length).map(([t, items]) => group("nodes", `<small>${t}</small>`, items, v => many("nodes", v))).join("")
     + group("pos", "Your position <small>· pick several</small>", [["", "Any"], ...ORDER[cfg.game].map(p => [p, p])], v => many("pos", v))
-    + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Postflop <small>· deal only hands that reach a solved heads-up pot (overrides Spots)</small>", [["on", "Play to postflop"]], () => cfg.toPost) : "")
+    + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Postflop <small>· deal only hands that reach a solved heads-up pot (overrides Spots)</small>", [["on", "Play to postflop"]], () => cfg.toPost)
+      + (cfg.toPost ? group("postFrom", "<small>Start deciding on · your earlier streets play themselves, the solver's way</small>", [["", "Flop"], ["turn", "Turn"], ["river", "River"]], v => (cfg.postFrom || "") === v) : "") : "")
     + group("pack", "Sound pack", Object.entries(PACKS).map(([k, p]) => [k, p.name]), v => v === pack);
-  $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}${toPost() ? " · to postflop" : ""}`;
+  $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}${toPost() ? " · to postflop" + (cfg.postFrom ? ", from the " + cfg.postFrom : "") : ""}`;
 }
 
 const handType = h => describe(h).replace(/^an? /, "");

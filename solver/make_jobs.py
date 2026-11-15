@@ -31,6 +31,9 @@ LIMP_SIZES = {"flop_sizes": ["33%, 75%", "3x"], "turn_sizes": ["75%", "3x"], "ri
 FIRST = ["6max_100bb_BTN_v_BB"]  # already solving when the order was last changed: finish it before anything else
 N_FLOPS, N_FLOPS_RARE = 95, 40
 RARE = 0.05  # pots rarer than 5% of the game's heads-up single-raised pots get the smaller flop set
+# ...except 6-max re-raised pots: they solve in seconds (low SPR), so they also get flops(55), which shares no flop with
+# flops(40): 95 flops in all, like the common pots, without re-solving the 40 already done (2026-11-14)
+CHEAP, N_FLOPS_MORE = {"3bet", "4bet", "sqz", "c4b"}, N_FLOPS - N_FLOPS_RARE
 STACK = 100
 
 SRC = {g: open(os.path.join(HERE, "..", f)).read() for g, f in FILES.items()}
@@ -144,7 +147,7 @@ def job(g, a, b, size, dead, flop):
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "jobs")
-    sets = {n: flops(n) for n in (N_FLOPS, N_FLOPS_RARE)}
+    sets = {n: flops(n) for n in (N_FLOPS, N_FLOPS_RARE, N_FLOPS_MORE)}
     assert all(len(f) == n and len(set(f)) == n for n, f in sets.items())
     sc = scenarios()
     J = {name: (lambda f, g=g, a=a, b=b, z=z, d=d: job(g, a, b, z, d, f)) for _, g, name, a, b, z, d in sc}
@@ -175,7 +178,8 @@ if __name__ == "__main__":
     # 6-max first, 8-max last; within each, the common single-raised pots, then the rest (limped first), most common first (2026-11-13)
     common_srp = lambda x: x[2].count("_") == 4 and x[0] >= cut[x[1]]
     for f, g, name, *_ in sorted(sc, key=lambda x: (x[2] not in FIRST, x[1] != "6max", not common_srp(x), -x[0] / cut[x[1]])):
-        fl = sets[N_FLOPS if f >= cut[g] else N_FLOPS_RARE]
+        fl = sets[N_FLOPS] if f >= cut[g] else sets[N_FLOPS_RARE] + (sets[N_FLOPS_MORE] if g == "6max" and name.split("_")[5:6] and name.split("_")[5] in CHEAP else [])
+        assert len(set(fl)) == len(fl)
         d = os.path.join(out, name); os.makedirs(d, exist_ok=True)
         for x in fl: json.dump(J[name](x), open(os.path.join(d, x + ".json"), "w"))
         order.append(name); print(f"{name:<34} {f / cut[g] * RARE:7.2%}  {len(fl)} flops")
