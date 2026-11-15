@@ -665,7 +665,7 @@ function leakSection(log, o) {
     ${meter("fold", fold.you, fold.sol, sN, "Looser", "Tighter", "How often you fold, against how often the solver folds the same hands in the same spots.")}
     ${meter("bet or raise", agg.you, agg.sol, agg.n, "More passive", "More aggressive", "When you play on: how often you bet or raise rather than check or call, against the solver with the same hands.")}
     ${costs.length ? `<h3>Cost of your mistakes <small>· ${bb(cost)}bb lost, ${bb(cost / log.length * 100)}bb per 100 ${o.unit}</small></h3>${costs.map(([t, [c, k]]) =>
-      barRow(t, c / costs[0][1][0], `${bb(c)}bb · ${k}×`, "var(--bad)", `${k} mistakes, ${pctOf(c, cost)}% of the bb you lost`)).join("")}` : ""}
+      barRow(`${t} <small>· ${k} time${k > 1 ? "s" : ""}</small>`, c / costs[0][1][0], `${bb(c)}bb`, "var(--bad)", `${k} mistakes, ${pctOf(c, cost)}% of the bb you lost`)).join("")}` : ""}
     <h3>${o.by[0]} <small>· worst first</small></h3>${buckets.map(([k, t, r]) => barRow(k, r / t, `${pctOf(r, t)}% · ${t}`, "var(--great)", `${r} of ${t} right`)).join("")}
     ${o.grid ? o.grid(log, bad) : ""}
     <h3>Biggest leaks ${o.drill && top.length > 1 ? `<button class="drill" data-b="all">Drill all</button>` : ""}</h3>
