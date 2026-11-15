@@ -17,7 +17,7 @@ Or open `index.html` from a download. Preflop works offline; postflop always nee
 - **Keys:** `1`–`9` pick the action buttons left to right, `Space` for the next step or hand, `M` to mute.
 - **Grading:**
   - ✓ Correct: within 5 points of the solver's most-played action, or played at least 50% of the time.
-  - ≈ Acceptable: a mixed action played at least 15% of the time.
+  - ≈ Mixed: a mixed action played at least 15% of the time.
   - ✗ Mistake: anything less.
 - **Leaks:** shows your mistake types and your worst spot and hand-type combinations, with a **Drill** button for each. Hands you miss come back for review after 3, then 10, 30 and 100 hands.
 - **Ranges:** pick any spot at the current format and stack and see its full chart and action mix, without playing a hand.

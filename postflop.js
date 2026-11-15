@@ -98,10 +98,12 @@ const potNow = () => P.pot0 + P.spent[0] + P.spent[1];
 const STREET = ["Flop", "Turn", "River"];
 const kind = a => a.split(" ")[0]; // Check, Call, Fold, Bet, Raise, Allin
 const amt = a => +a.split(" ")[1] || 0;
+// bet size as a fraction of the pot (1/3 pot, 3/4 pot, 5/4 pot); a size off every fraction stays a percentage
+const potFrac = x => { const f = x / potNow(); for (const [n, d] of [[1, 4], [1, 3], [1, 2], [2, 3], [3, 4], [1, 1], [5, 4], [3, 2], [2, 1]]) if (Math.abs(f - n / d) < .03) return d === 1 ? (n === 1 ? "pot" : `${n}× pot`) : `${n}/${d} pot`; return `${Math.round(f * 100)}%`; };
 const AC = { Fold: "var(--fold)", Check: "var(--call)", Call: "var(--call)", Bet: "var(--raise)", Raise: "var(--raise)", Allin: "var(--allin)" };
 function actName(a) { // button text
   const k = kind(a), x = amt(a), p = cur().player, call = P.put[1 - p] - P.put[p];
-  if (k === "Bet") return `Bet ${bb(x)} (${Math.round(x / potNow() * 100)}%)`;
+  if (k === "Bet") return `Bet ${bb(x)} (${potFrac(x)})`;
   if (k === "Raise") return `Raise to ${bb(x)}`;
   if (k === "Allin") return `All-in ${bb(P.stack - P.spent[p] + P.put[p])}`;
   return k === "Call" ? `Call ${bb(call)}` : k;
@@ -110,7 +112,7 @@ function actName(a) { // button text
 function btnLabel(a, i) {
   const k = kind(a), x = amt(a), pct = Math.round(x / potNow() * 100), sub = t => `<small class="amt">${t}</small>`;
   const key = `<kbd>${i + 1}</kbd>`;
-  if (k === "Bet") return `Bet ${pct <= 50 ? "small" : pct <= 100 ? "big" : "overbet"}${key}${sub(`${bb(x)} · ${pct}%`)}`;
+  if (k === "Bet") return `Bet ${pct <= 50 ? "small" : pct <= 100 ? "big" : "overbet"}${key}${sub(`${bb(x)} · ${potFrac(x)}`)}`;
   if (k === "Raise") return `Raise${key}${sub(`to ${bb(x)}`)}`;
   if (k === "Allin" || k === "Call") return `${k === "Call" ? "Call" : "All-in"}${key}${sub(actName(a).split(" ").at(-1))}`;
   return k + key;
@@ -385,14 +387,14 @@ async function postAnswer(i) {
   const grade = off ? "" : f >= 25 || f >= 5 && loss <= .02 * pot ? "great" : f >= 5 || f >= 1 && loss <= .05 * pot || loss <= .01 * pot ? "ok" : "bad";
   if (grade && !atEnd()) tally(grade);
   play(kind(node.actions[i]) === "Fold" ? "deal" : "chip");
-  const short = `${STREET[P.board.length - 3]} · ${{ Bet: `Bet ${Math.round(amt(node.actions[i]) / potNow() * 100)}%`, Allin: "All-in" }[kind(node.actions[i])] || kind(node.actions[i])}`;
+  const short = `${STREET[P.board.length - 3]} · ${{ Bet: `Bet ${potFrac(amt(node.actions[i]))}`, Allin: "All-in" }[kind(node.actions[i])] || kind(node.actions[i])}`;
   const plain = $("actions").innerHTML;
   const rsum = node.reach.reduce((x, y) => x + y, 0) || 1, mix = off ? strat(node, "").map(x => x / rsum) : node.strat.map(s => s[h]);
   stamp(String(i), j => mix[j], !off && (j => ev[j].toFixed(2) + "bb"));
   const btns = $("actions").innerHTML; // the graded buttons stay up until you continue, though the hand has moved on
   const names = node.actions.map(actName), hand = cardsOf(P.hands[P.me]).map(cardText).join("");
   $("verdict").className = "verdict " + grade;
-  $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable", bad: "✗ Mistake", "": "Not graded" }[grade];
+  $("verdict").textContent = { great: "✓ Correct", ok: "≈ Mixed", bad: "✗ Mistake", "": "Ungraded" }[grade];
   const pill = (j, v) => `<span class="pill" style="--c:${AC[kind(node.actions[j])]}"><span>${names[j]}</span><b>${Math.round(v)}%</b></span>`;
   // whole range at this node, weighted by reach
   const tot = node.reach.reduce((x, y) => x + y, 0) || 1, rm = node.strat.map(s => s.reduce((t, x, j) => t + x * node.reach[j], 0) / tot);
@@ -416,7 +418,7 @@ async function postAnswer(i) {
   }
   postDraw(false);
   $("actions").innerHTML = btns;
-  $("next").innerHTML = P.over ? "Next hand <kbd>Space</kbd>" : "Continue hand ▸<kbd>Space</kbd>";
+  $("next").innerHTML = P.over ? "Next hand <kbd>Space</kbd>" : "Continue ▸<kbd>Space</kbd>";
   $("feedback").classList.add("show");
 }
 async function postNext() {
