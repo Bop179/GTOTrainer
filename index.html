@@ -61,6 +61,12 @@ dialog { background: var(--panel); color: var(--text); border: 1px solid var(--l
 .meter i b { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: var(--ok); transform: translate(-50%, -50%); box-shadow: 0 0 0 2px var(--panel); z-index: 1; }
 .lgrid { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 2px; max-width: 440px; font-size: 10px; }
 .lgrid div { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 3px; color: var(--text); }
+/* instant hover tip (the native title tooltip lags or never shows); edge columns anchor inward so it stays inside the dialog */
+.lgrid div { position: relative; }
+.lgrid div:hover::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); z-index: 2; pointer-events: none;
+  white-space: nowrap; padding: 3px 7px; border-radius: 5px; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--muted); }
+.lgrid div:nth-child(13n+1):hover::after, .lgrid div:nth-child(13n+2):hover::after, .lgrid div:nth-child(13n+3):hover::after { left: 0; transform: none; }
+.lgrid div:nth-child(13n+11):hover::after, .lgrid div:nth-child(13n+12):hover::after, .lgrid div:nth-child(13n):hover::after { left: auto; right: 0; transform: none; }
 .lgrid .none, .lkey .none { background: transparent; color: var(--line); box-shadow: inset 0 0 0 1px var(--line); }
 .lkey { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
 .lkey i { width: 90px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--line), var(--bad)); } .lkey .none { padding: 0 6px; border-radius: 3px; margin-left: 10px; color: var(--muted); }
@@ -664,8 +670,8 @@ function handGrid(log, bad) {
   let cells = "";
   for (let i = 0; i < 13; i++) for (let j = 0; j < 13; j++) {
     const h = i === j ? R[i] + R[j] : i < j ? R[i] + R[j] + "s" : R[j] + R[i] + "o", t = seen[h] || 0, m = miss[h] || 0;
-    cells += t >= 2 ? `<div style="background:color-mix(in srgb, var(--bad) ${pctOf(m, t)}%, var(--line))" title="${h}: wrong ${m} of ${t}">${h}</div>`
-      : `<div class="none" title="${h}: ${t ? "1 hand" : "not played yet"}">${h}</div>`;
+    cells += t >= 2 ? `<div style="background:color-mix(in srgb, var(--bad) ${pctOf(m, t)}%, var(--line))" data-tip="${h}: wrong ${m} of ${t}">${h}</div>`
+      : `<div class="none" data-tip="${h}: ${t ? "1 hand" : "not played yet"}">${h}</div>`;
   }
   return `<h3>Hands you misplay <small>· hover a hand for its count</small></h3><div class="lgrid">${cells}</div>
     <div class="lkey"><span>never wrong</span><i></i><span>always wrong</span><span class="none">under 2 hands</span></div>`;
