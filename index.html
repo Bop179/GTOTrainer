@@ -17,7 +17,7 @@ header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding
 header h1 { font-size: 17px; margin: 0 12px 0 0; }
 select, button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 button { cursor: pointer; }
-header button:disabled, .next:disabled { opacity: .4; cursor: default; }
+.next:disabled { opacity: .4; cursor: default; }
 /* "Feedback after the hand": your decisions in order, coloured by grade; click one for its analysis */
 .revlist { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .revlist:empty { display: none; }
@@ -162,7 +162,6 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
     </div>
   </details>
   <button id="mute" title="Toggle sound (M)">🔊</button>
-  <button id="undo" class="undo" title="Take back your last decision in this hand (U)" disabled>↶ Undo</button>
   <button id="leakBtn">Leaks</button>
   <button id="browseBtn">Ranges</button>
   <div class="stats"><span>Hands <b id="sHands">0</b></span><span>Accuracy <b id="sAcc">–</b></span><span>Streak <b id="sStreak">0</b></span></div>
@@ -179,7 +178,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
       <div class="revlist" id="revlist"></div>
       <div class="verdict" id="verdict"></div>
       <button class="next" id="next">Next hand <kbd>Space</kbd></button>
-      <button class="next undo" title="Take back this decision (U)" disabled>↶ Undo <kbd>U</kbd></button>
+      <button class="next undo" title="Take back this decision (Z)" disabled>↶ Undo <kbd>Z</kbd></button>
       <div class="why" id="why"></div>
     </div>
     <div class="chart">
@@ -847,9 +846,9 @@ function drawTable(spot, z, heroCards, deal, from = 0) {
 const toss = (seat, sel) => seat.querySelectorAll(sel).forEach((x, j) => x.style.animationDelay = j * .07 + "s");
 const fly = b => { b.classList.remove("fly"); void b.offsetWidth; b.classList.add("fly"); }; // restart the slide-in
 
-// ---------- undo (U): take back your last decision in this hand, its grade and leak-log entry too; again for the one before ----------
+// ---------- undo (Z): take back your last decision in this hand, its grade and leak-log entry too; again for the one before ----------
 let undos = [];
-const undoOn = on => document.querySelectorAll(".undo").forEach(b => b.disabled = !on); // header, and beside Continue
+const undoOn = on => document.querySelectorAll(".undo").forEach(b => b.disabled = !on);
 function snap(hand) {
   undos.push({ hand, rev: rev.length, st: [st.hands, st.right, st.streak], prog: JSON.stringify(prog), drill: st.drill && [st.drill.n, st.drill.right] });
   undoOn(true);
@@ -1154,7 +1153,7 @@ document.addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   if ((k === " " || k === "enter") && st.cur?.answered) { e.preventDefault(); next(); return; }
   if (k === "m") return $("mute").click();
-  if (k === "u") return undo();
+  if (k === "z") return undo();
   const a = /^[1-9]$/.test(k) && document.querySelectorAll("#actions button")[k - 1]?.dataset.a; // 1, 2, 3… left to right, preflop and postflop
   if (a) answer(a);
 });
