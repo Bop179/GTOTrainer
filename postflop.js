@@ -418,7 +418,7 @@ async function postAnswer(i) {
   }
   postDraw(false);
   $("actions").innerHTML = btns;
-  $("next").innerHTML = P.over ? "Next hand <kbd>Space</kbd>" : "Continue ▸<kbd>Space</kbd>";
+  $("next").innerHTML = P.over ? "Next hand <kbd>Space</kbd>" : "Continue <kbd>Space</kbd>";
   $("feedback").classList.add("show");
 }
 async function postNext() {

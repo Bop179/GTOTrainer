@@ -124,7 +124,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .feedback { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: none; gap: 16px; grid-template-columns: 1fr auto; }
 .feedback.show { display: grid; }
 .verdict { font-size: 20px; font-weight: 700; }
-/* verdict, Continue and Undo on one line: the shortcuts (Space, Z) move into the buttons' tooltips to make room */
+/* verdict, Continue and Undo on one line */
 .vrow { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; } .vrow .verdict { margin-right: auto; font-size: 18px; white-space: nowrap; }
 .vrow .next { margin: 0; padding: 5px 9px; font-size: 14px; white-space: nowrap; }
 .verdict.great { color: var(--great); } .verdict.ok { color: var(--ok); } .verdict.bad { color: var(--bad); }
@@ -983,7 +983,7 @@ function answer(a) {
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
     : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p id="note"><b>▸ ${note}</b></p>`);
-  $("next").innerHTML = more ? "Continue ▸<kbd>Space</kbd>" : "Next hand <kbd>Space</kbd>";
+  $("next").innerHTML = more ? "Continue <kbd>Space</kbd>" : "Next hand <kbd>Space</kbd>";
   drawGrid(c);
   if (atEnd()) {
     if (after?.sd) $("note")?.remove();
