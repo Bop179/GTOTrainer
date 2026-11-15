@@ -23,7 +23,7 @@ fn main() {
     let (it, ex) = solve(&mut g, &j);
     let secs = t.elapsed().as_secs_f64();
     eprintln!("solved: {it} iterations, exploitability {:.3}% of pot, {secs:.0}s", ex * 100.0);
-    let nodes = dump(&mut g);
+    let nodes = dump(&mut g, &j);
     let n = nodes.len();
     let out = json!({"flop": j["flop"], "pot": j["pot"], "stack": j["stack"], "iters": it, "secs": secs.round(),
         "mem_gb": (mem_gb * 100.0).round() / 100.0, "exploit": ex, "nodes": nodes});

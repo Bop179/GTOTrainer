@@ -76,22 +76,25 @@ fn act(a: &Action) -> String {
 }
 
 /// Every decision node of the starting street, plus every turn (after any flop line that
-/// reaches one, raised or not) when starting on the flop. Trimmed for size: hands with reach < 0.001 dropped, strategy as whole %, EV to 0.01 bb.
-pub fn dump(g: &mut PostFlopGame) -> Map<String, Value> {
+/// reaches one, raised or not) when starting on the flop. Trimmed for size: hands with reach < job "min_reach" (default
+/// 0.001) dropped, strategy as whole %, EV to 0.01 bb. The solver still has a strategy and EV for a hand it never brings
+/// to a node (its average strategy isn't weighted by the hand's own reach), so "min_reach": 0 keeps every hand in the range.
+pub fn dump(g: &mut PostFlopGame, j: &Value) -> Map<String, Value> {
     g.back_to_root(); g.cache_normalized_weights();
     let mut out = Map::new();
-    walk(g, &mut vec![], &mut vec![], 0, &mut out);
+    let min = j["min_reach"].as_f64().unwrap_or(0.001) as f32;
+    walk(g, &mut vec![], &mut vec![], 0, min, &mut out);
     out
 }
 
-fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, street: u8, out: &mut Map<String, Value>) {
+fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, street: u8, min: f32, out: &mut Map<String, Value>) {
     if g.is_terminal_node() { return; }
     if g.is_chance_node() {
         if street > 0 || g.current_board().len() > 3 { return; }
         let cards = g.possible_cards();
         for c in (0..52u8).filter(|c| cards >> c & 1 == 1) {
             g.play(c as usize); g.cache_normalized_weights(); hist.push(c as usize); key.push(card_to_string(c).unwrap());
-            walk(g, hist, key, 1, out);
+            walk(g, hist, key, 1, min, out);
             hist.pop(); key.pop(); g.apply_history(hist); g.cache_normalized_weights();
         }
         return;
@@ -100,7 +103,7 @@ fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, stre
     let acts = g.available_actions();
     let n = g.private_cards(p).len();
     let (st, ev, reach) = (g.strategy(), g.expected_values_detail(p), g.normalized_weights(p).to_vec());
-    let keep: Vec<usize> = (0..n).filter(|&h| reach[h] >= 0.001).collect();
+    let keep: Vec<usize> = (0..n).filter(|&h| reach[h] >= min).collect();
     let hands = holes_to_strings(g.private_cards(p)).unwrap();
     let r = |x: f32, k: f64| ((x as f64) * k).round() / k;
     let per = |v: &[f32], k: f64, s: f64| (0..acts.len()).map(|a| keep.iter().map(|&h| r(v[a * n + h] * s as f32, k)).collect::<Vec<_>>()).collect::<Vec<_>>();
@@ -114,7 +117,7 @@ fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, stre
     }));
     for i in 0..acts.len() {
         g.play(i); g.cache_normalized_weights(); hist.push(i); key.push(i.to_string());
-        walk(g, hist, key, street, out);
+        walk(g, hist, key, street, min, out);
         hist.pop(); key.pop(); g.apply_history(hist); g.cache_normalized_weights();
     }
 }
@@ -143,7 +146,7 @@ mod wasm {
         if mb > max_mb { return Err(format!("tree needs {mb:.0} MB > max_mb {max_mb}")); }
         g.allocate_memory(false);
         let (it, ex) = solve(&mut g, &j);
-        Ok(json!({"iters": it, "exploit": ex, "mem_mb": mb.round(), "nodes": dump(&mut g)}))
+        Ok(json!({"iters": it, "exploit": ex, "mem_mb": mb.round(), "nodes": dump(&mut g, &j)}))
     }
 
     #[no_mangle]
