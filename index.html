@@ -941,8 +941,8 @@ function tally(grade, quiet) {
 // then a strip of your decisions, first to last and coloured by grade, opens each one's analysis and chart ----------
 let rev = []; // this hand's decisions: { name, grade, verdict class/text, why, grid, range, graded buttons }
 const atEnd = () => cfg.later === "hand" && !st.drill;
-// short action names for the decision chips: Check X, Call C, Bet B (3-bet 3B), Fold F, Raise R, All-in AI, Squeeze Sqz
-const abbr = t => t.replace(/(\d)-bet/g, "$1B").replace(/\b(Check|Call|Bet|Fold|Raise)\b/g, w => ({ Check: "X", Call: "C", Bet: "B", Fold: "F", Raise: "R" })[w]).replace("All-in", "AI").replace("Squeeze", "Sqz");
+// short action names for the decision chips: Check X, Call C, Bet B (3-bet 3B), Fold F, Raise R, All-in All, Squeeze Sqz
+const abbr = t => t.replace(/(\d)-bet/g, "$1B").replace(/\b(Check|Call|Bet|Fold|Raise)\b/g, w => ({ Check: "X", Call: "C", Bet: "B", Fold: "F", Raise: "R" })[w]).replace("All-in", "All").replace("Squeeze", "Sqz");
 function keep(name, grade, btns, pre = "") {
   rev.push({ name, grade, vc: $("verdict").className, vt: $("verdict").textContent, why: pre + $("why").innerHTML, grid: $("grid").innerHTML, range: $("range").innerHTML, btns });
 }
