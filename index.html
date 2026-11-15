@@ -74,7 +74,8 @@ dialog { background: var(--panel); color: var(--text); border: 1px solid var(--l
 .leak .lrow { color: var(--muted); font-size: 13px; }
 dialog::backdrop { background: #000a; }
 #browse { width: min(1100px, calc(100% - 32px)); }
-.bwrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; } .bwrap > div:first-child { flex: 1; min-width: 300px; }
+.bwrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; } .bwrap > div:first-child { flex: 1; min-width: min(300px, 100%); }
+@media (max-width: 600px) { .bwrap > div { flex-basis: 100%; } dialog { padding: 16px; } } /* range grid full width */
 dialog h2 { margin: 0 0 8px; font-size: 20px; } dialog h2 small { margin-left: 8px; font-size: 14px; font-weight: 400; color: var(--muted); } dialog h3 { margin: 18px 0 6px; font-size: 15px; color: var(--muted); }
 dialog table { width: 100%; border-collapse: collapse; font-size: 14px; }
 dialog td, dialog th { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--line); }
@@ -135,7 +136,14 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
 .bet.post.fly { animation-name: flypost; } /* postflop bets sit off to the side: slide from the seat's spot (--y0) */
 @keyframes flypost { from { left: 50%; top: var(--y0); opacity: 0; } }
 @media (max-width: 600px) {
-  .felt { --rx: 37%; --ry: 42%; aspect-ratio: 4 / 5; margin: 12px 0 64px; }
+  /* phone: title + buttons, then settings, then stats; the felt takes what's left so the action buttons stay on screen */
+  header { gap: 8px; padding: 10px 12px; } header h1 { font-size: 16px; margin: 0 auto 0 0; }
+  #sound { order: 1; } #leakBtn { order: 2; } #browseBtn { order: 3; }
+  #settings { order: 4; flex-basis: 100%; min-width: 0; } #settings summary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stats { order: 5; flex-wrap: wrap; gap: 0 12px; font-size: 13px; } .stats > span { white-space: nowrap; } .stats > span:first-child { display: none; }
+  main { padding: 12px; }
+  .situation { min-height: 0; margin-bottom: 4px; } .situation:has(.hist) { min-height: 132px; }
+  .felt { --rx: 37%; --ry: 42%; aspect-ratio: auto; height: clamp(300px, calc(100vh - 360px), 125vw); height: clamp(300px, calc(100dvh - 360px), 125vw); margin: 12px 0 40px; }
   .felt::before { inset: 3% 8%; }
   .plate { min-width: 54px; padding: 2px 6px; font-size: 11px; }
   .card { width: 46px; height: 66px; font-size: 20px; } .card span { font-size: 17px; }
@@ -148,7 +156,7 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
 .actions button.picked { outline: 3px solid #fff; opacity: 1 !important; }
 .actions .amt { display: block; font-size: 13px; font-weight: 500; opacity: .85; } /* postflop: the bet's size under its name */
 .actions .res { display: block; } .actions .res b { font-size: 20px; line-height: 1.2; } .actions .res small { font-size: 12px; opacity: .9; margin-left: 4px; }
-@media (max-width: 600px) { .actions { flex-wrap: wrap; } .actions button { min-width: 0; flex: 1 1 40%; } }
+@media (max-width: 600px) { .actions button { min-width: 0; flex: 1 1 0; padding: 8px 4px; white-space: normal; } } /* one row however many options, labels wrap inside */
 kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .feedback { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: none; gap: 16px; grid-template-columns: 1fr auto; }
 .feedback.show { display: grid; }
@@ -173,7 +181,10 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .board { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); display: flex; gap: 6px; }
 .still .card.new { animation: deal .25s ease-out both; }
 /* keep the whole table on screen: cap the felt by viewport height (2:1 felt, ~390px of header, hand history, spacing and buttons) */
-@media (min-width: 601px) { .felt { max-width: calc((100vh - 390px) * 2); margin-inline: auto; } }
+@media (min-width: 601px) { .felt { max-width: max(360px, calc((100vh - 390px) * 2)); margin-inline: auto; } } /* floor: a landscape phone's short viewport would size it to nothing */
+/* touch: no double-tap zoom on fast taps, no keyboard hints, no iOS zoom-on-focus (needs 16px inputs) */
+button, summary { touch-action: manipulation; }
+@media (hover: none) { kbd { display: none; } .chips input { font-size: 16px; } }
 /* wide screens: range chart | table | analysis side by side, so feedback never needs a scroll */
 @media (min-width: 1200px) {
   main { max-width: 1600px; grid-template-columns: 360px minmax(0, 1fr) 360px; grid-template-areas: "drill drill drill" "chart table analysis"; align-items: start; }
