@@ -560,7 +560,7 @@ function dueReview(fits) {
   return Object.entries(prog.srs).filter(([id, r]) => r.due <= prog.n && SPOTS[id.split("|")[0]] && handOk(id.split("|")[1]) && fits(parse(id.split("|")[0])))
     .sort((a, b) => a[1].due - b[1].due)[0]?.[0];
 }
-function review(id, wrong) {
+function srsMark(id, wrong) {
   const r = prog.srs[id];
   if (wrong) prog.srs[id] = { box: 0, due: prog.n + GAP[0] };
   else if (r && ++r.box >= GAP.length) delete prog.srs[id];
@@ -941,8 +941,8 @@ function tally(grade, quiet) {
 // then a strip of your decisions, first to last and coloured by grade, opens each one's analysis and chart ----------
 let rev = []; // this hand's decisions: { name, grade, verdict class/text, why, grid, range, graded buttons }
 const atEnd = () => cfg.later === "hand" && !st.drill;
-// short action names for the decision chips: Check X, Call C, Bet B (3-bet 3B), Fold F, Raise R, All-in All, Squeeze Sqz
-const abbr = t => t.replace(/(\d)-bet/g, "$1B").replace(/\b(Check|Call|Bet|Fold|Raise)\b/g, w => ({ Check: "X", Call: "C", Bet: "B", Fold: "F", Raise: "R" })[w]).replace("All-in", "All").replace("Squeeze", "Sqz");
+// short action names for the decision chips: Check X, Call C, Bet B (3-bet 3B), Fold F, Raise R, All-in All, Squeeze Sqz, Open O, Limp L
+const abbr = t => t.replace(/(\d)-bet/g, "$1B").replace(/\b(Check|Call|Bet|Fold|Raise)\b/g, w => ({ Check: "X", Call: "C", Bet: "B", Fold: "F", Raise: "R" })[w]).replace("All-in", "All").replace("Squeeze", "Sqz").replace(/^Open$/, "O").replace(/^Limp$/, "L");
 function keep(name, grade, btns, pre = "") {
   rev.push({ name, grade, vc: $("verdict").className, vt: $("verdict").textContent, why: pre + $("why").innerHTML, grid: $("grid").innerHTML, range: $("range").innerHTML, btns });
 }
@@ -984,7 +984,7 @@ function answer(a) {
     prog.n++;
     prog.log.push([c.spot.key, c.hand, grade, a, ACTS.reduce((x, y) => mix[y] > mix[x] ? y : x)]);
     if (prog.log.length > 3000) prog.log.shift();
-    review(c.spot.key + "|" + c.hand, grade === "bad");
+    srsMark(c.spot.key + "|" + c.hand, grade === "bad");
     saveProg();
     if (st.drill) { st.drill.n++; if (grade !== "bad") st.drill.right++; drawDrill(); }
   }
