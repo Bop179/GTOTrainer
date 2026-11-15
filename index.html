@@ -582,6 +582,46 @@ function newHand() {
 // past that, or where a format has none, a line that brings in a third player redeals or ends the hand, and a flat call ends it.
 const pick = w => { let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0; while ((r -= w[i]) > 0 && i < w.length - 1) i++; return i; };
 const sampleAct = key => { const rows = SPOTS[key], m = mixOf(rows[pick(rows.map((r, k) => COMBOS(HANDS[k]) * r[4]))]); return ACTS[pick(ACTS.map(a => m[a]))]; };
+// ---------- a called preflop all-in: the caller's hand, the runout and who wins ----------
+// The caller's hand comes from what that spot continues with against a normal raise. Facing a single raise (an open,
+// or an open and a call) a flat is a wide, medium hand that wouldn't call 100bb, so there only re-raises call a shove.
+// ponytail: still the range against a normal raise; bluff re-raises call too, and deeper spots keep their flats.
+const wideFlats = key => /\/FACINGRFI(_CALL)?$/.test(key);
+const RK = "23456789TJQKA", SU = "shdc"; // SU in SUITS order; card ids match handclass.js's strength()
+const cid52 = x => RK.indexOf(x[0]) * 4 + SU.indexOf(x[1]);
+const combosOf = h => { const o = []; for (const x of SU) for (const y of SU) if (h.length === 2 ? x < y : h[2] === "s" ? x === y : x !== y) o.push([h[0] + x, h[1] + y]); return o; };
+function allinCalled(c, p, key, pre = "") {
+  const mine = c.cards.map(([r, [sym]]) => r + SU[SUITS.findIndex(x => x[0] === sym)]);
+  const range = []; // [[cards], weight] for every combo that continues and misses your cards
+  SPOTS[key].forEach((r, k) => {
+    const m = mixOf(r), w = COMBOS(HANDS[k]) * r[4] * (wideFlats(key) ? m.Allin + m.Raise : 100 - m.Fold) / 100;
+    if (w > 0) combosOf(HANDS[k]).filter(cs => !cs.some(x => mine.includes(x))).forEach(cs => range.push([cs, w / COMBOS(HANDS[k])]));
+  });
+  if (!range.length) return { text: `${pre}${p} calls your all-in.` };
+  const w = range.map(x => x[1]), theirs = range[pick(w)][0], rest = n => [...RK].flatMap(r => [...SU].map(s => r + s)).filter(x => !n.includes(x));
+  const board = shuffle(rest([...mine, ...theirs])).slice(0, 5), str = cs => strength(cs.map(cid52));
+  const me = str([...mine, ...board]), them = str([...theirs, ...board]);
+  let won = 0; // your equity against the whole calling range: 3000 random hands and runouts
+  for (let n = 0; n < 3000; n++) {
+    const v = range[pick(w)][0], b = shuffle(rest([...mine, ...v])).slice(0, 5), x = str([...mine, ...b]), y = str([...v, ...b]);
+    won += x > y ? 1 : x === y ? .5 : 0;
+  }
+  const res = me > them ? "You win the pot." : me < them ? `${p} wins the pot.` : "Split pot.";
+  return { text: `${pre}${p} calls your all-in. Cards up!`, sd: { p, theirs, board, end: `${res} Your equity against everything ${p} calls with: about ${Math.round(won / 30)}%.` } };
+}
+// show the caller's cards, then the flop, turn and river a beat apart, then the result
+function runout(sd) {
+  const felt = $("felt"), card = x => { const [sym, red] = SUITS[SU.indexOf(x[1])]; return `<div class="card new${red ? " red" : ""}">${x[0] === "T" ? "10" : x[0]}<span>${sym}</span></div>`; };
+  const later = (ms, f) => replayTimers.push(setTimeout(f, ms));
+  later(500, () => {
+    const backs = felt.querySelector(`.seat[data-p="${sd.p}"] .backs`);
+    if (backs) backs.outerHTML = `<div class="cards">${sd.theirs.map(card).join("")}</div>`;
+    Object.assign($("pot").style, { left: "74%", top: "64%" }); // out from under the board, as postflop
+    felt.insertAdjacentHTML("beforeend", '<div class="board"></div>'); play("deal");
+  });
+  [[0, 3], [3, 4], [4, 5]].forEach(([i, j], k) => later(1500 + k * 1000, () => { felt.querySelector(".board").insertAdjacentHTML("beforeend", sd.board.slice(i, j).map(card).join("")); play("deal"); }));
+  later(4300, () => $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${sd.end}</b></p>`));
+}
 const NEXT = { RFI: "FACINGRFI", FACINGRFI: "FACING3B", FACING3B: "FACING4B", FACING4B: "FACING5B", FACING5B: "FACING6B",
   FACINGLIMP: "LIMP_FACING2B", LIMP_FACING2B: "LIMP_FACING3B", LIMP_FACING3B: "LIMP_FACING4B", LIMP_FACING4B: "LIMP_FACING5B", LIMP_FACING5B: "LIMP_FACING6B" };
 const nodeKey = (s, decider, aggressor, node) => [s.game, s.stack, ...(node === "RFI" ? [decider] : [aggressor, decider]), node].join("/");
@@ -622,9 +662,8 @@ function simNext(c, a, pot) {
   const shove = a === "Allin" || c.z.raise >= c.z.S, [o, w] = villains(s), K = (v, p, n) => [s.game, s.stack, v, p, n].join("/");
   const what = (b, n) => b === "Allin" ? "shoves all-in" : b === "Call" ? "calls" : RAISE_NAME[n].toLowerCase() + "s";
   const END = "No solver data past this point, so the hand ends.", NOREPLY = "The solver data doesn't cover the replies to your raise, so the hand ends here.";
-  // the next spot you face, if the data has it and your hand gets there
-  const reach = (text, key) => SPOTS[key]?.[c.i][4] ? { text: text + "!", spot: parse(key) }
-    : { text: `${text}. ${SPOTS[key] ? "The solver never gets here with your hand" : "No solver data past this point"}, so the hand ends.` };
+  // the next spot you face, if the data has it (a hand the solver never brings there plays it ungraded, see answer)
+  const reach = (text, key) => SPOTS[key] ? { text: text + "!", spot: parse(key) } : { text: `${text}. No solver data past this point, so the hand ends.` };
   // facing a squeeze or cold 4-bet as the opener, the caller or 3-bettor is still behind you; once the opener folds it's heads-up
   if (s.node === "FACINGSQZ" || s.node === "FACINGC4B") return { text: a === "Call" ? `You call, and ${o} still has to act. ${END}` : NOREPLY };
   if (s.node === "FACINGSQZ_CALLER" || s.node === "FACINGC4B_3B") {
@@ -637,11 +676,11 @@ function simNext(c, a, pot) {
     const [n1, n2] = REPLY[s.node], k1 = K(`${w}+${s.hero}`, o, n1), k2 = K(`${o}+${s.hero}`, w, n2);
     if (!SPOTS[k1]) return { text: NOREPLY };
     const b1 = sampleAct(k1);
-    if (b1 !== "Fold") return { text: shove ? `${o} calls your all-in. Cards on their backs!` : `${o} ${what(b1, n1)}. ${END}` };
+    if (b1 !== "Fold") return shove ? allinCalled(c, o, k1) : { text: `${o} ${what(b1, n1)}. ${END}` };
     if (!SPOTS[k2]) return { text: `${o} folds. ${END}` };
     const b2 = sampleAct(k2);
     if (b2 === "Fold") return { text: `${o} and ${w} fold. You take the ${bb(pot)} pot.` };
-    if (shove) return { text: `${o} folds, ${w} calls your all-in. Cards on their backs!` };
+    if (shove) return allinCalled(c, w, k2, `${o} folds, `);
     const sc = b2 === "Call" && postScen(s, a, w);
     if (sc) return { text: `${o} folds, ${w} calls: on to the flop!`, post: sc };
     return { text: b2 === "Call" ? `${o} folds, ${w} calls: on to the flop, where this preflop trainer stops.` : `${o} folds, ${w} ${what(b2, n2)}. ${END}` };
@@ -665,9 +704,10 @@ function simNext(c, a, pot) {
   for (const p of limp ? ["BB"] : s.node === "RFI" ? ORDER[s.game].slice(ORDER[s.game].indexOf(s.hero) + 1) : [s.villain]) {
     // after a call of your open, the rest face the open plus that call
     const mw = caller && [s.game, s.stack, `${s.hero}+${caller}`, p, "FACINGRFI_CALL"].join("/");
-    const key = SPOTS[mw] ? mw : nodeKey(s, p, s.hero, node), b = SPOTS[key] ? sampleAct(key) : "Fold";
+    const key = SPOTS[mw] ? mw : nodeKey(s, p, s.hero, node), b0 = SPOTS[key] ? sampleAct(key) : "Fold";
+    const b = shove && b0 === "Call" && wideFlats(key) ? "Fold" : b0; // see allinCalled
     if (b === "Fold") continue;
-    if (shove) return { text: `${p} calls your all-in. Cards on their backs!` };
+    if (shove) return allinCalled(c, p, key);
     if (b === "Call") { caller ??= p; callers++; continue; }
     if (key === mw) return reach(`${caller} calls, ${joinText([p, b], "FACINGRFI_CALL")}`, K(`${caller}+${p}`, s.hero, "FACINGSQZ"));
     // a 3-bet of your open: the players behind the 3-bettor get a cold 4-bet spot before it's back to you
@@ -783,20 +823,24 @@ function answer(a) {
   if (!c || c.answered || c.busy || !c.avail.includes(a)) return;
   c.answered = true; c.shown = c.E.length + 1; // the next decision replays from after your action
   document.querySelector(".seat.hero").classList.remove("turn");
-  const mix = mixOf(c.rows[c.i]), f = mix[a], best = Math.max(...Object.values(mix));
+  // off: an earlier move of yours was one the solver never makes with this hand, so it has no strategy for it here.
+  // Play on ungraded, with the whole range's mix on the buttons.
+  const off = !c.rows[c.i][4], mix = off ? rangeMix(c.rows) : mixOf(c.rows[c.i]), f = mix[a], best = Math.max(...Object.values(mix));
   // grade by bb lost against the best action where the spot has GTO Wizard's EV (ev.js), by frequency elsewhere
-  const row = c.rows.ev?.[c.i], evs = row && c.avail.every(x => row[ACTS.indexOf(x)] != null) && Object.fromEntries(c.avail.map(x => [x, row[ACTS.indexOf(x)]]));
+  const row = !off && c.rows.ev?.[c.i], evs = row && c.avail.every(x => row[ACTS.indexOf(x)] != null) && Object.fromEntries(c.avail.map(x => [x, row[ACTS.indexOf(x)]]));
   const top = evs && c.avail.reduce((x, y) => evs[y] > evs[x] ? y : x), loss = evs && evs[top] - evs[a];
-  const grade = evs ? (loss < 0.05 ? "great" : loss < 0.5 ? "ok" : "bad")
+  const grade = off ? "" : evs ? (loss < 0.05 ? "great" : loss < 0.5 ? "ok" : "bad")
     : f >= best - 5 || f >= 50 ? "great" : f >= 15 ? "ok" : "bad";
-  tally(grade);
-  prog.n++;
-  prog.log.push([c.spot.key, c.hand, grade, a, ACTS.reduce((x, y) => mix[y] > mix[x] ? y : x)]);
-  if (prog.log.length > 3000) prog.log.shift();
-  review(c.spot.key + "|" + c.hand, grade === "bad");
-  saveProg();
+  if (grade) {
+    tally(grade);
+    prog.n++;
+    prog.log.push([c.spot.key, c.hand, grade, a, ACTS.reduce((x, y) => mix[y] > mix[x] ? y : x)]);
+    if (prog.log.length > 3000) prog.log.shift();
+    review(c.spot.key + "|" + c.hand, grade === "bad");
+    saveProg();
+    if (st.drill) { st.drill.n++; if (grade !== "bad") st.drill.right++; drawDrill(); }
+  }
   play(a === "Fold" ? "deal" : "chip");
-  if (st.drill) { st.drill.n++; if (grade !== "bad") st.drill.right++; drawDrill(); }
 
   stamp(a, x => mix[x], evs && (x => sbb(evs[x])));
   // show your action on the table: fold mucks your cards, anything else moves chips in
@@ -809,16 +853,17 @@ function answer(a) {
     $("pot").innerHTML = `Pot <b>${bb(z.pot - z.heroIn + put)}</b>`;
   }
   $("verdict").className = "verdict " + grade;
-  $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable", bad: "✗ Mistake" }[grade];
+  $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable", bad: "✗ Mistake", "": "Not graded" }[grade];
   $("range").innerHTML = rangeHTML(c.spot);
-  $("why").innerHTML = explain(c, mix, a, grade).map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
+  $("why").innerHTML = (off ? [`<b>${c.hand}</b> is ${describe(c.hand)}.`, "Not graded: earlier in the hand you made a move the solver never makes with this hand, so it has no strategy for it here. The % on each button is what its whole range does in this spot."]
+    : explain(c, mix, a, grade)).map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
   // scripted steps continue down the line whatever you picked; after them the other players respond live
   // the scripted line raises at every step, except the SB's limp that starts a limped pot and the call that gets squeezed
   let more = c.k + 1 < c.steps.length, nx = more && c.steps[c.k + 1].node;
   let want = more && (c.spot.node === "RFI" && isLimp(nx) || nx === "FACINGSQZ_CALLER") ? "Call" : "Raise";
   let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
-  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post) { c.post = after.post; more = true; } }
+  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd); }
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
     : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${note}</b></p>`);
