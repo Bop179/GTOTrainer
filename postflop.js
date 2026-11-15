@@ -145,7 +145,7 @@ async function postBegin(c) {
   P.hands[1 - me] = vr.hands[pick(vr.hands.map((h, i) => cardsOf(h).some(x => mine.includes(x)) ? 0 : vr.reach[i]))];
   P.story.push({ s: "Flop" }); // the cards are on the board; the story only says who did what
   st.cur = P;
-  if (!hr.hands.includes(hero)) end(`${HANDS[c.i]} isn't in the solved range at the flop (the solver doesn't play it this way preflop), so the hand ends here.`);
+  // not in the solved range (the solver doesn't play it this way preflop): it still plays on, ungraded (see postAnswer)
   postDraw(true);
   if (!P.over) { P.busy = true; await run(); P.busy = false; postDraw(false); }
 }
@@ -232,7 +232,6 @@ async function run() {
       await step(pick(s));
     }
   } catch (e) { return end(e.message); }
-  if (!P.over && !cur().hands.includes(P.hands[P.me])) end("The solver never gets here with your hand, so the hand ends.");
 }
 // the villain's range now: reach × how often they took the action they took at their last decision (all of it before one)
 function villainRange() {
@@ -305,7 +304,7 @@ function postExplain(node, h) {
   let tot = 0, above = 0;
   node.hands.forEach((_, j) => { const w = node.reach[j]; if (!w) return; tot += w; if (best(j) > mine) above += w; });
   const topPct = Math.max(1, Math.round(above / (tot || 1) * 100));
-  out.push(`By the solver's EV, about ${topPct}% of the hands you'd have here do better than yours: ${topPct <= 25 ? "near the top of your range" : topPct <= 60 ? "the middle of your range" : "the bottom part of your range"}.`);
+  if (h >= 0) out.push(`By the solver's EV, about ${topPct}% of the hands you'd have here do better than yours: ${topPct <= 25 ? "near the top of your range" : topPct <= 60 ? "the middle of your range" : "the bottom part of your range"}.`);
   // hands in the same group: same made hand and draw; if that's thin, same made hand only
   const cls = node.hands.map(x => handClass(cardsOf(x), board));
   const group = by => node.hands.map((_, j) => j).filter(j => node.reach[j] > 0 && by(cls[j]));
@@ -326,15 +325,18 @@ function postExplain(node, h) {
 async function postAnswer(i) {
   if (P.over || P.answered || P.busy || !cur().actions[i]) return;
   P.answered = P.busy = true;
-  const node = cur(), h = node.hands.indexOf(P.hands[P.me]), f = node.strat[i][h], ev = node.ev.map(e => e[h]);
+  // h < 0: an earlier move of yours was one the solver never makes with this hand, so the solve has no strategy or EV for
+  // it here (hands under 0.1% reach are trimmed). Play on ungraded; the buttons show the range's average mix instead.
+  const node = cur(), h = node.hands.indexOf(P.hands[P.me]), off = h < 0, f = off ? 0 : node.strat[i][h], ev = node.ev.map(e => e[h]);
   const best = ev.indexOf(Math.max(...ev)), loss = ev[best] - ev[i], pot = potNow();
-  const grade = f >= 25 || f >= 5 && loss <= .02 * pot ? "great" : f >= 5 || f >= 1 && loss <= .05 * pot || loss <= .01 * pot ? "ok" : "bad";
-  tally(grade); play(kind(node.actions[i]) === "Fold" ? "deal" : "chip");
-  stamp(String(i), j => node.strat[j][h], j => ev[j].toFixed(2) + "bb");
+  const grade = off ? "" : f >= 25 || f >= 5 && loss <= .02 * pot ? "great" : f >= 5 || f >= 1 && loss <= .05 * pot || loss <= .01 * pot ? "ok" : "bad";
+  if (grade) tally(grade); play(kind(node.actions[i]) === "Fold" ? "deal" : "chip");
+  const rsum = node.reach.reduce((x, y) => x + y, 0) || 1, mix = off ? strat(node, "").map(x => x / rsum) : node.strat.map(s => s[h]);
+  stamp(String(i), j => mix[j], !off && (j => ev[j].toFixed(2) + "bb"));
   const btns = $("actions").innerHTML; // the graded buttons stay up until you continue, though the hand has moved on
   const names = node.actions.map(actName), hand = cardsOf(P.hands[P.me]).map(cardText).join("");
   $("verdict").className = "verdict " + grade;
-  $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable", bad: "✗ Mistake" }[grade];
+  $("verdict").textContent = { great: "✓ Correct", ok: "≈ Acceptable", bad: "✗ Mistake", "": "Not graded" }[grade];
   const pill = (j, v) => `<span class="pill" style="--c:${AC[kind(node.actions[j])]}"><span>${names[j]}</span><b>${Math.round(v)}%</b></span>`;
   // whole range at this node, weighted by reach
   const tot = node.reach.reduce((x, y) => x + y, 0) || 1, rm = node.strat.map(s => s.reduce((t, x, j) => t + x * node.reach[j], 0) / tot);
@@ -343,7 +345,8 @@ async function postAnswer(i) {
     <div class="pills">${rm.map((v, j) => v >= .5 ? pill(j, v) : "").join("")}</div>`;
   $("grid").innerHTML = gridHTML(classRows(node), "POST", HANDS.indexOf(classOf(P.hands[P.me])));
   const why = [`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}, pot ${bb(pot)}, ${P.me ? "in" : "out of"} position.`, ...postExplain(node, h),
-    i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`,
+    off ? "Not graded: earlier in the hand you made a move the solver never makes with this hand, so it has no strategy for it here. The % on each button is what its whole range does in this spot."
+    : i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`,
     "~Hand groups and board reads come from simple local rules; the percentages and EVs are the solver's."];
   try { await step(i, true); } catch (e) { end(e.message); }
   P.busy = false;
