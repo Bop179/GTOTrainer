@@ -325,7 +325,7 @@ function postDraw(fresh) {
 }
 function postButtons(mine) {
   if (!P.over && (!mine || P.busy)) return document.querySelectorAll("#actions button").forEach(b => b.disabled = true); // their move: keep your last buttons, greyed
-  if (P.over) { P.answered = true; $("actions").innerHTML = P.story.filter(x => x.end).map(x => `<div class="end">${x.t}</div>`).join("") + `<button data-next style="background:var(--panel)">Next hand<kbd>Space</kbd></button>`; return; }
+  if (P.over) { P.answered = true; $("actions").innerHTML = P.story.filter(x => x.end).map(x => `<div class="end">${x.t}</div>`).join("") + `<button data-next>Next hand<kbd>Space</kbd></button>`; return; }
   $("actions").innerHTML = cur().actions.map((a, i) => `<button data-a="${i}" style="background:${AC[kind(a)]}">${btnLabel(a, i)}</button>`).join("");
 }
 
