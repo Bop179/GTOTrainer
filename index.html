@@ -1302,6 +1302,7 @@ function drawBrowse() {
 // ---------- wiring ----------
 $("actions").addEventListener("click", e => { const b = e.target.closest("button"); if (b) b.dataset.next !== undefined ? next() : answer(b.dataset.a); });
 $("next").onclick = next;
+$("felt").onclick = () => st.cur?.answered && next(); // tap the table = Space: next hand once you've answered
 document.querySelectorAll(".undo").forEach(b => b.onclick = undo);
 $("revlist").onclick = e => { const r = e.target.closest("button")?.dataset.r; if (r) showRev(+r); };
 const stopDrill = () => { st.drill = null; drawDrill(); };
