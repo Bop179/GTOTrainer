@@ -48,6 +48,23 @@ button { cursor: pointer; }
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; width: min(640px, calc(100% - 32px)); padding: 20px; }
 #leaks { width: min(1320px, calc(100% - 32px)); }
 #leakBody { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(520px, 100%), 1fr)); gap: 16px 32px; align-items: start; } /* preflop | postflop */
+#leakBody h3 small { font-weight: 400; font-size: 12px; } #leakBody h3 .drill { float: right; }
+.lhead { display: flex; align-items: baseline; gap: 10px; color: var(--muted); } .lhead .big { font-size: 34px; font-weight: 800; color: var(--text); line-height: 1.1; }
+.lsum { margin: 6px 0 4px; }
+.lrow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 140px) 92px; gap: 10px; align-items: center; font-size: 14px; padding: 3px 0; }
+.lrow i, .meter i { display: block; height: 8px; border-radius: 4px; background: var(--line); position: relative; }
+.lrow i b { display: block; height: 100%; border-radius: 4px; }
+.lrow em { font-style: normal; font-size: 13px; color: var(--muted); text-align: right; white-space: nowrap; }
+.meter { margin: 6px 0 14px; } .mlab { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 6px; } .mlab strong { color: var(--text); }
+.meter i::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+.meter i b { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: var(--ok); transform: translate(-50%, -50%); box-shadow: 0 0 0 2px var(--panel); z-index: 1; }
+.lgrid { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 2px; max-width: 440px; font-size: 10px; }
+.lgrid div { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 3px; color: var(--text); }
+.lgrid .none, .lkey .none { background: transparent; color: var(--line); box-shadow: inset 0 0 0 1px var(--line); }
+.lkey { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
+.lkey i { width: 90px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--line), var(--bad)); } .lkey .none { padding: 0 6px; border-radius: 3px; margin-left: 10px; color: var(--muted); }
+.leak { padding: 6px 0 4px; border-bottom: 1px solid var(--line); } .ltop { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+.leak .lrow { color: var(--muted); font-size: 13px; }
 dialog::backdrop { background: #000a; }
 #browse { width: min(1100px, calc(100% - 32px)); }
 .bwrap { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; } .bwrap > div:first-child { flex: 1; min-width: 300px; }
@@ -591,26 +608,72 @@ const faced = node => node === "FACINGLIMP" ? "limp" : RAISE_NAME[Object.keys(NE
 const vsText = s => { const [o, w] = villains(s); return w ? `${o} ${MW[s.node][0]} + ${w} ${MW[s.node][1]}` : `${o} ${faced(s.node)}`; };
 const spotName = s => `${s.game} ${s.stack} · ` + (s.node === "RFI" ? `${s.hero} open` : `${s.hero} vs ${vsText(s)}`);
 let leakTop = [];
+// ---------- the Leaks view: per section a plain-English summary, two balance meters, bars, (preflop) a hand grid, then the biggest leaks ----------
+const AGG = k => k === "Raise" || k === "Allin" || k === "Bet";
+const actWord = k => k === "Allin" ? "All-in" : k;
+const pctOf = (n, d) => Math.round(n / (d || 1) * 100);
+const countBy = (arr, f) => arr.reduce((m, e) => (m[f(e)] = (m[f(e)] || 0) + 1, m), {});
+// a bar row: label, thin bar (frac of the track), value; title is the hover detail
+const barRow = (label, frac, val, c, title = "") => `<div class="lrow" title="${title}"><span>${label}</span><i><b style="width:${Math.max(2, frac * 100)}%;background:${c}"></b></i><em>${val}</em></div>`;
+// a balance meter: your mistakes leaning each way, the dot toward the side you lean
+function meter(lName, l, rName, r, tip) {
+  const t = l + r, x = t ? 50 + (r - l) / t * 50 : 50;
+  const verdict = t < 3 ? "Too few mistakes to tell" : Math.abs(r - l) / t < .2 ? "Balanced" : r > l ? rName : lName;
+  return `<div class="meter" title="${tip}"><div class="mlab"><span>${lName} · <b>${l}</b></span><strong>${verdict}</strong><span><b>${r}</b> · ${rName}</span></div><i><b style="left:${x}%"></b></i></div>`;
+}
+// log rows are [spot, hand, grade, picked, solver's favourite]; o: { name, unit, group, type, by: [title, bucket fn], grid, drill }
+function leakSection(log, o) {
+  if (!log.length) return "";
+  const bad = log.filter(e => e[2] === "bad"), acc = pctOf(log.length - bad.length, log.length);
+  const types = Object.entries(countBy(bad, e => o.type(e[3], e[4]))).sort((x, y) => y[1] - x[1]);
+  const seen = countBy(log, o.group), missed = countBy(bad, o.group);
+  const top = Object.entries(missed).filter(([k]) => seen[k] >= 3).sort((x, y) => y[1] - x[1] || y[1] / seen[y[0]] - x[1] / seen[x[0]]).slice(0, 8);
+  if (o.drill) leakTop = top;
+  const n = k => bad.filter(e => k(e[3], e[4])).length;
+  const tight = n((p, f) => p === "Fold" && f !== "Fold"), loose = n((p, f) => f === "Fold" && p !== "Fold");
+  const passive = n((p, f) => p !== "Fold" && !AGG(p) && AGG(f)), aggro = n((p, f) => AGG(p) && f !== "Fold" && !AGG(f));
+  const sum = !bad.length ? "No mistakes yet." : `Your most common mistake is <b>${types[0][0].toLowerCase()}</b> (${pctOf(types[0][1], bad.length)}% of your mistakes)`
+    + (top.length ? `, and your worst spot is <b>${top[0][0]}</b>: wrong ${top[0][1]} of ${seen[top[0][0]]} times.` : ".");
+  const tmax = types[0]?.[1] || 1;
+  const buckets = Object.entries(countBy(log, o.by[1])).map(([k, t]) => [k, t, log.filter(e => o.by[1](e) === k && e[2] !== "bad").length]).sort((x, y) => x[2] / x[1] - y[2] / y[1]);
+  // what you did against what the solver does, most often, in a leak
+  const fix = k => { const m = Object.entries(countBy(bad.filter(e => o.group(e) === k), e => e[3] === e[4] ? "Right action, wrong size" : `You ${actWord(e[3])} → solver ${actWord(e[4])}`)).sort((x, y) => y[1] - x[1])[0]; return m ? m[0] : ""; };
+  return `<section><h2>${o.name}</h2>
+    <div class="lhead"><div class="big">${acc}%</div><div>right, over ${log.length} ${o.unit}${o.extra || ""}</div></div>
+    <p class="lsum">${sum}</p>
+    <h3>Your tendencies <small>· which way your mistakes lean</small></h3>
+    ${meter("Too tight", tight, "Too loose", loose, "Too tight: you folded where the solver plays on. Too loose: you played on where the solver folds.")}
+    ${meter("Too passive", passive, "Too aggressive", aggro, "Too passive: you checked or called where the solver bets or raises. Too aggressive: you bet or raised where the solver checks or calls.")}
+    ${types.length ? `<h3>Mistake types</h3>${types.map(([t, c]) => barRow(t, c / tmax, `${c} (${pctOf(c, bad.length)}%)`, "var(--bad)")).join("")}` : ""}
+    <h3>${o.by[0]} <small>· worst first</small></h3>${buckets.map(([k, t, r]) => barRow(k, r / t, `${pctOf(r, t)}% · ${t}`, "var(--great)", `${r} of ${t} right`)).join("")}
+    ${o.grid ? o.grid(log, bad) : ""}
+    <h3>Biggest leaks ${o.drill && top.length > 1 ? `<button class="drill" data-b="all">Drill all</button>` : ""}</h3>
+    ${top.length ? top.map(([k, c]) => `<div class="leak"><div class="ltop"><span>${k}</span>${o.drill ? `<button class="drill" data-b="${k}">Drill</button>` : ""}</div>
+      ${barRow(fix(k), c / seen[k], `wrong ${c} of ${seen[k]}`, "var(--bad)")}</div>`).join("")
+      : `<p class="muted">Not enough data yet: a spot needs at least 3 ${o.unit}.</p>`}</section>`;
+}
+// preflop: every hand class, coloured by how often you get it wrong (2+ hands seen)
+function handGrid(log, bad) {
+  const seen = countBy(log, e => e[1]), miss = countBy(bad, e => e[1]), R = "AKQJT98765432";
+  let cells = "";
+  for (let i = 0; i < 13; i++) for (let j = 0; j < 13; j++) {
+    const h = i === j ? R[i] + R[j] : i < j ? R[i] + R[j] + "s" : R[j] + R[i] + "o", t = seen[h] || 0, m = miss[h] || 0;
+    cells += t >= 2 ? `<div style="background:color-mix(in srgb, var(--bad) ${pctOf(m, t)}%, var(--line))" title="${h}: wrong ${m} of ${t}">${h}</div>`
+      : `<div class="none" title="${h}: ${t ? "1 hand" : "not played yet"}">${h}</div>`;
+  }
+  return `<h3>Hands you misplay <small>· hover a hand for its count</small></h3><div class="lgrid">${cells}</div>
+    <div class="lkey"><span>never wrong</span><i></i><span>always wrong</span><span class="none">under 2 hands</span></div>`;
+}
 function renderLeaks() {
-  const log = prog.log, bad = log.filter(e => e[2] === "bad"), tally = (arr, f) => arr.reduce((m, e) => (m[f(e)] = (m[f(e)] || 0) + 1, m), {});
-  const types = Object.entries(tally(bad, e => leakType(e[3], e[4]))).sort((a, b) => b[1] - a[1]);
-  const seen = tally(log, e => spotName(parse(e[0])) + " · " + handType(e[1]));
-  const missed = tally(bad, e => spotName(parse(e[0])) + " · " + handType(e[1]));
-  const top = leakTop = Object.entries(missed).filter(([b]) => seen[b] >= 3).sort((a, b) => b[1] - a[1] || b[1] / seen[b[0]] - a[1] / seen[a[0]]).slice(0, 10);
   const due = Object.values(prog.srs).filter(r => r.due <= prog.n).length;
-  $("leakStats").textContent = !log.length ? "" : `${log.length} hands · ${Math.round((1 - bad.length / log.length) * 100)}% right · ${Object.keys(prog.srs).length} to review (${due} due)`;
-  // postflop: the same two tables, grouped loosely (street, position, what you face; made hand or draw), without drills
-  const plog = prog.plog, pbad = plog.filter(e => e[2] === "bad"), pkey = e => e[0] + " · " + e[1];
-  const ptypes = Object.entries(tally(pbad, e => postLeakType(e[3], e[4]))).sort((a, b) => b[1] - a[1]);
-  const pseen = tally(plog, pkey), ptop = Object.entries(tally(pbad, pkey)).filter(([b]) => pseen[b] >= 3).sort((a, b) => b[1] - a[1] || b[1] / pseen[b[0]] - a[1] / pseen[a[0]]).slice(0, 10);
-  const post = !plog.length ? "" : `<section><h2>Postflop <small>${plog.length} decisions · ${Math.round((1 - pbad.length / plog.length) * 100)}% right</small></h2>
-    <h3>Mistake types</h3>${ptypes.length ? `<table>${ptypes.map(([t, n]) => `<tr><td>${t}</td><td>${n} (${Math.round(n / pbad.length * 100)}%)</td></tr>`).join("")}</table>` : "<p>No mistakes yet.</p>"}
-    <h3>Biggest leaks</h3>${ptop.length ? `<table><tr><th>Street · spot · hand</th><th>Mistakes</th></tr>${ptop.map(([b, n]) => `<tr><td>${b}</td><td>${n} of ${pseen[b]} (${Math.round(n / pseen[b] * 100)}%)</td></tr>`).join("")}</table>`
-      : "<p>Not enough data yet: a spot and hand needs at least 3 decisions.</p>"}</section>`;
-  $("leakBody").innerHTML = (!log.length ? plog.length ? "" : "<p>Play some hands first.</p>" : `<section><h2>Preflop</h2>
-    <h3>Mistake types</h3>${types.length ? `<table>${types.map(([t, n]) => `<tr><td>${t}</td><td>${n} (${Math.round(n / bad.length * 100)}%)</td></tr>`).join("")}</table>` : "<p>No mistakes yet.</p>"}
-    <h3>Biggest leaks</h3>${top.length ? `<table><tr><th>Spot · hand type</th><th>Mistakes</th><th>${top.length > 1 ? `<button class="drill" data-b="all">Drill all</button>` : ""}</th></tr>${top.map(([b, n]) => `<tr><td>${b}</td><td>${n} of ${seen[b]} hands (${Math.round(n / seen[b] * 100)}%)</td><td><button class="drill" data-b="${b}">Drill</button></td></tr>`).join("")}</table>`
-      : "<p>Not enough data yet: a spot and hand type needs at least 3 hands.</p>"}</section>`) + post;
+  $("leakStats").textContent = "";
+  const pre = leakSection(prog.log, { name: "Preflop", unit: "hands", type: leakType, drill: true, grid: handGrid,
+    extra: ` · ${Object.keys(prog.srs).length} to review (${due} due)`,
+    group: e => spotName(parse(e[0])) + " · " + handType(e[1]), by: ["Accuracy by position", e => parse(e[0]).hero] });
+  // postflop: grouped loosely (street, position, what you face; made hand or draw), no drills
+  const post = leakSection(prog.plog || [], { name: "Postflop", unit: "decisions", type: postLeakType,
+    group: e => e[0] + " · " + e[1], by: ["Accuracy by street", e => e[0].split(" · ")[0]] });
+  $("leakBody").innerHTML = pre + post || "<p>Play some hands first.</p>";
 }
 
 function newHand() {
