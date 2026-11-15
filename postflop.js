@@ -128,7 +128,7 @@ async function postBegin(c) {
   const scen = c.post, m = PI[scen], me = m.oop === c.spot.hero ? 0 : 1;
   c.post = null; c.busy = true; // a second Space while the flop loads doesn't deal twice, and undo waits for it
   $("feedback").classList.remove("show");
-  const from = FROM[cfg.postFrom] || 0;
+  const from = fromSt();
   $("actions").innerHTML = "";
   // starting on the turn or river: the streets before it play out unseen (fast), and a line that ends early is replayed on
   // the same flop, so you only ever see a hand that gets to your street
@@ -179,7 +179,7 @@ async function postBegin(c) {
   reveal(); postDraw(false);
 }
 // the hand was playing out unseen (P.quiet) and reached your street: show the table, every board card dealing in
-function reveal() { if (P.quiet && P.street >= (FROM[cfg.postFrom] || 0)) { P.quiet = false; P.isNew = 0; postDraw(true); } }
+function reveal() { if (P.quiet && P.street >= fromSt()) { P.quiet = false; P.isNew = 0; postDraw(true); } }
 
 // apply action i at the current node, for whoever is to act; deals the next card when a street closes
 // hold: your own action closed the street; the next card waits until you continue (closeStreet from postNext)
@@ -263,8 +263,9 @@ const strat = (node, hand) => {
 // "Start deciding on" the flop, turn or river (cfg.postFrom): preflop is skipped (newHand), and your earlier postflop decisions play themselves the solver's way,
 // and before your street nobody folds when they have another line (a fold would end the hand before you decide)
 const FROM = { flop: 0, turn: 1, river: 2 };
+const fromSt = () => toPost() && FROM[cfg.postFrom] || 0; // only in "Postflop only": a hand played on from preflop decides every street
 async function run() {
-  const from = FROM[cfg.postFrom] || 0, h = P;
+  const from = fromSt(), h = P;
   try {
     for (let p; !P.over && ((p = cur().player) !== P.me || P.street < from); P.quiet || postDraw(false)) {
       reveal();

@@ -33,6 +33,7 @@ button { cursor: pointer; }
 .menu h4, #bPick h4 { margin: 6px 0; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
 .menu h4 small, #bPick h4 small { text-transform: none; letter-spacing: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .sub { align-self: center; margin-left: 8px; color: var(--muted); font-size: 12px; }
 .chips button { padding: 5px 12px; border-radius: 999px; font-size: 13px; }
 .chips button.on { background: var(--ok); border-color: var(--ok); color: #111; font-weight: 600; }
 @media (max-width: 600px) { .menu > div { position: fixed; top: auto; left: 16px; right: 16px; width: auto; max-height: 75vh; overflow: auto; } }
@@ -515,10 +516,14 @@ function drawSettings() {
     + SPOT_ROWS.map(([t, row]) => [t, Object.entries(row).filter(([n]) => ALL.some(s => s.game === cfg.game && s.stack === cfg.stack && n.split("|").includes(s.node)))])
       .filter(([, items]) => items.length).map(([t, items]) => group("nodes", `<small>${t}</small>`, items, v => many("nodes", v))).join("")
     + group("pos", "Your position <small>· pick several</small>", [["", "Any"], ...ORDER[cfg.game].map(p => [p, p])], v => many("pos", v))
-    + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Play to postflop, deciding from <small>· deals only hands that reach a solved heads-up pot (overrides Spots); streets before yours play themselves, the solver's way</small>",
-      [["", "Off"], ["pre", "Preflop"], ["flop", "Flop"], ["turn", "Turn"], ["river", "River"]], v => (cfg.toPost ? cfg.postFrom || "pre" : "") === v) : "")
+    // Streets: preflop only (a hand stops at the flop), both (on into a solved heads-up pot when it gets there), or postflop only
+    // (only hands that get there, starting on the street you pick: the @ chips, a sub-line shown with it)
+    + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Streets <small>· Postflop only deals just hands that reach a solved heads-up pot (overrides Spots), and you start deciding on the street you pick; the streets before it play themselves, the solver's way</small>",
+      [["pre", "Preflop only"], ["", "Both"], ["post", "Postflop only"]], v => (cfg.toPost ? "post" : cfg.preOnly ? "pre" : "") === v)
+      + (cfg.toPost ? group("post", "", [["@", "Preflop"], ["@flop", "Flop"], ["@turn", "Turn"], ["@river", "River"]], v => "@" + (cfg.postFrom || "") === v)
+        .replace("<h4></h4>", "").replace('data-g="post">', 'data-g="post"><small class="sub">start deciding on</small>') : "") : "")
     + group("later", "Feedback <small>· after the hand: no grades until it's played out, then each decision's analysis</small>", [["", "After each decision"], ["hand", "After the hand"]], v => (cfg.later || "") === v);
-  $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}${toPost() ? " · to postflop" + (cfg.postFrom ? ", from the " + cfg.postFrom : "") : ""}`;
+  $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}${toPost() ? " · postflop only" + (cfg.postFrom ? ", from the " + cfg.postFrom : "") : cfg.preOnly ? " · preflop only" : ""}`;
 }
 
 const handType = h => describe(h).replace(/^an? /, "");
@@ -974,7 +979,7 @@ function answer(a) {
   let want = more && (c.spot.node === "RFI" && isLimp(nx) || nx === "FACINGSQZ_CALLER") ? "Call" : "Raise";
   let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
-  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); }
+  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); }
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
     : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p id="note"><b>▸ ${note}</b></p>`);
@@ -1135,7 +1140,7 @@ $("chips").onclick = e => {
   const b = e.target.closest("button");
   if (!b) return;
   const g = b.parentElement.dataset.g, v = b.dataset.v;
-  if (g === "post") { cfg.toPost = !!v; if (v) cfg.postFrom = v === "pre" ? "" : v; }
+  if (g === "post") { if (v[0] === "@") cfg.postFrom = v.slice(1); else { cfg.toPost = v === "post"; cfg.preOnly = v === "pre"; } }
   else if (g === "nodes" || g === "pos") cfg[g] = !v ? [] : cfg[g].includes(v) ? cfg[g].filter(x => x !== v) : [...cfg[g], v];
   else cfg[g] = v;
   if (g === "game") { cfg.pos = []; if (!stacksOf(v).includes(cfg.stack)) cfg.stack = stacksOf(v).at(-1); }
