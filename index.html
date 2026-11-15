@@ -1020,7 +1020,7 @@ function answer(a) {
   drawGrid(c);
   if (atEnd()) {
     if (after?.sd) $("note")?.remove();
-    keep(`P ${abbr(label(a, c.spot.node))}`, grade, $("actions").innerHTML, after?.sd ? `<p><b>▸ ${after.sd.end}</b></p>` : "");
+    keep(`P · ${abbr(label(a, c.spot.node))}`, grade, $("actions").innerHTML, after?.sd ? `<p><b>▸ ${after.sd.end}</b></p>` : "");
     $("actions").innerHTML = plain; document.querySelectorAll("#actions button").forEach(b => b.disabled = true);
     // a beat for your action to land (the whole runout after a called all-in), then on with the hand, or its review
     c.answered = false; c.busy = true;
