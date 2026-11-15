@@ -1,4 +1,5 @@
 #!/bin/bash
+# TEMPORARY: delete this file once it has run (by 2026-11-30); it removes its own launchd job.
 # End the trial-credit worker: terminate gto-worker (its boot volume goes with it), stop gto-vm's sync cron, and put
 # the quota back to free-tier only (A1 4/24, 200 GB). Run from the Mac by hand once the worker's queue is done;
 # launchd (com.gtotrainer.worker-down) also runs it on 2026-11-30, before the $300 credits end (~2026-12-13) and the

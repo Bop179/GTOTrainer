@@ -9,7 +9,7 @@
 # results get re-solved in place; they keep being served until overwritten; restart the queue after touching it, since
 # a running queue never retakes a job it already claimed). No .since file: any result counts.
 # REVERSE=1 takes each scenario's flops last-first: gto-vm does that while the worker goes first-first, so both follow
-# the scenario priority without solving the same flop.
+# the scenario priority without solving the same flop. TEMPORARY: only matters while gto-worker exists (until 2026-11-30).
 cd ~ || exit 1
 BIN=~/solver/target/release/gto-solve
 ORDER=${ORDER:-jobs/order.txt}

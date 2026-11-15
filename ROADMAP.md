@@ -181,6 +181,11 @@ Postflop covers heads-up pots only; 9-max reuses the 8-max solves. The flop and 
   - over a single raise, only re-raises call a shove;
   - calling an all-in goes to the showdown against the range that shoved.
 - Re-raising a squeezer or cold 4-bettor gets a reply, from that seat's 3-bet-facing-a-4-bet spot.
+- Undo (↶ button or U): takes back your last decision in the hand, preflop or postflop, with its grade, stats and leak-log entry; repeat to go further back.
+
+**Temporary, remove when done** (each marked TEMPORARY in the code):
+- After the keep-every-hand re-solve finishes: postflop.js `P.inRange` and its "solved before every hand was kept" message, and the "turns after a raised flop aren't solved yet" ending.
+- After gto-worker is terminated (by 2026-11-30): solver/worker_down.sh, the REVERSE option in run_queue.sh, the worker parts of dashboard.py, and ~/worker_sync.sh on gto-vm.
 
 ## Out of scope for now
 

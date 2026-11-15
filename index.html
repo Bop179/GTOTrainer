@@ -17,6 +17,7 @@ header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding
 header h1 { font-size: 17px; margin: 0 12px 0 0; }
 select, button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 button { cursor: pointer; }
+header button:disabled { opacity: .4; cursor: default; }
 .menu { position: relative; }
 .menu summary { cursor: pointer; list-style: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: var(--panel); }
 .menu summary::-webkit-details-marker { display: none; }
@@ -155,6 +156,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
     </div>
   </details>
   <button id="mute" title="Toggle sound (M)">🔊</button>
+  <button id="undo" title="Take back your last decision in this hand (U)" disabled>↶ Undo</button>
   <button id="leakBtn">Leaks</button>
   <button id="browseBtn">Ranges</button>
   <div class="stats"><span>Hands <b id="sHands">0</b></span><span>Accuracy <b id="sAcc">–</b></span><span>Streak <b id="sStreak">0</b></span></div>
@@ -512,7 +514,6 @@ const saveProg = () => { try { localStorage.setItem("gto-progress", JSON.stringi
 // Leitner boxes counted in hands, not days: a missed spot returns after 3 hands, then 10; right twice in a row and it's learned
 // (it drops out of training reviews but stays in the Leaks drills, which read the hand log).
 const GAP = [3, 10];
-for (const id in prog.srs) if (prog.srs[id].box >= GAP.length) delete prog.srs[id]; // already learned under the old 4-box schedule
 function dueReview(fits) {
   return Object.entries(prog.srs).filter(([id, r]) => r.due <= prog.n && SPOTS[id.split("|")[0]] && fits(parse(id.split("|")[0])))
     .sort((a, b) => a[1].due - b[1].due)[0]?.[0];
@@ -552,6 +553,7 @@ function renderLeaks() {
 }
 
 function newHand() {
+  undos = []; $("undo").disabled = true;
   const g = cfg.game + "/" + cfg.stack, nodes = cfg.nodes.flatMap(n => n.split("|")), pos = cfg.pos;
   const fits = s => s.game + "/" + s.stack === g && (!nodes.length || nodes.includes(s.node)) && (!pos.length || pos.includes(s.hero));
   // drilling a leak overrides the filters: only that spot, only that hand type ("drill all" picks one of its leaks each hand)
@@ -836,6 +838,28 @@ function drawTable(spot, z, heroCards, deal, from = 0) {
 const toss = (seat, sel) => seat.querySelectorAll(sel).forEach((x, j) => x.style.animationDelay = j * .07 + "s");
 const fly = b => { b.classList.remove("fly"); void b.offsetWidth; b.classList.add("fly"); }; // restart the slide-in
 
+// ---------- undo (U): take back your last decision in this hand, its grade and leak-log entry too; again for the one before ----------
+let undos = [];
+function snap(hand) {
+  undos.push({ hand, st: [st.hands, st.right, st.streak], prog: JSON.stringify(prog), drill: st.drill && [st.drill.n, st.drill.right] });
+  $("undo").disabled = false;
+}
+function undo() {
+  if (!undos.length || st.cur?.busy) return; // not while the table is moving or the flop is loading
+  const u = undos.pop(), h = u.hand;
+  [st.hands, st.right, st.streak] = u.st;
+  $("sHands").textContent = st.hands; $("sAcc").textContent = st.hands ? Math.round(st.right / st.hands * 100) + "%" : "–"; $("sStreak").textContent = st.streak;
+  prog = JSON.parse(u.prog); saveProg();
+  if (u.drill && st.drill) { [st.drill.n, st.drill.right] = u.drill; drawDrill(); }
+  $("undo").disabled = !undos.length;
+  replayTimers.forEach(clearTimeout);
+  $("feedback").classList.remove("show");
+  if (h.post) return postRestore(h.post);
+  for (const k in h.c) delete h.c[k];
+  st.cur = Object.assign(h.c, h.data);
+  showStep(false);
+}
+
 // score a decision (preflop or postflop): header stats and the grade sound
 function tally(grade) {
   st.hands++; if (grade !== "bad") st.right++;
@@ -847,6 +871,7 @@ function answer(a) {
   if (st.cur?.postflop) return postAnswer(+a);
   const c = st.cur;
   if (!c || c.answered || c.busy || !c.avail.includes(a)) return;
+  snap({ c, data: { ...c, steps: [...c.steps] } });
   c.answered = true; c.shown = c.E.length + 1; // the next decision replays from after your action
   document.querySelector(".seat.hero").classList.remove("turn");
   // off: an earlier move of yours was one the solver never makes with this hand, so it has no strategy for it here.
@@ -1035,6 +1060,7 @@ function drawBrowse() {
 // ---------- wiring ----------
 $("actions").addEventListener("click", e => { const b = e.target.closest("button"); if (b) b.dataset.next !== undefined ? next() : answer(b.dataset.a); });
 $("next").onclick = next;
+$("undo").onclick = undo;
 const stopDrill = () => { st.drill = null; drawDrill(); };
 $("chips").onclick = e => {
   const b = e.target.closest("button");
@@ -1083,6 +1109,7 @@ document.addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   if ((k === " " || k === "enter") && st.cur?.answered) { e.preventDefault(); next(); return; }
   if (k === "m") return $("mute").click();
+  if (k === "u") return undo();
   const a = /^[1-9]$/.test(k) && document.querySelectorAll("#actions button")[k - 1]?.dataset.a; // 1, 2, 3… left to right, preflop and postflop
   if (a) answer(a);
 });

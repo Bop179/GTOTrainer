@@ -2,7 +2,8 @@
 """Queue dashboard for the solver VM. Binds 127.0.0.1 only; view from the Mac with
    ssh -N -L 8080:localhost:8080 gto-vm   then open http://localhost:8080
 Reads ~/jobs, ~/results and ~/results/queue.log (written by run_queue.sh) plus /proc, and ~/.worker_status while the
-trial-credit worker exists (gto-vm's cron writes it every minute; older than 3 minutes = worker gone, shown as absent)."""
+trial-credit worker exists (gto-vm's cron writes it every minute; older than 3 minutes = worker gone, shown as absent).
+TEMPORARY: the worker parts (WSTAT, worker_status and its uses) can go once gto-worker is terminated (by 2026-11-30)."""
 import calendar, collections, html, os, re, subprocess, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path

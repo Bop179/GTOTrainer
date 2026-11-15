@@ -126,7 +126,7 @@ const say0 = s => s[0].toUpperCase() + s.slice(1);
 async function postBegin(c) {
   replayTimers.forEach(clearTimeout);
   const scen = c.post, m = PI[scen], me = m.oop === c.spot.hero ? 0 : 1;
-  c.post = null; // a second Space while the flop loads doesn't deal twice
+  c.post = null; c.busy = true; // a second Space while the flop loads doesn't deal twice, and undo waits for it
   $("feedback").classList.remove("show");
   $("actions").innerHTML = ""; $("situation").textContent = "Dealing the flop…";
   // random suit relabel (solver suit -> table suit), then a solved flop that misses your cards in solver suits
@@ -138,7 +138,7 @@ async function postBegin(c) {
     flop = shuffle([...m.flops]).find(f => !cardsOf(f).concat(f.slice(4)).some(x => mine.includes(x)));
   }
   let nodes;
-  try { nodes = await loadPiece(`${scen}/${flop}/flop`); } catch (e) { $("situation").textContent = e.message; return; }
+  try { nodes = await loadPiece(`${scen}/${flop}/flop`); } catch (e) { c.busy = false; $("situation").textContent = e.message; return; }
   const [p0, key0] = ways(scen)[1], z0 = sizing(parse(key0)), who = (p, v1, v3) => p === c.spot.hero ? "you " + v1 : `${p} ${v3}`;
   const VERB = { Limp: ["limp", "limps"], Call: ["call", "calls"], Check: ["check", "checks"], Fold: ["fold", "folds"], Open: ["open", "opens"] };
   const told = ([p, to, tag]) => { // a preflop bet from sizing()'s line, as a story entry
@@ -152,6 +152,9 @@ async function postBegin(c) {
     story: [{ s: "Preflop" }, ...[...z0.line, [p0, 0, key0.endsWith("FACINGLIMP") ? "Check" : "Call"]].map(told)] };
   P.hands = [];
   P.hands[me] = hero;
+  // TEMPORARY until the keep-every-hand re-solve (results/.since, 2026-11-15) finishes; then delete this and the "off && P.inRange" message in postAnswer.
+  // Your hand is in the flop range but may be missing later: flops solved before then dropped hands under 0.1% reach.
+  P.inRange = hr.hands.includes(hero);
   P.hands[1 - me] = vr.hands[pick(vr.hands.map((h, i) => cardsOf(h).some(x => mine.includes(x)) ? 0 : vr.reach[i]))];
   P.story.push({ s: "Flop" }); // the cards are on the board; the story only says who did what
   st.cur = P;
@@ -200,7 +203,8 @@ async function closeStreet() {
     const absent = [...SUIT].filter(x => ![1, 3, 5].some(i => P.flop[i] === x)), swap = absent.indexOf(c[1]) > 0 ? [absent[0], c[1]] : null;
     const turn = await loadPiece(`${P.scen}/${P.flop}/${swap ? c[0] + absent[0] : c}`, swap);
     P.nodes = { ...P.nodes, ...turn }; P.k = nk + "-" + c;
-    // ponytail: the pre-solve keeps turns only after an unraised flop; a live turn solve would cover the rest
+    // TEMPORARY until the 2026-11-15 re-solve finishes: solves since 2026-11-13 keep the turn after a raised flop too;
+    // after that this only fires if a piece is missing
     if (!P.nodes[P.k]) return end("The flop was raised, and turns after a raised flop aren't solved yet, so the hand ends here.");
   } else {
     $("situation").textContent = "Solving the river…";
@@ -254,6 +258,10 @@ function winner() {
   const id = x => UP.indexOf(x[0]) * 4 + SUIT.indexOf(x[1]), sc = p => strength([...cardsOf(P.hands[p]), ...P.board].map(id)), d = sc(P.me) - sc(1 - P.me);
   return d > 0 ? `You win the ${bb(potNow())} pot.` : d < 0 ? `${P.seat[1 - P.me]} wins the ${bb(potNow())} pot.` : "Split pot.";
 }
+// undo (index.html): the hand as it was before your decision. Arrays are copied; the nodes are shared, since a piece
+// is never changed (a new street replaces P.nodes).
+const copyP = x => ({ ...x, spent: [...x.spent], put: [...x.put], tag: [...x.tag], hist: [...x.hist], story: [...x.story], board: [...x.board], hands: [...x.hands] });
+function postRestore(s) { P = st.cur = copyP(s); P.isNew = 9; P.drawnKey = null; postDraw(false); }
 function end(text, show) { P.over = true; P.show = show; P.story.push({ t: text, end: true }); }
 
 // redraws the table; whatever changed since the last draw animates as in preflop: bets slide in, a fold tosses its cards
@@ -339,9 +347,10 @@ function postExplain(node, h) {
 // ponytail: thresholds are a judgment call
 async function postAnswer(i) {
   if (P.over || P.answered || P.busy || !cur().actions[i]) return;
+  snap({ post: copyP(P) });
   P.answered = P.busy = true;
-  // h < 0: an earlier move of yours was one the solver never makes with this hand, so the solve has no strategy or EV for
-  // it here (hands under 0.1% reach are trimmed). Play on ungraded; the buttons show the range's average mix instead.
+  // h < 0: the solve has no strategy or EV for your hand here: it isn't in the preflop range, or (flops solved before
+  // 2026-11-15 only) its reach fell under 0.1% and it was trimmed. Play on ungraded; the buttons show the range's average mix instead.
   const node = cur(), h = node.hands.indexOf(P.hands[P.me]), off = h < 0, f = off ? 0 : node.strat[i][h], ev = node.ev.map(e => e[h]);
   const best = ev.indexOf(Math.max(...ev)), loss = ev[best] - ev[i], pot = potNow();
   const grade = off ? "" : f >= 25 || f >= 5 && loss <= .02 * pot ? "great" : f >= 5 || f >= 1 && loss <= .05 * pot || loss <= .01 * pot ? "ok" : "bad";
@@ -360,7 +369,8 @@ async function postAnswer(i) {
     <div class="pills">${rm.map((v, j) => v >= .5 ? pill(j, v) : "").join("")}</div>`;
   $("grid").innerHTML = gridHTML(classRows(node), "POST", HANDS.indexOf(classOf(P.hands[P.me])));
   const why = [`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}, pot ${bb(pot)}, ${P.me ? "in" : "out of"} position.`, ...postExplain(node, h),
-    off ? "Not graded: earlier in the hand you made a move the solver never makes with this hand, so it has no strategy for it here. The % on each button is what its whole range does in this spot."
+    off && P.inRange ? "Not graded: this flop was solved before every hand was kept, and the solver gets here with your hand so rarely (under 0.1%) that it was left out of this spot. It will be graded once this flop is re-solved. The % on each button is what its whole range does in this spot." // TEMPORARY, see P.inRange
+    : off ? "Not graded: your preflop play with this hand isn't in the solver's range, so it has no strategy for it here. The % on each button is what its whole range does in this spot."
     : i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`,
     "~Hand groups and board reads come from simple local rules; the percentages and EVs are the solver's."];
   try { await step(i, true); } catch (e) { end(e.message); }
