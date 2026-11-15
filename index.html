@@ -637,19 +637,26 @@ function allinCalled(c, p, key, pre = "", wt = null, head = `${pre}${p} calls yo
   return { text: head, sd: { p, theirs, board, end: `${res} Your equity against ${vs}: about ${Math.round(won / 30)}%.` } };
 }
 // show the caller's cards, then the flop, turn and river a beat apart, then the result
-function runout(sd) {
+function runout(sd, S) {
   const felt = $("felt"), card = x => { const [sym, red] = SUITS[SU.indexOf(x[1])]; return `<div class="card new${red ? " red" : ""}">${x[0] === "T" ? "10" : x[0]}<span>${sym}</span></div>`; };
   const later = (ms, f) => replayTimers.push(setTimeout(f, ms));
+  // the table turns into the heads-up postflop one: the caller up top with cards face up, you below, chips in the pot off to the side
   later(500, () => {
-    const backs = felt.querySelector(`.seat[data-p="${sd.p}"] .backs`);
-    if (backs) backs.outerHTML = `<div class="cards">${sd.theirs.map(card).join("")}</div>`;
-    // chips into the pot, as postflop; the pot takes your bet's spot below the board (off to the side it covered a seat's bet)
-    felt.querySelectorAll(".bet").forEach(b => b.hidden = true);
-    Object.assign($("pot").style, { left: "50%", top: "calc(50% + .36 * var(--ry))" });
-    felt.insertAdjacentHTML("beforeend", '<div class="board"></div>'); play("deal");
+    // both all-in for the whole stack (every player starts with S); the pot is that plus what the folded players left in
+    const them = felt.querySelector(`.seat[data-p="${sd.p}"]`), me = felt.querySelector(".seat.hero"), mine = $("heroTag").textContent;
+    const dead = [...felt.querySelectorAll(".bet")].filter(b => b.dataset.p !== sd.p && b.id !== "heroBet" && !b.hidden).reduce((t, b) => t + (parseFloat(b.textContent) || 0), 0);
+    const seat = (el, s, cards, tag) => `<div class="seat${s > 0 ? " hero" : ""}" style="--c:0;--s:${s};--r:1">${cards}`
+      + el.querySelector(".plate").outerHTML.replace(/<span>.*<\/span>/, `<span>${bb(0)}</span>`) + tag + "</div>";
+    felt.classList.add("still");
+    felt.innerHTML = seat(them, -1, `<div class="cards">${sd.theirs.map(card).join("")}</div>`,
+        mine === "All-in" ? `<em class="tag" style="background:${tagBg("Call")}">Call</em>` : them.querySelector(".tag").outerHTML)
+      + seat(me, 1, me.querySelector(".cards").outerHTML, me.querySelector(".tag").outerHTML)
+      + `<div class="board"></div><div class="pot" id="pot" style="left:74%;top:64%">Pot <b>${bb(dead + 2 * S)}</b></div>`;
+    play("deal");
   });
   [[0, 3], [3, 4], [4, 5]].forEach(([i, j], k) => later(1500 + k * 1000, () => { felt.querySelector(".board").insertAdjacentHTML("beforeend", sd.board.slice(i, j).map(card).join("")); play("deal"); }));
-  if (!atEnd()) later(4300, () => $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${sd.end}</b></p>`)); // after the hand: it's in the review
+  // the river's out: the result replaces "… Cards up!" (after the hand: only the result goes in the review)
+  if (!atEnd()) later(4300, () => { $("note")?.remove(); $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${sd.end}</b></p>`); });
 }
 const NEXT = { RFI: "FACINGRFI", FACINGRFI: "FACING3B", FACING3B: "FACING4B", FACING4B: "FACING5B", FACING5B: "FACING6B",
   FACINGLIMP: "LIMP_FACING2B", LIMP_FACING2B: "LIMP_FACING3B", LIMP_FACING3B: "LIMP_FACING4B", LIMP_FACING4B: "LIMP_FACING5B", LIMP_FACING5B: "LIMP_FACING6B" };
@@ -967,13 +974,14 @@ function answer(a) {
   let want = more && (c.spot.node === "RFI" && isLimp(nx) || nx === "FACINGSQZ_CALLER") ? "Call" : "Raise";
   let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
-  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd); }
+  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); }
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
     : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
-  if (note) $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${note}</b></p>`);
+  if (note) $("why").insertAdjacentHTML("afterbegin", `<p id="note"><b>▸ ${note}</b></p>`);
   $("next").innerHTML = more ? "Continue hand ▸<kbd>Space</kbd>" : "Next hand <kbd>Space</kbd>";
   drawGrid(c);
   if (atEnd()) {
+    if (after?.sd) $("note")?.remove();
     keep(`Pre · ${label(a, c.spot.node)}`, grade, $("actions").innerHTML, after?.sd ? `<p><b>▸ ${after.sd.end}</b></p>` : "");
     $("actions").innerHTML = plain; document.querySelectorAll("#actions button").forEach(b => b.disabled = true);
     // a beat for your action to land (the whole runout after a called all-in), then on with the hand, or its review
