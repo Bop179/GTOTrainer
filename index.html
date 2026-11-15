@@ -652,7 +652,11 @@ function leakSection(log, o) {
   // cost: the bb each mistake (ok or bad) lost; entries without it (no EV for the spot, or logged before 2026-11-15) count 1 if bad, 1/4 if ok
   const lost = e => Number.isFinite(e[5]) ? e[5] : { bad: 1, ok: .25 }[e[2]] || 0, bb = x => Math.round(x * 10) / 10;
   const miss = log.filter(e => e[2] !== "great"), cost = miss.reduce((s, e) => s + lost(e), 0);
-  const costs = Object.entries(miss.reduce((m, e) => { const t = o.type(e[3], e[4]); m[t] = m[t] || [0, 0]; m[t][0] += lost(e); m[t][1]++; return m; }, {})).sort((x, y) => y[1][0] - x[1][0]);
+  // per mistake type: bb lost, how many, and the spots it can happen in (decisions where the solver's play is the one you missed),
+  // so the rate reads "how often you make this mistake when it's on offer"
+  const costs = Object.entries(miss.reduce((m, e) => { const t = o.type(e[3], e[4]); m[t] ||= [0, 0, new Set()]; m[t][0] += lost(e); m[t][1]++; m[t][2].add(e[4]); return m; }, {}))
+    .map(([t, [c, k, favs]]) => [t, c, k, log.filter(e => favs.has(e[4])).length, [...favs].map(actWord).join(" or ")]).sort((x, y) => y[1] - x[1]);
+  const per100 = x => bb(x / log.length * 100);
   const sum = !bad.length ? "No mistakes yet." : `Your most common mistake is <b>${types[0][0].toLowerCase()}</b> (${pctOf(types[0][1], bad.length)}% of your mistakes)`
     + (top.length ? `, and your worst spot is <b>${top[0][0]}</b>: wrong ${top[0][1]} of ${seen[top[0][0]]} times.` : ".");
   const buckets = Object.entries(countBy(log, o.by[1])).map(([k, t]) => [k, t, log.filter(e => o.by[1](e) === k && e[2] !== "bad").length]).sort((x, y) => x[2] / x[1] - y[2] / y[1]);
@@ -664,8 +668,9 @@ function leakSection(log, o) {
     <h3>Your style <small>· how often you do it, against the solver with the same hands${sN < log.length ? ` (${sN} ${o.unit} with the solver's mix saved)` : ""}</small></h3>
     ${meter("fold", fold.you, fold.sol, sN, "Looser", "Tighter", "How often you fold, against how often the solver folds the same hands in the same spots.")}
     ${meter("bet or raise", agg.you, agg.sol, agg.n, "More passive", "More aggressive", "When you play on: how often you bet or raise rather than check or call, against the solver with the same hands.")}
-    ${costs.length ? `<h3>Cost of your mistakes <small>· ${bb(cost)}bb lost, ${bb(cost / log.length * 100)}bb per 100 ${o.unit}</small></h3>${costs.map(([t, [c, k]]) =>
-      barRow(`${t} <small>· ${k} time${k > 1 ? "s" : ""}</small>`, c / costs[0][1][0], `${bb(c)}bb`, "var(--bad)", `${k} mistakes, ${pctOf(c, cost)}% of the bb you lost`)).join("")}` : ""}
+    ${costs.length ? `<h3>Cost of your mistakes <small>· ${per100(cost)}bb per 100 ${o.unit} (${bb(cost)}bb in all) · how often you make each when the spot comes up</small></h3>${costs.map(([t, c, k, n, fav]) =>
+      barRow(`${t} <small>· ${pctOf(k, n)}% of the time</small>`, c / costs[0][1], `${per100(c)}bb/100`, "var(--bad)",
+        `${k} of ${n} ${o.unit} where the solver's play was ${fav}; ${bb(c)}bb lost, ${pctOf(c, cost)}% of the total`)).join("")}` : ""}
     <h3>${o.by[0]} <small>· worst first</small></h3>${buckets.map(([k, t, r]) => barRow(k, r / t, `${pctOf(r, t)}% · ${t}`, "var(--great)", `${r} of ${t} right`)).join("")}
     ${o.grid ? o.grid(log, bad) : ""}
     <h3>Biggest leaks ${o.drill && top.length > 1 ? `<button class="drill" data-b="all">Drill all</button>` : ""}</h3>
