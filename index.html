@@ -184,6 +184,11 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 @media (min-width: 601px) { .felt { max-width: max(360px, calc((100vh - 390px) * 2)); margin-inline: auto; } } /* floor: a landscape phone's short viewport would size it to nothing */
 /* touch: no double-tap zoom on fast taps, no keyboard hints, no iOS zoom-on-focus (needs 16px inputs) */
 button, summary { touch-action: manipulation; }
+/* once you've answered, the table deals the next hand: pointer on desktop, a "Tap for next hand" hint on touch */
+main:has(.feedback.show) .felt { cursor: pointer; }
+@media (hover: none) { main:has(.feedback.show) .felt::after { content: "Tap for next hand"; position: absolute; right: 0; bottom: 0; z-index: 2; /* the felt's corner, outside the oval: never a seat, bet or board there */ pointer-events: none;
+  padding: 3px 12px; border-radius: 999px; font-size: 13px; white-space: nowrap; color: var(--text); background: #0009; animation: hint .4s .3s both; } }
+@keyframes hint { from { opacity: 0; } }
 @media (hover: none) { kbd { display: none; } .chips input { font-size: 16px; } }
 /* wide screens: range chart | table | analysis side by side, so feedback never needs a scroll */
 @media (min-width: 1200px) {
