@@ -630,7 +630,7 @@ const barRow = (label, frac, val, c, title = "") => `<div class="lrow" title="${
 // a balance meter: your mistakes leaning each way, the dot toward the side you lean
 function meter(lName, l, rName, r, tip) {
   const t = l + r, x = t ? 50 + (r - l) / t * 50 : 50;
-  const verdict = t < 3 ? "Too few mistakes to tell" : Math.abs(r - l) / t < .2 ? "Balanced" : r > l ? rName : lName;
+  const verdict = t < 3 ? "Too few mistakes this way" : Math.abs(r - l) / t < .2 ? "Balanced" : r > l ? rName : lName;
   return `<div class="meter" title="${tip}"><div class="mlab"><span>${lName} · <b>${l}</b></span><strong>${verdict}</strong><span><b>${r}</b> · ${rName}</span></div><i><b style="left:${x}%"></b></i></div>`;
 }
 // log rows are [spot, hand, grade, picked, solver's favourite]; o: { name, unit, group, type, by: [title, bucket fn], grid, drill }
