@@ -162,7 +162,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .feedback.show { display: grid; }
 .verdict { font-size: 20px; font-weight: 700; }
 /* verdict, Continue and Undo on one line */
-.vrow { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; } .vrow .verdict { margin-right: auto; font-size: 18px; white-space: nowrap; }
+.vrow { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; scroll-margin-bottom: 12px; } .vrow .verdict { margin-right: auto; font-size: 18px; white-space: nowrap; }
 .vrow .next { margin: 0; padding: 5px 9px; font-size: 14px; white-space: nowrap; }
 .verdict.great { color: var(--great); } .verdict.ok { color: var(--ok); } .verdict.bad { color: var(--bad); }
 .mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 8px 0; }
@@ -1073,6 +1073,11 @@ function showRev(j) {
   $("why").innerHTML = r.why; $("grid").innerHTML = r.grid; $("range").innerHTML = r.range; $("actions").innerHTML = r.btns;
 }
 // the hand is over: count the grades now, then open the last decision
+// show the analysis; where it sits below the table (phone), bring the verdict row into view ("nearest": no scroll if it's already on screen)
+function showFeedback() {
+  $("feedback").classList.add("show");
+  requestAnimationFrame(() => document.querySelector(".vrow").scrollIntoView({ behavior: "smooth", block: "nearest" }));
+}
 function review(end = "") {
   if (!rev.length) return false;
   if (end) rev.at(-1).why = `<p><b>▸ ${end}</b></p>` + rev.at(-1).why;
@@ -1080,7 +1085,7 @@ function review(end = "") {
   play(rev.some(r => r.grade === "bad") ? "bad" : rev.some(r => r.grade) ? "great" : "chip");
   showRev(rev.length - 1);
   $("next").innerHTML = "Next hand <kbd>Space</kbd>";
-  $("feedback").classList.add("show");
+  showFeedback();
   st.cur.answered = true;
   return true;
 }
@@ -1146,7 +1151,7 @@ function answer(a) {
     c.answered = false; c.busy = true;
     return replayTimers.push(setTimeout(() => { c.busy = false; c.answered = true; more ? next() : review(); }, more ? 700 : after?.sd ? 4400 : 300));
   }
-  $("feedback").classList.add("show");
+  showFeedback();
 }
 
 const sbb = v => (v > 0 ? "+" : "") + v.toFixed(2) + "bb";
