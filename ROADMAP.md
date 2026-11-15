@@ -2,7 +2,7 @@
 
 **Focus: 100bb and 200bb cash at 6-max, 8-max and 9-max.** Everything else is out of scope for now (see the end of this file).
 
-## Where things stand (2026-11-05)
+## Where things stand (preflop 2026-11-05; postflop, item 9, 2026-11-15)
 
 | | 100bb | 200bb |
 |---|---|---|
@@ -94,78 +94,95 @@ Grading now goes by how often the solver plays your action. Grading by EV loss w
 - [ ] Trainer: add the EV to each spot's rows and grade by EV lost against the best action (thresholds to pick).
   - Live for every node read so far (2026-11-14): `build_ev.py` packs `.claude/gw*_ev.json` into `ev.js` (re-run after each pull), and 9-max shares 8-max's EV. Grade: under 0.05bb lost correct, under 0.5bb acceptable, else mistake; spots without EV still grade by frequency. Each button shows its EV. Known noise: in BB vs the SB's 5-bet to 53 in a limped pot (rarely reached), the solver mixes calls its own EV puts 1-2.8bb behind folding, so those calls grade as mistakes. The feedback lists every action available with its EV in bb, signed (+ is a gain, - a loss, fold is 0), marks the best one, and shows your pick's EV and its gap to the best ("Call +1.2bb, 0.4bb less than 3-bet +1.6bb").
 
-### 9. Postflop: heads-up single-raised pots at 6-max 100bb (started 2026-11-13)
+### 9. Postflop: every heads-up pot at 6-max and 8-max, 100bb and 200bb (started 2026-11-13)
 
-Postflop was out of scope until 2026-11-13. It's now in, for heads-up pots only. The flop and turn are solved ahead of time on a free Oracle Cloud VM; the river is solved live in the browser.
+Postflop covers heads-up pots only; 9-max reuses the 8-max solves. The flop and turn are pre-solved on Oracle Cloud; the river is solved live in the browser.
 
-- **Spots:** all 15 heads-up single-raised pots at 6-max 100bb (every opener and caller pair). Ranges and open sizes come from `data6.js` (GTO Wizard). Each spot assumes the players behind fold.
-  - They're ranked by how often they happen: open frequency × flat frequency from the same data. The queue solves the most common first.
-  - The six at 5% or more of heads-up single-raised pots get 95 flops: BTN vs BB 28%, CO vs BB 14%, SB vs BB 12%, HJ vs BB 9%, UTG vs BB 7%, BTN vs SB 6%.
-  - The nine rarer ones get 40 flops (decided 2026-11-13). CO vs BTN, at 4.9%, is the most common of them.
-- **Flops:** 95 (common matchups) or 40 (rare ones) of the 1,755 distinct flops, sampled so each texture shows up about as often as it's dealt (5 of 95 monotone, 16 paired). The trainer deals only these.
-- **Bet sizes:**
-  - Flop: 33% and 75% of the pot.
-  - Turn: 75% and a 125% overbet.
-  - River: 75% (the pre-solve's tree); the live river solve can use any sizes.
-  - Raises: 2.5x the bet. Re-raises go on until someone is all-in.
-  - All-in: offered once the stack is 1.5x the pot or less.
-- **Accuracy:** each solve stops at 1% of the pot exploitability (about 0.05bb a hand in a single-raised pot) or 1,000 iterations.
-- **Code:** `solver/`, Rust on b-inary's `postflop-solver` (AGPL-3.0).
-  - `make_jobs.py` builds the 930 jobs and the queue order (`jobs/order.txt`).
-  - `run_queue.sh` solves them on the VM.
-  - `src/lib.rs` holds the solve and node dump, shared by the VM binary and the browser build.
-- **Rules:**
-  - Big solves run on the VM only, never on the 8 GB Mac. The largest tree is 19.4 GB; trees over 16 GB are compressed automatically.
-  - River solves in the browser are small (one test took about 0.1 s and under 150 MB), so they're fine anywhere.
+**Spots** (`solver/make_jobs.py`, header lists names and range sources):
+- Every heads-up pot type at 6-max (`data6.js`, `data200.js`) and 8-max (`data8.js`), at 100bb then 200bb: 570 scenarios.
+- Pot types:
+  - single-raised;
+  - 3-bet and 4-bet pots;
+  - SB-vs-BB limped and limp-raised pots;
+  - squeeze and cold 4-bet pots that end heads-up (the opener folds).
+- Pots are ranked by how often they happen.
+- Flops (of the 1,755 distinct ones, sampled so each texture shows up about as often as it's dealt):
 
-- [x] Solver wrapper, job builder and queue runner, with a memory guard and a restart after a reboot.
-- [x] Oracle VM running (4 OCPU / 24 GB, Always Free). Quotas and a $0.01 budget alert keep the account at $0.
-- [ ] Pre-solve the flop and turn for every heads-up pot at 6-max and 8-max 100bb (2026-11-13): 285 scenarios, 12,225 solves, about 32 days of the VM (rough: only the 6-max single-raised and 3-bet times are measured). Started 2026-11-13. The queue finishes 6-max BTN vs BB first, then 6-max's other common single-raised pots, then limped and limp-raised, then every other 6-max pot by frequency (3,920 solves in all), then 8-max last in the same order (`jobs/order.txt`; reordered 2026-11-13).
-  - Each solve saves every flop decision, and every turn decision after a flop line with no raise (check-check or bet-call). Hands below 0.1% reach are dropped. Frequencies are whole percentages and EVs are rounded to 0.01bb.
-  - Turn data is about 8 MB a flop compressed (measured on an unconverged test), so about 6 GB in all. It stays on the VM, which has 41 GB free.
-- [x] River solver in the browser (2026-11-13). `river.js` and `river_wasm.js`: the same solver compiled to WebAssembly (1.4 MB, base64 so it loads from `file://`). Rebuild it with `solver/build_wasm.sh`.
-  - A worst-case river (full preflop ranges, two bet sizes) solves in under 0.1 s to 0.8% of the pot.
-  - Its result matched the native solver exactly.
-- [ ] Shrink the turn data before shipping it to the trainer. Turn cards with the same suit pattern give the same strategy with suits swapped (checked), so store one of each and map suits in the trainer.
-- [ ] Serve the solutions to other users from a static file server on the VM (decided 2026-11-13).
-  - [x] Caddy on the VM (2026-11-13) serves `~/post` at `https://147-224-143-161.sslip.io/`: no directory listing, 443 only (AdGuard owns :80 on 10.8.0.1, so the cert uses the TLS-ALPN challenge). Cron re-splits `~/results` into `~/post` every 10 minutes under `flock /tmp/split.lock`.
-  - [x] Trainer: `index.html` loads the index and every piece from the VM (`POST_BASE`). No solves are stored locally (2026-11-13: local `post/` mode and `pull_post.sh` removed).
-  - [ ] Open TCP 443: ingress rule in the OCI security list, and `iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT` + `netfilter-persistent save` on the VM.
-  - Egress is free up to 10 TB a month. The security list needs port 443 opened.
-  - Not Object Storage: its API requests are only free up to 50,000 a month, and quotas can't cap them.
-  - Size: every heads-up pot at 6-max and 8-max 100bb is now queued (12,225 solves); see the items below. About 90 GB on the VM, which fits the free 200 GB of block storage once a volume is added (47 GB is the boot disk).
-  - 9-max postflop reuses the 8-max solves, as preflop already does once UTG folds (decided 2026-11-13).
-- [x] Postflop in the live hand (2026-11-13), `postflop.js`. When preflop ends heads-up in a solved matchup, the hand goes on to the flop instead of stopping.
-  - The flop is one of that matchup's solved flops that misses your cards, with its suits randomly relabelled. The villain's hand is drawn from their range at the flop, and they play by sampling their solved strategy.
-  - Each flop, turn and river decision is graded by frequency and EV lost: frequency first, since EV gaps of a few % of the pot are solver noise: right if the solver plays it 25% or more, or 5% or more within 2% of the pot; acceptable if it plays it 5% or more, 1% or more within 5% of the pot, or under 1% within 1% of the pot; otherwise a mistake. The feedback also reads the spot: your made hand and draws and the board texture (local rules in `handclass.js`), the price when facing a bet, where your hand ranks in your range by the solver's EV, and the solver's mix for hands in the same group. The feedback lists every action's EV, the hand's mix, the whole range's mix and a 13x13 chart of the node.
-  - River: both ranges come from the turn reach times the frequency of each player's last turn action, solved live with 33%, 75% and 125% bets (about 0.1 s).
-  - **Play to postflop** setting: deals only preflop spots that lead into a solved matchup (an open from the opener's seat, or the caller facing it) with a hand that opens or calls there; the others are scripted to fold and the caller to call.
-  - Data: VM cron runs `solver/split.py` (one flop piece and one piece per turn card, gzipped and base64 inside a `<script>` so it loads into a `file://` page) and writes `index.js` listing every split flop; the trainer fetches pieces from the VM as hands need them.
-  - Not yet: a showdown winner (it only shows the villain's cards); hands after a raised flop end at the turn (no turn data); postflop hands aren't in the leak log or reviews.
+  | Pots | Flops |
+  |---|---|
+  | The six common 6-max 100bb single-raised pots (BTN, CO, SB, HJ, UTG v BB; BTN v SB) | 183 |
+  | Other pots at 5% or more of a game's single-raised pots, and every 3-bet, 4-bet, squeeze and cold 4-bet pot | 95 |
+  | Rarer single-raised pots | 40 |
 
-- [x] Every heads-up pot type queued (2026-11-13). `make_jobs.py` builds them all, at 6-max (`data6.js`) and 8-max (`data8.js`) 100bb; 9-max reuses 8-max. Each is ranked by frequency (within its game, against that game's single-raised total) and gets 95 or 40 flops by the 5% rule. 15 scenarios get 95 flops, 270 get 40. The script's header lists the names and range sources.
-  - Single-raised: 15 pairs at 6-max, 28 at 8-max.
-  - 3-bet pots, `..._<OPENER>_v_<3BETTOR>_3bet`: the 3-bettor's raise from `FACINGRFI`, and the opener's call from `FACING3B` (reach there is the opener's open frequency). Sizes from `SIZES`. Stack-to-pot 3.3 to 5.3, at most 1.9 GB, about 2 minutes a solve.
-    - [x] The trainer sends 3-bet pots to the flop (2026-11-13, untested until the first one is pulled): you call a heads-up 3-bet of your open, or you 3-bet and the opener calls; "Play to postflop" deals those lines too.
-  - 4-bet pots, `..._<OPENER>_v_<3BETTOR>_4bet`: the opener's 4-bet from `FACING3B` and the 3-bettor's call from `FACING4B`. Sizes from `SIZES` (CO 4-bets to 23 against BTN's 8.5, so the pot is 47.5). A 4-bet that's all-in has no postflop and is skipped.
-  - **SB vs BB limped pots**, `..._SB_v_BB_limp` and `..._SB_v_BB_limpraise`.
-    - At 100bb the SB limps 49% of hands, so the limped pot is the most common heads-up pot in both games: 44% of the single-raised total at 6-max, 35% at 8-max.
-    - The full sizes needed 62 GB, so limped pots use smaller ones (`LIMP_SIZES`): flop 33% and 75%, turn and river 75%, 3x raises. That's 26 GB, 13 GB compressed.
-    - The limp-raise pot (BB raises to 3.5, SB calls) keeps the normal sizes (18 GB, compressed automatically).
-  - **Multiway preflop that ends heads-up:**
-    - Squeeze pots, `..._<CALLER>_v_<SQUEEZER>_sqz_<OPENER>`: open, flat, squeeze, the opener folds, the caller calls. Ranges from `FACINGRFI_CALL` (the squeeze) and `FACINGSQZ_CALLER` (the call); the opener's fold from `FACINGSQZ` sets the frequency.
-    - Cold 4-bet pots, `..._<3BETTOR>_v_<C4BETTOR>_c4b_<OPENER>`: open, 3-bet, cold 4-bet, the opener folds, the 3-bettor calls. Ranges from `FACING3B_COLD` and `FACINGC4B_3B`.
-    - The opener's money is dead in the pot.
-    - Sizes come from the closing caller's `SIZES` (GTO Wizard's, e.g. UTG 2.5, CO squeezes to 11), as `sizing()` in `index.html` reads them, so the postflop pot matches the preflop replay. Fixed 2026-11-13: the first queue used `sizing()`'s fallback (a squeeze to 7.5) for all 150 of these; none had been solved, and the VM's jobs were replaced. `solver/test_postways.js` now checks every scenario's pot against the trainer's line.
-    - Only the "opener folds" line is in the data. When the opener calls, the other player's reply isn't, and the pot could go 3-way, so those lines are skipped.
-- [x] Trainer: every queued pot type goes to the flop (2026-11-13), at 6-max and 8-max: `ways()` in `postflop.js` lists each player's last preflop spot into each kind, and both live play and "Play to postflop" use it. `split.py`'s `TRAINER_KINDS` now passes all of them to `~/post`. Untested in the browser until each kind's first flop is pulled.
-  - Check: `node solver/test_postways.js` (each scenario's spots exist, are found from the preflop line, and put in the solved pot).
-- [ ] Disk: about 90 GB of results and trainer pieces at the end against 40 GB free on the VM, full in about 2 weeks. Add a block volume (about 150 GB is left in the free 200 GB) and move `~/results` and `~/post` onto it.
-  - `postflop.js` matches hands to solved scenarios by name, so new pot types need scenario names it can find from the preflop line (agree with the trainer side first).
+  The trainer deals only solved flops.
+- Each spot assumes the players behind fold. When the opener calls a squeeze or cold 4-bet the pot could go 3-way, so that line isn't solved.
+
+**Solves:**
+- Sizes:
+  - flop 33% and 75%;
+  - turn 75% and 125%;
+  - river 75% in the pre-solve (the live river uses 33/75/125%);
+  - 2.5x raises;
+  - all-in once the stack is 1.5x the pot.
+  - Limped pots use flop 33/75%, turn and river 75%, 3x raises, so they fit in memory.
+- Each solve stops at 1% of the pot exploitability or 1,000 iterations.
+- Every flop decision and every turn decision is kept, raised flops included (since 2026-11-14).
+- Every hand at every node is kept (`"min_reach": 0`, since 2026-11-15). The solver works out a strategy and EV for a hand even where its line never brings it, so a hand that left the line is still graded.
+- Largest trees: 100bb 19.8 GB, 200bb 22.5 GB (limped pot). Trees over 16 GB are compressed automatically, so all fit in 12 GB.
+
+**Machines and cost:**
+- gto-vm: Always Free A1, 4 OCPU / 24 GB, 150 GB data volume. It serves the pieces.
+- gto-worker: 60 OCPU / 360 GB on the $300 trial credits, from 2026-11-13. It runs 15 solves at once and syncs results to gto-vm every minute.
+- The free A1 allowance is 3,000 OCPU-h and 18,000 GB-h per calendar month, pooled across instances, and gto-vm alone uses nearly all of it. So the worker must be gone before December:
+  - it powers itself off on 2026-11-30 at 17:00 UTC;
+  - the Mac's launchd runs `solver/worker_down.sh` the same day, which terminates it and restores the free-only quota.
+- Expected spend: about $100 of credits.
+- Disk guards:
+  - under 10 GB free on /data, the worker is powered off (`~/worker_sync.sh`);
+  - under 8 GB, `run_queue.sh` stops.
+
+**Storage** (`solver/split.py`, 2026-11-15):
+- Each flop is cut into a flop piece and one piece per turn card. Pieces are gzipped binary: strategy 1 byte, EV 4 bytes, hands as card indices.
+- Turns in suits the flop doesn't have are stored once and suit-swapped on load (verified identical).
+- Raw results are truncated to empty markers, with their mtime kept, once split.
+- A single-raised flop takes about 12 MB with every hand kept, down from 36 MB (raw copy plus base64 pieces).
+- Expected total: about 123 GB of the 147 GB volume.
+
+- [x] Solver wrapper, job builder, queue runner (parallel claims, `REVERSE=1` on gto-vm so both machines follow the order from opposite ends), restart after a reboot.
+- [x] River solver in the browser (2026-11-13): `river.js` and `river_wasm.js`, the same solver in WebAssembly. Under 0.1 s and 150 MB for a worst-case river; matches the native solver. Rebuild with `solver/build_wasm.sh`.
+- [x] Caddy on gto-vm serves `~/post` at `https://147-224-143-161.sslip.io/` (443 only, no directory listing, `Access-Control-Allow-Origin *` so `file://` can fetch). Cron re-splits every 10 minutes.
+- [x] Compact storage and suit-swapped turns (2026-11-15).
+- [x] Postflop in the live hand (`postflop.js`): when preflop ends heads-up in a solved pot, the hand goes on to the flop.
+  - The villain's hand is drawn from their flop range, and they play by sampling their strategy. The river is solved live from both players' turn ranges.
+  - Grading: frequency first, EV second.
+    - Correct: played 25%+, or 5%+ within 2% of the pot.
+    - Acceptable: 5%+; or 1%+ within 5% of the pot; or under 1% within 1% of the pot.
+    - Otherwise a mistake.
+  - Feedback:
+    - your hand and draws, and the board texture;
+    - the price to call, and your equity against villain's current range (exact, every runout);
+    - outs;
+    - where your hand ranks in your range;
+    - the mix for hands like yours;
+    - every action's EV, the whole range's mix, and a 13x13 chart.
+  - **Play to postflop** deals only spots that lead into a solved pot. **Start deciding on** Flop / Turn / River plays your earlier streets by the solver's strategy, skipping its fold when it has another line.
+  - A hand off the solver's line plays on ungraded (whole-range mix on the buttons) instead of ending. Once the re-solve is done, only a hand that was never in the flop range stays ungraded until the river.
+  - Showdowns name the winner. Every ending other than your fold says why (multiway, unsolved pot, game or stack without postflop).
+  - Check: `node solver/test_postways.js` (every scenario's spots exist, are found from the preflop line, and put in the solved pot).
+- [ ] Pre-solve everything (100bb re-solve with every hand from 2026-11-15 01:15Z, then 200bb): 51,158 solves, about 87 h on the worker, done around 2026-11-19. Progress: dashboard `solver/dashboard.py` (`ssh -N -L 8080:localhost:8080 gto-vm`).
+- [ ] Open TCP 443 to other users: ingress rule in the OCI security list, and `iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT` + `netfilter-persistent save` on the VM. Egress is free up to 10 TB a month.
+- [ ] Postflop hands in the leak log and reviews.
+- [ ] Maybe: grade a hand that was never in the flop range (a preflop misplay) as the closest hand that is, marked approximate.
+
+**Preflop, done alongside (2026-11-14/15):**
+- A hand the solver never brings to a spot plays it ungraded instead of ending.
+- A called all-in runs out to a showdown, with your equity against the calling range:
+  - over a single raise, only re-raises call a shove;
+  - calling an all-in goes to the showdown against the range that shoved.
+- Re-raising a squeezer or cold 4-bettor gets a reply, from that seat's 3-bet-facing-a-4-bet spot.
 
 ## Out of scope for now
 
 Might do these later, might never do these:
 
-- (Moved in 2026-11-15: 6-max and 8-max 200bb postflop are queued after all of 100bb; make_jobs.py writes both stacks.)
 - Postflop multiway pots (3 or more players on the flop; decided 2026-11-13). postflop-solver is heads-up only, and 3-way trees would not fit on the VM.
