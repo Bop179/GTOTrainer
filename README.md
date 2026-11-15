@@ -4,7 +4,11 @@ A preflop trainer for No-Limit Hold'em cash games. You get dealt a hand at a spo
 
 ## Run it
 
-Open `index.html` in a browser. You don't need to install anything, run a server or be online. Settings and progress are saved in your browser.
+Open it online, always the latest version:
+- https://bop179.github.io/GTOTrainer/ (GitHub Pages, updates a minute or two after a push)
+- https://147-224-143-161.sslip.io/app/ (the solver VM, which pulls the repo every 5 minutes)
+
+Or open `index.html` from a download. Preflop works offline; postflop always needs the VM. Settings and progress are saved per browser and per site, so each link (and a downloaded copy) keeps its own.
 
 ## Using it
 
