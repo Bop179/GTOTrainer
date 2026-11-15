@@ -17,7 +17,13 @@ header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding
 header h1 { font-size: 17px; margin: 0 12px 0 0; }
 select, button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 button { cursor: pointer; }
-header button:disabled { opacity: .4; cursor: default; }
+header button:disabled, .next:disabled { opacity: .4; cursor: default; }
+/* "Feedback after the hand": your decisions in order, coloured by grade; click one for its analysis */
+.revlist { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.revlist:empty { display: none; }
+.revlist button { padding: 4px 10px; font-size: 13px; border-radius: 999px; border: 2px solid transparent; background: var(--line); color: var(--text); }
+.revlist .great { background: var(--great); color: #111; } .revlist .ok { background: var(--ok); color: #111; } .revlist .bad { background: var(--bad); color: #111; }
+.revlist button.on { border-color: var(--text); }
 .menu { position: relative; }
 .menu summary { cursor: pointer; list-style: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: var(--panel); }
 .menu summary::-webkit-details-marker { display: none; }
@@ -156,7 +162,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
     </div>
   </details>
   <button id="mute" title="Toggle sound (M)">🔊</button>
-  <button id="undo" title="Take back your last decision in this hand (U)" disabled>↶ Undo</button>
+  <button id="undo" class="undo" title="Take back your last decision in this hand (U)" disabled>↶ Undo</button>
   <button id="leakBtn">Leaks</button>
   <button id="browseBtn">Ranges</button>
   <div class="stats"><span>Hands <b id="sHands">0</b></span><span>Accuracy <b id="sAcc">–</b></span><span>Streak <b id="sStreak">0</b></span></div>
@@ -170,8 +176,10 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
   </section>
   <section class="feedback" id="feedback">
     <div class="analysis">
+      <div class="revlist" id="revlist"></div>
       <div class="verdict" id="verdict"></div>
       <button class="next" id="next">Next hand <kbd>Space</kbd></button>
+      <button class="next undo" title="Take back this decision (U)" disabled>↶ Undo <kbd>U</kbd></button>
       <div class="why" id="why"></div>
     </div>
     <div class="chart">
@@ -496,6 +504,7 @@ function drawSettings() {
     + group("pos", "Your position <small>· pick several</small>", [["", "Any"], ...ORDER[cfg.game].map(p => [p, p])], v => many("pos", v))
     + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Postflop <small>· deal only hands that reach a solved heads-up pot (overrides Spots)</small>", [["on", "Play to postflop"]], () => cfg.toPost)
       + (cfg.toPost ? group("postFrom", "<small>Start deciding on · your earlier streets play themselves, the solver's way</small>", [["", "Flop"], ["turn", "Turn"], ["river", "River"]], v => (cfg.postFrom || "") === v) : "") : "")
+    + group("later", "Feedback <small>· after the hand: no grades until it's played out, then each decision's analysis</small>", [["", "After each decision"], ["hand", "After the hand"]], v => (cfg.later || "") === v)
     + group("pack", "Sound pack", Object.entries(PACKS).map(([k, p]) => [k, p.name]), v => v === pack);
   $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}${toPost() ? " · to postflop" + (cfg.postFrom ? ", from the " + cfg.postFrom : "") : ""}`;
 }
@@ -553,7 +562,7 @@ function renderLeaks() {
 }
 
 function newHand() {
-  undos = []; $("undo").disabled = true;
+  undos = []; undoOn(false); rev = []; $("revlist").innerHTML = "";
   const g = cfg.game + "/" + cfg.stack, nodes = cfg.nodes.flatMap(n => n.split("|")), pos = cfg.pos;
   const fits = s => s.game + "/" + s.stack === g && (!nodes.length || nodes.includes(s.node)) && (!pos.length || pos.includes(s.hero));
   // drilling a leak overrides the filters: only that spot, only that hand type ("drill all" picks one of its leaks each hand)
@@ -624,7 +633,7 @@ function runout(sd) {
     felt.insertAdjacentHTML("beforeend", '<div class="board"></div>'); play("deal");
   });
   [[0, 3], [3, 4], [4, 5]].forEach(([i, j], k) => later(1500 + k * 1000, () => { felt.querySelector(".board").insertAdjacentHTML("beforeend", sd.board.slice(i, j).map(card).join("")); play("deal"); }));
-  later(4300, () => $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${sd.end}</b></p>`));
+  if (!atEnd()) later(4300, () => $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${sd.end}</b></p>`)); // after the hand: it's in the review
 }
 const NEXT = { RFI: "FACINGRFI", FACINGRFI: "FACING3B", FACING3B: "FACING4B", FACING4B: "FACING5B", FACING5B: "FACING6B",
   FACINGLIMP: "LIMP_FACING2B", LIMP_FACING2B: "LIMP_FACING3B", LIMP_FACING3B: "LIMP_FACING4B", LIMP_FACING4B: "LIMP_FACING5B", LIMP_FACING5B: "LIMP_FACING6B" };
@@ -840,9 +849,10 @@ const fly = b => { b.classList.remove("fly"); void b.offsetWidth; b.classList.ad
 
 // ---------- undo (U): take back your last decision in this hand, its grade and leak-log entry too; again for the one before ----------
 let undos = [];
+const undoOn = on => document.querySelectorAll(".undo").forEach(b => b.disabled = !on); // header, and beside Continue
 function snap(hand) {
-  undos.push({ hand, st: [st.hands, st.right, st.streak], prog: JSON.stringify(prog), drill: st.drill && [st.drill.n, st.drill.right] });
-  $("undo").disabled = false;
+  undos.push({ hand, rev: rev.length, st: [st.hands, st.right, st.streak], prog: JSON.stringify(prog), drill: st.drill && [st.drill.n, st.drill.right] });
+  undoOn(true);
 }
 function undo() {
   if (!undos.length || st.cur?.busy) return; // not while the table is moving or the flop is loading
@@ -851,7 +861,8 @@ function undo() {
   $("sHands").textContent = st.hands; $("sAcc").textContent = st.hands ? Math.round(st.right / st.hands * 100) + "%" : "–"; $("sStreak").textContent = st.streak;
   prog = JSON.parse(u.prog); saveProg();
   if (u.drill && st.drill) { [st.drill.n, st.drill.right] = u.drill; drawDrill(); }
-  $("undo").disabled = !undos.length;
+  undoOn(undos.length);
+  rev.length = u.rev; $("revlist").innerHTML = "";
   replayTimers.forEach(clearTimeout);
   $("feedback").classList.remove("show");
   if (h.post) return postRestore(h.post);
@@ -861,11 +872,36 @@ function undo() {
 }
 
 // score a decision (preflop or postflop): header stats and the grade sound
-function tally(grade) {
+function tally(grade, quiet) {
   st.hands++; if (grade !== "bad") st.right++;
   st.streak = grade === "bad" ? 0 : st.streak + 1;
   $("sHands").textContent = st.hands; $("sAcc").textContent = Math.round(st.right / st.hands * 100) + "%"; $("sStreak").textContent = st.streak;
-  play(grade); if (grade !== "bad" && st.streak % 10 === 0) play("streak");
+  if (!quiet) { play(grade); if (grade !== "bad" && st.streak % 10 === 0) play("streak"); }
+}
+// ---------- "Feedback after the hand" (cfg.later): nothing is graded on screen (stats and sounds included) until the hand is over;
+// then a strip of your decisions, first to last and coloured by grade, opens each one's analysis and chart ----------
+let rev = []; // this hand's decisions: { name, grade, verdict class/text, why, grid, range, graded buttons }
+const atEnd = () => cfg.later === "hand" && !st.drill;
+function keep(name, grade, btns, pre = "") {
+  rev.push({ name, grade, vc: $("verdict").className, vt: $("verdict").textContent, why: pre + $("why").innerHTML, grid: $("grid").innerHTML, range: $("range").innerHTML, btns });
+}
+function showRev(j) {
+  const r = rev[j];
+  $("revlist").innerHTML = rev.map((x, k) => `<button data-r="${k}" class="${x.grade}${k === j ? " on" : ""}" title="${x.vt}">${x.name}</button>`).join("");
+  $("verdict").className = r.vc; $("verdict").textContent = r.vt;
+  $("why").innerHTML = r.why; $("grid").innerHTML = r.grid; $("range").innerHTML = r.range; $("actions").innerHTML = r.btns;
+}
+// the hand is over: count the grades now, then open the last decision
+function review(end = "") {
+  if (!rev.length) return false;
+  if (end) rev.at(-1).why = `<p><b>▸ ${end}</b></p>` + rev.at(-1).why;
+  rev.forEach(r => r.grade && tally(r.grade, true));
+  play(rev.some(r => r.grade === "bad") ? "bad" : rev.some(r => r.grade) ? "great" : "chip");
+  showRev(rev.length - 1);
+  $("next").innerHTML = "Next hand <kbd>Space</kbd>";
+  $("feedback").classList.add("show");
+  st.cur.answered = true;
+  return true;
 }
 function answer(a) {
   if (st.cur?.postflop) return postAnswer(+a);
@@ -883,7 +919,7 @@ function answer(a) {
   const grade = off ? "" : evs ? (loss < 0.05 ? "great" : loss < 0.5 ? "ok" : "bad")
     : f >= best - 5 || f >= 50 ? "great" : f >= 15 ? "ok" : "bad";
   if (grade) {
-    tally(grade);
+    if (!atEnd()) tally(grade);
     prog.n++;
     prog.log.push([c.spot.key, c.hand, grade, a, ACTS.reduce((x, y) => mix[y] > mix[x] ? y : x)]);
     if (prog.log.length > 3000) prog.log.shift();
@@ -893,6 +929,7 @@ function answer(a) {
   }
   play(a === "Fold" ? "deal" : "chip");
 
+  const plain = $("actions").innerHTML;
   stamp(a, x => mix[x], evs && (x => sbb(evs[x])));
   // show your action on the table: fold mucks your cards, anything else moves chips in
   const z = c.z, put = { Fold: z.heroIn, Call: z.heroIn + z.toCall, Raise: z.raise, Allin: z.S }[a];
@@ -920,6 +957,13 @@ function answer(a) {
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p><b>▸ ${note}</b></p>`);
   $("next").innerHTML = more ? "Continue hand ▸<kbd>Space</kbd>" : "Next hand <kbd>Space</kbd>";
   drawGrid(c);
+  if (atEnd()) {
+    keep(`Pre · ${label(a, c.spot.node)}`, grade, $("actions").innerHTML, after?.sd ? `<p><b>▸ ${after.sd.end}</b></p>` : "");
+    $("actions").innerHTML = plain; document.querySelectorAll("#actions button").forEach(b => b.disabled = true);
+    // a beat for your action to land (the whole runout after a called all-in), then on with the hand, or its review
+    c.answered = false; c.busy = true;
+    return replayTimers.push(setTimeout(() => { c.busy = false; c.answered = true; more ? next() : review(); }, more ? 700 : after?.sd ? 4400 : 300));
+  }
   $("feedback").classList.add("show");
 }
 
@@ -1060,7 +1104,8 @@ function drawBrowse() {
 // ---------- wiring ----------
 $("actions").addEventListener("click", e => { const b = e.target.closest("button"); if (b) b.dataset.next !== undefined ? next() : answer(b.dataset.a); });
 $("next").onclick = next;
-$("undo").onclick = undo;
+document.querySelectorAll(".undo").forEach(b => b.onclick = undo);
+$("revlist").onclick = e => { const r = e.target.closest("button")?.dataset.r; if (r) showRev(+r); };
 const stopDrill = () => { st.drill = null; drawDrill(); };
 $("chips").onclick = e => {
   const b = e.target.closest("button");

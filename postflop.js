@@ -354,7 +354,10 @@ async function postAnswer(i) {
   const node = cur(), h = node.hands.indexOf(P.hands[P.me]), off = h < 0, f = off ? 0 : node.strat[i][h], ev = node.ev.map(e => e[h]);
   const best = ev.indexOf(Math.max(...ev)), loss = ev[best] - ev[i], pot = potNow();
   const grade = off ? "" : f >= 25 || f >= 5 && loss <= .02 * pot ? "great" : f >= 5 || f >= 1 && loss <= .05 * pot || loss <= .01 * pot ? "ok" : "bad";
-  if (grade) tally(grade); play(kind(node.actions[i]) === "Fold" ? "deal" : "chip");
+  if (grade && !atEnd()) tally(grade);
+  play(kind(node.actions[i]) === "Fold" ? "deal" : "chip");
+  const short = `${STREET[P.board.length - 3]} · ${{ Bet: `Bet ${Math.round(amt(node.actions[i]) / potNow() * 100)}%`, Allin: "All-in" }[kind(node.actions[i])] || kind(node.actions[i])}`;
+  const plain = $("actions").innerHTML;
   const rsum = node.reach.reduce((x, y) => x + y, 0) || 1, mix = off ? strat(node, "").map(x => x / rsum) : node.strat.map(s => s[h]);
   stamp(String(i), j => mix[j], !off && (j => ev[j].toFixed(2) + "bb"));
   const btns = $("actions").innerHTML; // the graded buttons stay up until you continue, though the hand has moved on
@@ -375,9 +378,15 @@ async function postAnswer(i) {
     "~Hand groups and board reads come from simple local rules; the percentages and EVs are the solver's."];
   try { await step(i, true); } catch (e) { end(e.message); }
   P.busy = false;
+  $("why").innerHTML = why.map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
+  if (atEnd()) { // nothing shown yet: keep the analysis, put back the plain buttons and play on; the review comes when the hand ends
+    keep(short, grade, btns);
+    $("actions").innerHTML = plain; P.drawnKey = null; postDraw(false);
+    if (!P.over) await postNext();
+    return P.over && review(P.story.filter(x => x.end).map(x => x.t).join(" "));
+  }
   postDraw(false);
   $("actions").innerHTML = btns;
-  $("why").innerHTML = why.map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
   $("next").innerHTML = P.over ? "Next hand <kbd>Space</kbd>" : "Continue hand ▸<kbd>Space</kbd>";
   $("feedback").classList.add("show");
 }

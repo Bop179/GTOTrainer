@@ -181,7 +181,8 @@ Postflop covers heads-up pots only; 9-max reuses the 8-max solves. The flop and 
   - over a single raise, only re-raises call a shove;
   - calling an all-in goes to the showdown against the range that shoved.
 - Re-raising a squeezer or cold 4-bettor gets a reply, from that seat's 3-bet-facing-a-4-bet spot.
-- Undo (↶ button or U): takes back your last decision in the hand, preflop or postflop, with its grade, stats and leak-log entry; repeat to go further back.
+- Undo (↶ in the header, beside Continue, or U): takes back your last decision in the hand, preflop or postflop, with its grade, stats and leak-log entry; repeat to go further back.
+- Feedback "After the hand" (setting): no grades, stats or grade sounds until the hand is played out; then a strip of your decisions, first to last and coloured by grade, opens each one's analysis, graded buttons and chart.
 
 **Temporary, remove when done** (each marked TEMPORARY in the code):
 - After the keep-every-hand re-solve finishes: postflop.js `P.inRange` and its "solved before every hand was kept" message, and the "turns after a raised flop aren't solved yet" ending.
