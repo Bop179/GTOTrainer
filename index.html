@@ -656,12 +656,20 @@ function joiner(s, o, w, node) {
 }
 const REPLY = { FACINGRFI_CALL: ["FACINGSQZ", "FACINGSQZ_CALLER"], FACING3B_COLD: ["FACINGC4B", "FACINGC4B_3B"] }; // who answers a squeeze / cold 4-bet
 const joinText = ([p, b], node) => `${p} ${b === "Allin" ? "shoves all-in" : b === "Call" ? "calls too" : node === "FACINGRFI_CALL" ? "squeezes" : "cold 4-bets"}`;
+// a hand that reaches the flop where postflop can't go on, and why: postflop is solved heads-up, pot by pot, in some games
+function noFlop(s, players) {
+  const games = [...new Set(postGames())], name = g => GAMES[g.split("/")[0]] + " " + g.split("/")[1];
+  const why = players > 2 ? `${players} players see the flop, and postflop is only solved heads-up`
+    : !games.includes(s.game + "/" + s.stack) ? `postflop is only solved at ${games.map(name).join(" and ") || "no stack yet"}`
+    : "this pot isn't solved (only the common heads-up lines are)";
+  return `on to the flop, where the hand stops: ${why}.`;
+}
 // What the others do after your action: the next spot you face, or how the hand ends
 function simNext(c, a, pot) {
   const s = c.spot, limp = s.node === "RFI" && a === "Call", node = limp ? "FACINGLIMP" : NEXT[s.node];
   if (a === "Fold") return null;
   const pr = postReply(c, a); if (pr) return pr;
-  if (limp && !SPOTS[nodeKey(s, "BB", s.hero, node)]) return { text: "You limp. The solver data has no limped pot here, so the hand ends." };
+  if (limp && !SPOTS[nodeKey(s, "BB", s.hero, node)]) return { text: "You limp. The solver data has no limped pot here (only the SB's limp is in it), so the hand ends." };
   const shove = a === "Allin" || c.z.raise >= c.z.S, [o, w] = villains(s), K = (v, p, n) => [s.game, s.stack, v, p, n].join("/");
   const what = (b, n) => b === "Allin" ? "shoves all-in" : b === "Call" ? "calls" : RAISE_NAME[n].toLowerCase() + "s";
   const END = "No solver data past this point, so the hand ends.", NOREPLY = "The solver data doesn't cover the replies to your raise, so the hand ends here.";
@@ -679,10 +687,10 @@ function simNext(c, a, pot) {
       const b = sampleAct(ak);
       if (b === "Fold") return { text: `${w} folds. You take the ${bb(pot)} pot.` };
       if (shove) return allinCalled(c, w, ak);
-      return { text: b === "Call" ? `${w} calls: on to the flop, where this preflop trainer stops (this pot isn't solved).` : `${w} ${what(b, ak.split("/").pop())}. ${END}` };
+      return { text: b === "Call" ? `${w} calls: ${noFlop(s, 2)}` : `${w} ${what(b, ak.split("/").pop())}. ${END}` };
     }
     const sc = a === "Call" && postScen(s, a);
-    return sc ? { text: "You call: on to the flop!", post: sc } : { text: a === "Call" ? "You call: on to the flop, where this preflop trainer stops." : NOREPLY };
+    return sc ? { text: "You call: on to the flop!", post: sc } : { text: a === "Call" ? `You call: ${noFlop(s, 2)}` : NOREPLY };
   }
   // you squeezed or cold 4-bet: the opener answers first, then (if the opener folds) the caller or 3-bettor
   // ponytail: the players behind you are assumed to fold (the data covers only that line), and an all-in gets the same answers as the solver's raise
@@ -697,7 +705,7 @@ function simNext(c, a, pot) {
     if (shove) return allinCalled(c, w, k2, `${o} folds, `);
     const sc = b2 === "Call" && postScen(s, a, w);
     if (sc) return { text: `${o} folds, ${w} calls: on to the flop!`, post: sc };
-    return { text: b2 === "Call" ? `${o} folds, ${w} calls: on to the flop, where this preflop trainer stops.` : `${o} folds, ${w} ${what(b2, n2)}. ${END}` };
+    return { text: b2 === "Call" ? `${o} folds, ${w} calls: ${noFlop(s, 2)}` : `${o} folds, ${w} ${what(b2, n2)}. ${END}` };
   }
   // you call an all-in heads-up: no flop to play, straight to the showdown against the range that bet it (raise or all-in
   // at the villain's spot before yours: the line's raise is the all-in once it passes 55% of the stack, see sizing)
@@ -714,8 +722,8 @@ function simNext(c, a, pot) {
   // your call (or check) closes preflop heads-up in a solved pot: the hand goes on to the flop
   const sc = a === "Call" && !j && postScen(s, a);
   if (sc) return { text: `You ${s.node === "FACINGLIMP" ? "check" : "call"}${s.node === "FACINGRFI" ? " and the rest fold" : ""}: on to the flop!`, post: sc };
-  if (a === "Call" && !limp) return { text: `${j ? joinText(j) + ". " : ""}You ${s.node === "FACINGLIMP" ? "check" : "call"}: on to the flop, where this preflop trainer stops.` };
-  if (villains(s).length > 1) return { text: "The solver data doesn't cover the replies to your raise, so the hand ends here." };
+  if (a === "Call" && !limp) return { text: `${j ? joinText(j) + ". " : ""}You ${s.node === "FACINGLIMP" ? "check" : "call"}: ${noFlop(s, j ? 3 : 2)}` };
+  if (villains(s).length > 1) return { text: "Two players are still in behind your raise, and the solver data only has replies to a raise from one player, so the hand ends here." };
   // a villain with no spot to respond from would otherwise "fold"
   if (!node || s.villain && !SPOTS[nodeKey(s, s.villain, s.hero, node)]) return { text: "No solver data past this point, so the hand ends here." };
   let caller, callers = 0;
@@ -736,7 +744,7 @@ function simNext(c, a, pot) {
   // you bet (or limp) and one player calls (or checks), heads-up in a solved pot
   const sc2 = callers === 1 && !j && !shove && postScen(s, a, caller);
   if (sc2) return { text: `${caller} ${limp ? "checks" : "calls"}: on to the flop!`, post: sc2 };
-  return { text: caller ? `${caller} ${limp ? "checks" : "calls"}: on to the flop, where this preflop trainer stops.` : `Everyone folds. You take the ${bb(pot)} pot.` };
+  return { text: caller ? `${callers > 1 ? `${callers} players call` : `${caller} ${limp ? "checks" : "calls"}`}: ${noFlop(s, callers + 1)}` : `Everyone folds. You take the ${bb(pot)} pot.` };
 }
 
 // Earlier decisions that lead to a spot, oldest first: e.g. "HJ opens, you 3-bet from SB, HJ 4-bets"

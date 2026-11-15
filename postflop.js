@@ -180,9 +180,9 @@ async function closeStreet() {
       P.board.push(dealOne()); P.isNew = P.board.length - 1; postDraw(false);
     }
     await new Promise(r => setTimeout(r, 600));
-    return end(`All-in: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}.`, true);
+    return end(`All-in: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. ${winner()}`, true);
   }
-  if (P.street === 2) return end(`Showdown: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}.`, true);
+  if (P.street === 2) return end(`Showdown: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. ${winner()}`, true);
   const c = dealOne();
   P.board.push(c); P.street++; P.put = [0, 0]; P.tag = ["", ""]; P.isNew = P.board.length - 1;
   P.story.push({ s: STREET[P.street] });
@@ -238,6 +238,10 @@ function villainRange() {
   const h = P.hist.filter(x => x.p !== P.me).at(-1), n = h ? h.node : P.vr, w = {};
   n.hands.forEach((x, j) => w[x] = n.reach[j] * (h ? n.strat[h.i][j] : 1));
   return w;
+}
+function winner() {
+  const id = x => UP.indexOf(x[0]) * 4 + SUIT.indexOf(x[1]), sc = p => strength([...cardsOf(P.hands[p]), ...P.board].map(id)), d = sc(P.me) - sc(1 - P.me);
+  return d > 0 ? `You win the ${bb(potNow())} pot.` : d < 0 ? `${P.seat[1 - P.me]} wins the ${bb(potNow())} pot.` : "Split pot.";
 }
 function end(text, show) { P.over = true; P.show = show; P.story.push({ t: text, end: true }); }
 
