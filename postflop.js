@@ -389,7 +389,7 @@ async function postAnswer(i) {
   const grade = off ? "" : f >= 25 || f >= 5 && loss <= .02 * pot ? "great" : f >= 5 || f >= 1 && loss <= .05 * pot || loss <= .01 * pot ? "ok" : "bad";
   if (grade && !atEnd()) tally(grade);
   play(kind(node.actions[i]) === "Fold" ? "deal" : "chip");
-  const short = `${STREET[P.board.length - 3]} · ${{ Bet: `Bet ${potFrac(amt(node.actions[i]))}`, Allin: "All-in" }[kind(node.actions[i])] || kind(node.actions[i])}`;
+  const short = `${STREET[P.board.length - 3][0]} ${abbr({ Bet: `Bet ${potFrac(amt(node.actions[i])).replace(/ pot$/, "")}`, Allin: "All-in" }[kind(node.actions[i])] || kind(node.actions[i]))}`;
   const plain = $("actions").innerHTML;
   const rsum = node.reach.reduce((x, y) => x + y, 0) || 1, mix = off ? strat(node, "").map(x => x / rsum) : node.strat.map(s => s[h]);
   stamp(String(i), j => mix[j], !off && (j => ev[j].toFixed(2) + "bb"));

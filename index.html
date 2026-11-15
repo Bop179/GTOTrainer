@@ -21,9 +21,11 @@ button { cursor: pointer; }
 /* "Feedback after the hand": your decisions in order, coloured by grade; click one for its analysis */
 .revlist { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .revlist:empty { display: none; }
-.revlist button { padding: 4px 10px; font-size: 13px; border-radius: 999px; border: 2px solid transparent; background: var(--line); color: var(--text); }
-.revlist .great { background: var(--great); color: #111; } .revlist .ok { background: var(--ok); color: #111; } .revlist .bad { background: var(--bad); color: #111; }
-.revlist button.on { border-color: var(--text); }
+/* your graded decisions, styled like the action history: outlined in the grade's colour, light text */
+.revlist button { padding: 1px 9px; font-size: 13px; border-radius: 999px; white-space: nowrap; color: var(--text); --c: var(--muted);
+  border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 25%, transparent); }
+.revlist .great { --c: var(--great); } .revlist .ok { --c: var(--ok); } .revlist .bad { --c: var(--bad); }
+.revlist button.on { background: color-mix(in srgb, var(--c) 60%, transparent); box-shadow: 0 0 0 1px var(--c); }
 .menu { position: relative; }
 .menu summary { cursor: pointer; list-style: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: var(--panel); }
 .menu summary::-webkit-details-marker { display: none; }
@@ -913,6 +915,8 @@ function tally(grade, quiet) {
 // then a strip of your decisions, first to last and coloured by grade, opens each one's analysis and chart ----------
 let rev = []; // this hand's decisions: { name, grade, verdict class/text, why, grid, range, graded buttons }
 const atEnd = () => cfg.later === "hand" && !st.drill;
+// short action names for the decision chips: Check X, Call C, Bet B (3-bet 3B), Fold F, Raise R, All-in AI
+const abbr = t => t.replace(/(\d)-bet/g, "$1B").replace(/\b(Check|Call|Bet|Fold|Raise)\b/g, w => ({ Check: "X", Call: "C", Bet: "B", Fold: "F", Raise: "R" })[w]).replace("All-in", "AI");
 function keep(name, grade, btns, pre = "") {
   rev.push({ name, grade, vc: $("verdict").className, vt: $("verdict").textContent, why: pre + $("why").innerHTML, grid: $("grid").innerHTML, range: $("range").innerHTML, btns });
 }
@@ -990,7 +994,7 @@ function answer(a) {
   drawGrid(c);
   if (atEnd()) {
     if (after?.sd) $("note")?.remove();
-    keep(`Pre · ${label(a, c.spot.node)}`, grade, $("actions").innerHTML, after?.sd ? `<p><b>▸ ${after.sd.end}</b></p>` : "");
+    keep(`P ${abbr(label(a, c.spot.node))}`, grade, $("actions").innerHTML, after?.sd ? `<p><b>▸ ${after.sd.end}</b></p>` : "");
     $("actions").innerHTML = plain; document.querySelectorAll("#actions button").forEach(b => b.disabled = true);
     // a beat for your action to land (the whole runout after a called all-in), then on with the hand, or its review
     c.answered = false; c.busy = true;
