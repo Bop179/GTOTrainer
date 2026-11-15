@@ -98,8 +98,10 @@ const potNow = () => P.pot0 + P.spent[0] + P.spent[1];
 const STREET = ["Flop", "Turn", "River"];
 const kind = a => a.split(" ")[0]; // Check, Call, Fold, Bet, Raise, Allin
 const amt = a => +a.split(" ")[1] || 0;
-// bet size as a fraction of the pot (1/3 pot, 3/4 pot, 5/4 pot); a size off every fraction stays a percentage
-const potFrac = x => { const f = x / potNow(); for (const [n, d] of [[1, 4], [1, 3], [1, 2], [2, 3], [3, 4], [1, 1], [5, 4], [3, 2], [2, 1]]) if (Math.abs(f - n / d) < .03) return d === 1 ? (n === 1 ? "pot" : `${n}× pot`) : `${n}/${d} pot`; return `${Math.round(f * 100)}%`; };
+// size as a fraction of the pot: 1/3 pot, 3/4 pot, pot, 1.5× pot; a size off every fraction reads 70% pot (or 1.8× pot past the pot)
+const fracText = f => { for (const [n, d] of [[1, 4], [1, 3], [1, 2], [2, 3], [3, 4]]) if (Math.abs(f - n / d) < .03) return `${n}/${d} pot`;
+  return Math.abs(f - 1) < .03 ? "pot" : f > 1 ? `${+f.toFixed(2)}× pot` : `${Math.round(f * 100)}% pot`; };
+const potFrac = x => fracText(x / potNow());
 const AC = { Fold: "var(--fold)", Check: "var(--call)", Call: "var(--call)", Bet: "var(--raise)", Raise: "var(--raise)", Allin: "var(--allin)" };
 function actName(a) { // button text
   const k = kind(a), x = amt(a), p = cur().player, call = P.put[1 - p] - P.put[p];
