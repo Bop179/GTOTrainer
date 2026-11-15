@@ -36,11 +36,11 @@ function postDeal(g, pos) {
     const [gm, sk] = scen.split("_");
     if (gm !== game || sk !== stack) continue;
     for (const [hero, key, col] of ways(scen) || [])
-      if (SPOTS[key] && (!pos.length || pos.includes(hero))) opts.push({ scen, key, col });
+      if (SPOTS[key] && (!pos.length || pos.includes(hero)) && SPOTS[key].some((r, k) => r[4] * r[col] && handOk(HANDS[k]))) opts.push({ scen, key, col });
   }
   if (!opts.length) return null;
   const o = opts[Math.floor(Math.random() * opts.length)], rows = SPOTS[o.key];
-  return { spot: parse(o.key), i: pick(rows.map((r, k) => COMBOS(HANDS[k]) * r[4] * r[o.col])), scen: o.scen };
+  return { spot: parse(o.key), i: pick(rows.map((r, k) => COMBOS(HANDS[k]) * r[4] * r[o.col] * handOk(HANDS[k]))), scen: o.scen };
 }
 // with "Play to postflop" on: you made the move that leads to the flop, so the scripted closer calls and the rest fold
 function postReply(c, a) {
