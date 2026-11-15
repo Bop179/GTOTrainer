@@ -91,6 +91,7 @@ Grading now goes by how often the solver plays your action. Grading by EV loss w
 - [x] Find the cheapest way to read per-action EV for all 169 hands. Done 2026-11-13: the page's own store already holds every action's strategy and EV for all 169 hands, one view per node, whatever the grid display mode. It matched the Hands panel and the old grid reads (within 0.05pp).
 - [ ] Re-read every node with EV: 1,352 nodes (8-max 100bb 470, 8-max 200bb 488, 6-max 100bb 190, 6-max 200bb 204), about 15 days of the free quota. Daily pull started 2026-11-12. Reordered 2026-11-14: 6-max 100bb and 200bb next, then the rest of 8-max 100bb (196 of 470 read), then 8-max 200bb.
   - 8-max 100bb: 196 of 470 (2026-11-14).
+  - 6-max 100bb: 100 of 190 (2026-11-15).
 - [ ] Trainer: add the EV to each spot's rows and grade by EV lost against the best action (thresholds to pick).
   - Live for every node read so far (2026-11-14): `build_ev.py` packs `.claude/gw*_ev.json` into `ev.js` (re-run after each pull), and 9-max shares 8-max's EV. Grade: under 0.05bb lost correct, under 0.5bb acceptable, else mistake; spots without EV still grade by frequency. Each button shows its EV. Known noise: in BB vs the SB's 5-bet to 53 in a limped pot (rarely reached), the solver mixes calls its own EV puts 1-2.8bb behind folding, so those calls grade as mistakes. The feedback lists every action available with its EV in bb, signed (+ is a gain, - a loss, fold is 0), marks the best one, and shows your pick's EV and its gap to the best ("Call +1.2bb, 0.4bb less than 3-bet +1.6bb").
 
