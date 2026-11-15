@@ -627,13 +627,16 @@ const pctOf = (n, d) => Math.round(n / (d || 1) * 100);
 const countBy = (arr, f) => arr.reduce((m, e) => (m[f(e)] = (m[f(e)] || 0) + 1, m), {});
 // a bar row: label, thin bar (frac of the track), value; title is the hover detail
 const barRow = (label, frac, val, c, title = "") => `<div class="lrow" title="${title}"><span>${label}</span><i><b style="width:${Math.max(2, frac * 100)}%;background:${c}"></b></i><em>${val}</em></div>`;
-// a balance meter: your mistakes leaning each way, the dot toward the side you lean
-function meter(lName, l, rName, r, tip) {
-  const t = l + r, x = t ? 50 + (r - l) / t * 50 : 50;
-  const verdict = t < 3 ? "Too few mistakes this way" : Math.abs(r - l) / t < .2 ? "Balanced" : r > l ? rName : lName;
-  return `<div class="meter" title="${tip}"><div class="mlab"><span>${lName} · <b>${l}bb</b></span><strong>${verdict}</strong><span><b>${r}bb</b> · ${rName}</span></div><i><b style="left:${x}%"></b></i></div>`;
+// a style meter: how often you do something against how often the solver does in the same spots (percent);
+// the dot sits off centre by the gap, 20 points reaching the end
+function meter(what, you, sol, n, lName, rName, tip) {
+  const d = you - sol, x = 50 + Math.max(-1, Math.min(1, d / 20)) * 50;
+  const verdict = n < 20 ? "Too few hands to tell" : Math.abs(d) < 3 ? "Like the solver" : d > 0 ? rName : lName;
+  return `<div class="meter" title="${tip}"><div class="mlab"><span>${lName}</span><strong>${verdict}</strong><span>${rName}</span></div><i><b style="left:${x}%"></b></i>
+    <div class="mlab"><small>${n < 20 ? "" : `You ${what} <b>${Math.round(you)}%</b> · solver ${Math.round(sol)}%`}</small></div></div>`;
 }
-// log rows are [spot, hand, grade, picked, solver's favourite]; o: { name, unit, group, type, by: [title, bucket fn], grid, drill }
+// log rows are [spot, hand, grade, picked, solver's favourite, bb lost, (postflop) [solver fold %, bet/raise %]];
+// o: { name, unit, group, type, mix: row -> [solver fold %, bet/raise %] or null, by: [title, bucket fn], grid, drill }
 function leakSection(log, o) {
   if (!log.length) return "";
   const bad = log.filter(e => e[2] === "bad"), acc = pctOf(log.length - bad.length, log.length);
@@ -641,24 +644,28 @@ function leakSection(log, o) {
   const seen = countBy(log, o.group), missed = countBy(bad, o.group);
   const top = Object.entries(missed).filter(([k]) => seen[k] >= 3).sort((x, y) => y[1] - x[1] || y[1] / seen[y[0]] - x[1] / seen[x[0]]).slice(0, 8);
   if (o.drill) leakTop = top;
-  // meters weigh each mistake by the bb it lost; entries without it (no EV for the spot, or logged before 2026-11-15) count by grade
-  const lost = e => Number.isFinite(e[5]) ? e[5] : { bad: 1, ok: .25 }[e[2]] || 0;
-  const n = k => Math.round(log.reduce((s, e) => s + (k(e[3], e[4]) ? lost(e) : 0), 0) * 10) / 10;
-  const tight = n((p, f) => p === "Fold" && f !== "Fold"), loose = n((p, f) => f === "Fold" && p !== "Fold");
-  const passive = n((p, f) => p !== "Fold" && !AGG(p) && AGG(f)), aggro = n((p, f) => AGG(p) && f !== "Fold" && !AGG(f));
+  // style, by frequency: how often you fold, and bet or raise when you play on, against the solver's mix for the same hand in the same spot
+  const sty = log.map(e => [e, o.mix(e)]).filter(([, m]) => m), sN = sty.length;
+  const sum0 = f => sty.reduce((s, x) => s + f(...x), 0), on = sum0(e => e[3] !== "Fold"), solOn = sum0((e, m) => 100 - m[0]);
+  const fold = { you: 100 - on / (sN || 1) * 100, sol: 100 - solOn / (sN || 1) };
+  const agg = { you: sum0(e => AGG(e[3])) / (on || 1) * 100, sol: sum0((e, m) => m[1]) / (solOn || 1) * 100, n: on };
+  // cost: the bb each mistake (ok or bad) lost; entries without it (no EV for the spot, or logged before 2026-11-15) count 1 if bad, 1/4 if ok
+  const lost = e => Number.isFinite(e[5]) ? e[5] : { bad: 1, ok: .25 }[e[2]] || 0, bb = x => Math.round(x * 10) / 10;
+  const miss = log.filter(e => e[2] !== "great"), cost = miss.reduce((s, e) => s + lost(e), 0);
+  const costs = Object.entries(miss.reduce((m, e) => { const t = o.type(e[3], e[4]); m[t] = m[t] || [0, 0]; m[t][0] += lost(e); m[t][1]++; return m; }, {})).sort((x, y) => y[1][0] - x[1][0]);
   const sum = !bad.length ? "No mistakes yet." : `Your most common mistake is <b>${types[0][0].toLowerCase()}</b> (${pctOf(types[0][1], bad.length)}% of your mistakes)`
     + (top.length ? `, and your worst spot is <b>${top[0][0]}</b>: wrong ${top[0][1]} of ${seen[top[0][0]]} times.` : ".");
-  const tmax = types[0]?.[1] || 1;
   const buckets = Object.entries(countBy(log, o.by[1])).map(([k, t]) => [k, t, log.filter(e => o.by[1](e) === k && e[2] !== "bad").length]).sort((x, y) => x[2] / x[1] - y[2] / y[1]);
   // what you did against what the solver does, most often, in a leak
   const fix = k => { const m = Object.entries(countBy(bad.filter(e => o.group(e) === k), e => e[3] === e[4] ? "Right action, wrong size" : `You ${actWord(e[3])} → solver ${actWord(e[4])}`)).sort((x, y) => y[1] - x[1])[0]; return m ? m[0] : ""; };
   return `<section><h2>${o.name}</h2>
     <div class="lhead"><div class="big">${acc}%</div><div>right, over ${log.length} ${o.unit}${o.extra || ""}</div></div>
     <p class="lsum">${sum}</p>
-    <h3>Your tendencies <small>· which way your mistakes lean</small></h3>
-    ${meter("Too tight", tight, "Too loose", loose, "Too tight: you folded where the solver plays on. Too loose: you played on where the solver folds. Each mistake counts the big blinds it lost.")}
-    ${meter("Too passive", passive, "Too aggressive", aggro, "Too passive: you checked or called where the solver bets or raises. Too aggressive: you bet or raised where the solver checks or calls. Each mistake counts the big blinds it lost.")}
-    ${types.length ? `<h3>Mistake types</h3>${types.map(([t, c]) => barRow(t, c / tmax, `${c} (${pctOf(c, bad.length)}%)`, "var(--bad)")).join("")}` : ""}
+    <h3>Your style <small>· how often you do it, against the solver with the same hands${sN < log.length ? ` (${sN} ${o.unit} with the solver's mix saved)` : ""}</small></h3>
+    ${meter("fold", fold.you, fold.sol, sN, "Looser", "Tighter", "How often you fold, against how often the solver folds the same hands in the same spots.")}
+    ${meter("bet or raise", agg.you, agg.sol, agg.n, "More passive", "More aggressive", "When you play on: how often you bet or raise rather than check or call, against the solver with the same hands.")}
+    ${costs.length ? `<h3>Cost of your mistakes <small>· ${bb(cost)}bb lost, ${bb(cost / log.length * 100)}bb per 100 ${o.unit}</small></h3>${costs.map(([t, [c, k]]) =>
+      barRow(t, c / costs[0][1][0], `${bb(c)}bb · ${k}×`, "var(--bad)", `${k} mistakes, ${pctOf(c, cost)}% of the bb you lost`)).join("")}` : ""}
     <h3>${o.by[0]} <small>· worst first</small></h3>${buckets.map(([k, t, r]) => barRow(k, r / t, `${pctOf(r, t)}% · ${t}`, "var(--great)", `${r} of ${t} right`)).join("")}
     ${o.grid ? o.grid(log, bad) : ""}
     <h3>Biggest leaks ${o.drill && top.length > 1 ? `<button class="drill" data-b="all">Drill all</button>` : ""}</h3>
@@ -682,10 +689,11 @@ function renderLeaks() {
   const due = Object.values(prog.srs).filter(r => r.due <= prog.n).length;
   $("leakStats").textContent = "";
   const pre = leakSection(prog.log, { name: "Preflop", unit: "hands", type: leakType, drill: true, grid: handGrid,
+    mix: e => { const r = SPOTS[e[0]]?.[HANDS.indexOf(e[1])], m = r?.[4] && mixOf(r); return m && [m.Fold, m.Raise + m.Allin]; },
     extra: ` · ${Object.keys(prog.srs).length} to review (${due} due)`,
     group: e => spotName(parse(e[0])) + " · " + handType(e[1]), by: ["Accuracy by position", e => parse(e[0]).hero] });
   // postflop: grouped loosely (street, position, what you face; made hand or draw), no drills
-  const post = leakSection(prog.plog || [], { name: "Postflop", unit: "decisions", type: postLeakType,
+  const post = leakSection(prog.plog || [], { name: "Postflop", unit: "decisions", type: postLeakType, mix: e => Array.isArray(e[6]) && e[6].every(Number.isFinite) ? e[6] : null,
     group: e => e[0] + " · " + e[1], by: ["Accuracy by street", e => e[0].split(" · ")[0]] });
   $("leakBody").innerHTML = pre + post || "<p>Play some hands first.</p>";
 }

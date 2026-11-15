@@ -393,7 +393,8 @@ async function postAnswer(i) {
     const hc = handClass(cardsOf(P.hands[me]), P.board), made = hc.made.replace(/^an? /, "");
     const fav = node.strat.reduce((b, s, j) => s[h] > node.strat[b][h] ? j : b, 0);
     prog.plog ||= []; prog.plog.push([`${STREET[P.board.length - 3]} · ${me ? "IP" : "OOP"} ${face}`, hc.draw && /no pair|ace high/.test(made) ? hc.draw.replace(/\ban? /g, "") : made,
-      grade, kind(node.actions[i]), kind(node.actions[fav]), Math.round(loss * 100) / 100]); // [5]: bb lost
+      grade, kind(node.actions[i]), kind(node.actions[fav]), Math.round(loss * 100) / 100, // [5]: bb lost
+      ["Fold", "Bet|Raise|Allin"].map(k => Math.round(node.actions.reduce((t, x, j) => t + (k.split("|").includes(kind(x)) ? node.strat[j][h] : 0), 0)))]); // [6]: solver fold %, bet/raise %
     if (prog.plog.length > 3000) prog.plog.shift();
     saveProg();
   }
