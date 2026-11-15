@@ -29,6 +29,10 @@ next() {
 loop() {
   local j out tmp=/tmp/gto-out.$1.json err=/tmp/gto-err.$1.txt
   while j=$(next); do
+    # disk guard: under 8 GB free where results and pieces land, stop rather than fill the disk
+    if [ "$(df --output=avail -BG results/ | tail -1 | tr -dc 0-9)" -lt 8 ]; then
+      echo "$(date -u +%FT%TZ) disk guard: under 8 GB free, stopping" >> results/queue.log; break
+    fi
     out=results/${j#jobs/}.gz
     mkdir -p "$(dirname "$out")"
     if "$BIN" "$j" $tmp 2>$err && gzip -c $tmp > "$out.tmp"; then

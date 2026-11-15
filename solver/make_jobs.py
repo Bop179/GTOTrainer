@@ -192,9 +192,9 @@ if __name__ == "__main__":
         common_srp = lambda x: x[2].count("_") == 4 and x[0] >= cut[x[1]]
         for f, g, name, *_ in sorted(sc, key=lambda x: (x[2] not in FIRST, x[1] != "6max", not common_srp(x), -x[0] / cut[x[1]])):
             kind = (name.split("_")[5:6] or [""])[0]
-            # 200bb: no extra single-raised flops, and 8-max's re-raised pots stay at 40 flops, to fit the disk
+            # 200bb: no extra single-raised flops, to fit the disk (re-raised pots get 95 everywhere, 2026-11-15)
             more_srp = stack == 100 and g == "6max" and kind == ""
-            more_cheap = kind in CHEAP and (stack == 100 or g == "6max")
+            more_cheap = kind in CHEAP
             fl = (sets[N_FLOPS] + ([x for x in sets[N_FLOPS_SRP6] if x not in sets[N_FLOPS]] if more_srp else [])
                   if f >= cut[g] else sets[N_FLOPS_RARE] + (sets[N_FLOPS_MORE] if more_cheap else []))
             assert len(set(fl)) == len(fl)
