@@ -27,7 +27,7 @@ Or open `index.html` from a download. Preflop works offline; postflop always nee
 
 | | ✓ Correct | ≈ Mixed / Close | ✗ Mistake |
 |---|---|---|---|
-| **Preflop, spots with the solver's EV** | Loses under 0.05bb against the best action, or the solver plays it 15% of the time or more | Loses under 0.1bb (or under 0.5% of the pot, where that's more), or the solver plays it 5% or more | Anything else |
+| **Preflop, spots with the solver's EV** | The solver plays it 15% of the time or more, or 5% or more and it loses under 0.05bb against the best action | The solver plays it 5% or more; or it loses under 0.1bb (or under 0.5% of the pot, where that's more) | Anything else |
 | **Preflop, other spots** | Within 5 points of the solver's most-played action, or played 50% or more | Played 5% or more | Anything else |
 | **Postflop** | Played 25% or more, or 5% or more and within 2% of the pot of the best action | Played 5% or more; or 1% or more and within 5% of the pot; or within 1% of the pot | Anything else |
 

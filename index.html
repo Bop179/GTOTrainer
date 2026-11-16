@@ -1176,15 +1176,16 @@ function answer(a) {
   // Play on ungraded, with the whole range's mix on the buttons.
   const off = !c.rows[c.i][4], mix = off ? rangeMix(c.rows) : mixOf(c.rows[c.i]), f = mix[a], best = Math.max(...Object.values(mix));
   // Grade by bb lost against the best action where the spot has GTO Wizard's EV (ev.js), by frequency elsewhere.
-  // EV: Correct under 0.05bb lost, or any action the solver plays 15%+ (its own mix is never wrong; rare deep pots carry EV noise).
+  // EV, frequency first like postflop: Correct when the solver plays it 15%+ (its own mix is never wrong; rare deep pots carry
+  // EV noise), or 5%+ and under 0.05bb lost. An action it plays under 5% is never Correct, however little it costs: at best Close.
   // Mistake from 0.1bb lost, or 0.5% of the pot once you've called where that's more (noise grows with the pot), unless the solver
-  // plays it 5%+. In between: Close. Checked against the 296 EV spots (2026-11-15): at the old 0.5bb, opening any hand at all was
+  // plays it 5%+. In between: Close (Mixed when the solver plays it 5%+). Checked against the 296 EV spots (2026-11-15): at the old 0.5bb, opening any hand at all was
   // never a Mistake (8% of the plays the solver never makes there were); at 0.1bb 72% are, and none of the solver's own plays.
   // Frequency: Correct within 5 points of the most-played action or at 50%+, Mixed from 5% (the EV rule's floor), else Mistake.
   const row = !off && c.rows.ev?.[c.i], evs = row && c.avail.every(x => row[ACTS.indexOf(x)] != null) && Object.fromEntries(c.avail.map(x => [x, row[ACTS.indexOf(x)]]));
   const top = evs && c.avail.reduce((x, y) => evs[y] > evs[x] ? y : x), loss = evs && evs[top] - evs[a];
   const cut = Math.max(0.1, 0.005 * (c.z.pot + c.z.toCall));
-  const grade = off ? "" : evs ? (loss < 0.05 || f >= 15 ? "great" : loss < cut || f >= 5 ? "ok" : "bad")
+  const grade = off ? "" : evs ? (f >= 15 || f >= 5 && loss < 0.05 ? "great" : loss < cut || f >= 5 ? "ok" : "bad")
     : f >= best - 5 || f >= 50 ? "great" : f >= 5 ? "ok" : "bad";
   if (grade) {
     if (!atEnd()) tally(grade);
@@ -1263,6 +1264,13 @@ const vsFull = spot => { const [o, w] = villains(spot); return w ? `${o}'s ${MW[
 // correct though the solver mostly plays something else (EV-graded spots only): say why right under the hand line
 function withRare(out, c, mix, a, grade, evs, top, loss) {
   const fav = ACTS.reduce((x, y) => mix[y] > mix[x] ? y : x), L = x => label(x, c.spot.node);
+  // Close though it costs next to nothing: the solver (almost) never plays it, so it isn't the solver's strategy
+  if (grade === "ok" && evs && mix[a] < 5 && loss < 0.05 && evs[fav] != null) {
+    out.splice(1, 0, `<b>Why ${Math.round(mix[a])}% is Close, not Correct:</b> the solver ${mix[a] < 0.5 ? "never plays" : "almost never plays"} ${L(a)} here; `
+      + `it plays ${L(fav)} (${Math.round(mix[fav])}%). ${L(a)} costs only ${loss < 0.005 ? "about nothing" : loss.toFixed(2) + "bb"} against the best action, so it's nearly as good, `
+      + `but grades follow the solver's strategy first.`);
+    return out;
+  }
   if (grade !== "great" || !evs || loss >= 0.05 || mix[fav] - mix[a] < 20 || evs[fav] == null) return out;
   out.splice(1, 0, `<b>Why ${Math.round(mix[a])}% is still correct:</b> the solver prefers ${L(fav)} (${Math.round(mix[fav])}%), but the EVs are nearly equal `
     + `(${sbb(evs[a])} vs ${sbb(evs[fav])}${a === top ? ", yours higher" : `, ${Math.abs(evs[fav] - evs[a]).toFixed(2)}bb apart`}). `
