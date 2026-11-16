@@ -462,10 +462,10 @@ async function postAnswer(i) {
     + "When actions are worth about the same, the solver mixes them to stay unreadable, and either one is a fine play.";
   // the panel: the spot, what you hold, three tiles, one row per action (this hand, hands like it, EV), then the maths folded away
   const X = postExplain(node, h), para = (t, c) => t ? `<p${c ? ` class="${c}"` : ""}>${t}</p>` : "";
-  const table = `<table class="acts"><tr><th></th><th>This hand</th><th>Hands like it</th><th>EV bb</th><th></th></tr>${node.actions.map((a, j) =>
+  const table = `<table class="acts"><tr><th></th><th>Hand</th><th>Similar</th><th>EV bb</th><th></th></tr>${node.actions.map((a, j) =>
     `<tr${j === i ? ' class="you"' : ""}><td><i style="background:${AC[kind(a)]}"></i>${names[j]}</td><td>${off ? "–" : Math.round(mix[j]) + "%"}</td><td>${X.like ? Math.round(X.like[j]) + "%" : "–"}</td>`
     + `<td>${off ? "–" : sbb(ev[j]).replace("bb", "")}</td><td>${off ? "" : j === best ? "best" : "−" + (ev[best] - ev[j]).toFixed(2)}</td></tr>`).join("")}</table>`
-    + para(X.like && `Hands like it: ${X.likeNote}.`, "muted");
+    + para(X.like && `Similar hands: ${X.likeNote}.`, "muted");
   const why = para(`<b>${hand}</b> on ${P.board.map(cardText).join(" ")} · pot ${bb(pot)} · ${P.me ? "in" : "out of"} position`)
     + `<div class="pills">${X.have.map(t => `<span class="pill" style="--c:var(--ok)">${t}</span>`).join("")}<span class="sub">Board: ${X.board}</span></div>`
     + para(rare) + `<div class="tiles">${X.tiles}</div>` + table
