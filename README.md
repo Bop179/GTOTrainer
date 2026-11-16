@@ -15,7 +15,7 @@ Or open `index.html` from a download. Preflop works offline; postflop always nee
 - **⚙ Settings:**
   - **Game, stack and spots:** pick the format, stack depth, spot types (Open, vs Open, Squeeze, Cold 4-bet, vs 3-bet, vs Squeeze, vs Cold 4-bet, vs 4-bet+ and Limped pot; only the types the chosen format and stack have data for are shown) and your positions. Leave the spot types on **All** and hands play out like a real table: the other seats act from the same ranges, and the hand continues until it ends or the data runs out.
   - **Your hand:** only deal the hands you list (`AKs, 88, AQ`).
-  - **Streets** (where postflop is solved): Preflop only, Both, or Postflop only. Postflop only deals just hands that reach a solved pot and lets you start deciding on the flop, turn or river.
+  - **Streets** (where postflop is solved): Preflop only, Both, or Play to postflop. Play to postflop deals just hands that reach a solved pot and lets you start deciding on the flop, turn or river.
   - **Feedback:** after each decision, or after the hand (no grades until it's played out, then each decision's analysis).
 - **Action replay:** before each decision the table plays out what happened since your last action, one seat at a time: folders throw their cards in, bets slide out from the seat. The buttons unlock when it's your turn.
 - **Keys:** `1`–`9` pick the action buttons left to right, `Space` or `Enter` for the next step or hand, `Z` takes back your last decision, `M` mutes, `Esc` closes a menu. On a phone, tap the table for the next step.

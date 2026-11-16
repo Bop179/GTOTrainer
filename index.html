@@ -621,14 +621,14 @@ function drawSettings() {
       .filter(([, items]) => items.length).map(([t, items]) => group("nodes", `<small>${t}</small>`, items, v => many("nodes", v))).join("")
     + group("pos", "Your position <small>· pick several</small>", [["", "Any"], ...ORDER[cfg.game].map(p => [p, p])], v => many("pos", v))
     + `<h4>Your hand <small>· e.g. AKs, 88, AQ (both suited and offsuit); empty = any</small></h4><div class="chips"><input id="handsIn" placeholder="Any hand" spellcheck="false" value="${cfg.hands.join(", ")}"></div>`
-    // Streets: preflop only (a hand stops at the flop), both (on into a solved heads-up pot when it gets there), or postflop only
+    // Streets: preflop only (a hand stops at the flop), both (on into a solved heads-up pot when it gets there), or play to postflop
     // (only hands that get there, starting on the street you pick: the @ chips, a sub-line shown with it)
-    + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Streets <small>· Postflop only deals just hands that reach a solved heads-up pot (overrides Spots), and you start deciding on the street you pick; the streets before it play themselves, the solver's way</small>",
-      [["pre", "Preflop only"], ["", "Both"], ["post", "Postflop only"]], v => (cfg.toPost ? "post" : cfg.preOnly ? "pre" : "") === v)
+    + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Streets <small>· Play to postflop deals just hands that reach a solved heads-up pot (overrides Spots), and you start deciding on the street you pick; the streets before it play themselves, the solver's way</small>",
+      [["pre", "Preflop only"], ["", "Both"], ["post", "Play to postflop"]], v => (cfg.toPost ? "post" : cfg.preOnly ? "pre" : "") === v)
       + (cfg.toPost ? group("post", "", [["@", "Preflop"], ["@flop", "Flop"], ["@turn", "Turn"], ["@river", "River"]], v => "@" + (cfg.postFrom || "") === v)
         .replace("<h4></h4>", "").replace('data-g="post">', 'data-g="post"><small class="sub">start deciding on</small>') : "") : "")
     + group("later", "Feedback <small>· after the hand: no grades until it's played out, then each decision's analysis</small>", [["", "After each decision"], ["hand", "After the hand"]], v => (cfg.later || "") === v);
-  $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}${cfg.hands.length ? " · " + cfg.hands.join(", ") : ""}${toPost() ? " · postflop only" + (cfg.postFrom ? ", from the " + cfg.postFrom : "") : cfg.preOnly ? " · preflop only" : ""}`;
+  $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}${cfg.hands.length ? " · " + cfg.hands.join(", ") : ""}${toPost() ? " · play to postflop" + (cfg.postFrom ? ", from the " + cfg.postFrom : "") : cfg.preOnly ? " · preflop only" : ""}`;
 }
 
 const handType = h => describe(h).replace(/^an? /, "");

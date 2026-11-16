@@ -76,7 +76,7 @@ function postReply(c, a) {
       setIndex(idx);
       try {
         drawSettings(); // the Streets row can show now
-        // "Postflop only" was saved, and the hand dealt before the index came hasn't been played: deal the hand it asks for
+        // "Play to postflop" was saved, and the hand dealt before the index came hasn't been played: deal the hand it asks for
         if (toPost() && st.cur?.steps && !st.cur.answered && !undos.length) newHand();
       } catch {} // the page's own script hasn't run yet: it draws with the index when it does
     }, () => left && setTimeout(getIndex, 5000, left - 1));
@@ -298,7 +298,7 @@ const strat = (node, hand) => {
 // "Start deciding on" the flop, turn or river (cfg.postFrom): preflop is skipped (newHand), and your earlier postflop decisions play themselves the solver's way,
 // and before your street nobody folds when they have another line (a fold would end the hand before you decide)
 const FROM = { flop: 0, turn: 1, river: 2 };
-const fromSt = () => toPost() && FROM[cfg.postFrom] || 0; // only in "Postflop only": a hand played on from preflop decides every street
+const fromSt = () => toPost() && FROM[cfg.postFrom] || 0; // only in "Play to postflop": a hand played on from preflop decides every street
 async function run() {
   const from = fromSt(), h = P;
   try {
