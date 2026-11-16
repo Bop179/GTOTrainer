@@ -147,6 +147,9 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
   main { padding: 12px; }
   .situation { min-height: 0; margin-bottom: 4px; } .situation:has(.hist) { min-height: 132px; margin-bottom: 24px; } /* room for the top seat's shown cards */
   .felt { --rx: 37%; --ry: 42%; aspect-ratio: auto; height: clamp(300px, calc(100vh - 360px), 125vw); height: clamp(300px, calc(100dvh - 360px), 125vw); margin: 12px 0 40px; }
+  /* postflop: the hand history above takes ~125px more than the one-line preflop situation, so the felt gives it back and the
+     action buttons stay on screen (at 390x844 they ended 42px under the fold); two seats and a board need less felt anyway */
+  main:has(.hist) .felt { height: clamp(258px, calc(100vh - 420px), 125vw); height: clamp(258px, calc(100dvh - 420px), 125vw); }
   .felt::before { inset: 3% 8%; }
   .plate { min-width: 54px; padding: 2px 6px; font-size: 11px; }
   .card { width: 46px; height: 66px; font-size: 20px; } .card span { font-size: 17px; }
@@ -264,10 +267,10 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
 <script src="data8.js"></script>
 <script src="data6.js"></script>
 <script src="ev.js"></script>
-<script src="river_wasm.js"></script>
-<script src="river.js"></script>
-<script>window.POST_BASE = "https://147-224-143-161.sslip.io/";</script><!-- postflop solves live on the VM only; VM down = no postflop -->
-<script src="https://147-224-143-161.sslip.io/index.js"></script>
+<script src="river.js"></script><!-- loads river_wasm.js (the 1.8 MB solver) itself, on the first postflop hand -->
+<!-- postflop solves live on the VM only; VM down = no postflop. postflop.js fetches the VM's index as data, after the page is up:
+     as a script tag it held the whole page back (76 s with the VM unreachable) and ran the VM's code on this site -->
+<script>window.POST_BASE = "https://147-224-143-161.sslip.io/";</script>
 <script src="handclass.js"></script>
 <script src="postflop.js"></script>
 <script>
@@ -1108,11 +1111,17 @@ function answer(a) {
   // off: an earlier move of yours was one the solver never makes with this hand, so it has no strategy for it here.
   // Play on ungraded, with the whole range's mix on the buttons.
   const off = !c.rows[c.i][4], mix = off ? rangeMix(c.rows) : mixOf(c.rows[c.i]), f = mix[a], best = Math.max(...Object.values(mix));
-  // grade by bb lost against the best action where the spot has GTO Wizard's EV (ev.js), by frequency elsewhere
+  // Grade by bb lost against the best action where the spot has GTO Wizard's EV (ev.js), by frequency elsewhere.
+  // EV: Correct under 0.05bb lost, or any action the solver plays 15%+ (its own mix is never wrong; rare deep pots carry EV noise).
+  // Mistake from 0.1bb lost, or 0.5% of the pot once you've called where that's more (noise grows with the pot), unless the solver
+  // plays it 5%+. In between: Close. Checked against the 296 EV spots (2026-11-15): at the old 0.5bb, opening any hand at all was
+  // never a Mistake (8% of the plays the solver never makes there were); at 0.1bb 72% are, and none of the solver's own plays.
+  // Frequency: Correct within 5 points of the most-played action or at 50%+, Mixed from 5% (the EV rule's floor), else Mistake.
   const row = !off && c.rows.ev?.[c.i], evs = row && c.avail.every(x => row[ACTS.indexOf(x)] != null) && Object.fromEntries(c.avail.map(x => [x, row[ACTS.indexOf(x)]]));
   const top = evs && c.avail.reduce((x, y) => evs[y] > evs[x] ? y : x), loss = evs && evs[top] - evs[a];
-  const grade = off ? "" : evs ? (loss < 0.05 ? "great" : loss < 0.5 ? "ok" : "bad")
-    : f >= best - 5 || f >= 50 ? "great" : f >= 15 ? "ok" : "bad";
+  const cut = Math.max(0.1, 0.005 * (c.z.pot + c.z.toCall));
+  const grade = off ? "" : evs ? (loss < 0.05 || f >= 15 ? "great" : loss < cut || f >= 5 ? "ok" : "bad")
+    : f >= best - 5 || f >= 50 ? "great" : f >= 5 ? "ok" : "bad";
   if (grade) {
     if (!atEnd()) tally(grade);
     prog.n++;
@@ -1136,7 +1145,7 @@ function answer(a) {
     $("pot").innerHTML = `Pot <b>${bb(z.pot - z.heroIn + put)}</b>`;
   }
   $("verdict").className = "verdict " + grade;
-  $("verdict").textContent = { great: "✓ Correct", ok: "≈ Mixed", bad: "✗ Mistake", "": "Ungraded" }[grade];
+  $("verdict").textContent = verdictText(grade, f);
   $("range").innerHTML = rangeHTML(c.spot);
   $("why").innerHTML = (off ? [`<b>${c.hand}</b> is ${describe(c.hand)}.`, "Not graded: earlier in the hand you made a move the solver never makes with this hand, so it has no strategy for it here. The % on each button is what its whole range does in this spot."]
     : withRare(explain(c, mix, a, grade), c, mix, a, grade, evs, top, loss)).map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
@@ -1148,7 +1157,7 @@ function answer(a) {
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
   if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); else if (!more) foldOut(after.text); }
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
-    : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
+    : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`}${grade === "great" && loss >= 0.05 ? ` The solver still plays it ${Math.round(f)}% of the time here, so that gap is noise in its EVs for a spot this rare.` : ""} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p id="note"><b>▸ ${note}</b></p>`);
   $("next").innerHTML = more ? "Continue <kbd>Space</kbd>" : "Next hand <kbd>Space</kbd>";
   drawGrid(c);
@@ -1164,6 +1173,8 @@ function answer(a) {
 }
 
 const sbb = v => (v > 0 ? "+" : "") + v.toFixed(2) + "bb";
+// the middle grade is Mixed for a play the solver makes 5%+ of the time, Close for one it (almost) never makes that costs little
+const verdictText = (grade, f) => ({ great: "✓ Correct", ok: f >= 5 ? "≈ Mixed" : "≈ Close", bad: "✗ Mistake", "": "Ungraded" })[grade];
 const evEl = (x, c, evs) => `${label(x, c.spot.node)} <b style="color:var(--${evs[x] < 0 ? "bad" : evs[x] > 0 ? "great" : "muted"})">${sbb(evs[x])}</b>`;
 // after you answer: every action button shows how often the solver takes it, plus its EV when given; yours is ringed
 function stamp(picked, pct, ev) {
@@ -1187,7 +1198,7 @@ const vsFull = spot => { const [o, w] = villains(spot); return w ? `${o}'s ${MW[
 // correct though the solver mostly plays something else (EV-graded spots only): say why right under the hand line
 function withRare(out, c, mix, a, grade, evs, top, loss) {
   const fav = ACTS.reduce((x, y) => mix[y] > mix[x] ? y : x), L = x => label(x, c.spot.node);
-  if (grade !== "great" || !evs || mix[fav] - mix[a] < 20 || evs[fav] == null) return out;
+  if (grade !== "great" || !evs || loss >= 0.05 || mix[fav] - mix[a] < 20 || evs[fav] == null) return out;
   out.splice(1, 0, `<b>Why ${Math.round(mix[a])}% is still correct:</b> the solver prefers ${L(fav)} (${Math.round(mix[fav])}%), but the EVs are nearly equal `
     + `(${sbb(evs[a])} vs ${sbb(evs[fav])}${a === top ? ", yours higher" : `, ${Math.abs(evs[fav] - evs[a]).toFixed(2)}bb apart`}). `
     + "When actions are worth about the same, the solver mixes them to stay unreadable, and either one is a fine play.");

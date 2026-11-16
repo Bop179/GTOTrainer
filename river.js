@@ -6,8 +6,13 @@
 // ponytail: runs on the main thread (the page pauses while it solves); move into a Worker if solves get slow.
 window.RiverSolver = (() => {
   let ready;
-  const load = () => ready ??= WebAssembly.instantiate(Uint8Array.from(atob(window.RIVER_WASM), c => c.charCodeAt(0)))
-    .then(r => r.instance.exports);
+  // river_wasm.js is fetched on first use (postflop.js calls load() when a postflop hand starts), so preflop-only play never pays for it
+  const load = () => ready ??= new Promise((res, rej) => {
+    if (window.RIVER_WASM) return res();
+    const s = Object.assign(document.createElement("script"), { src: "river_wasm.js", onload: res, onerror: () => rej(new Error("The river solver (river_wasm.js) didn't load")) });
+    document.head.append(s);
+  }).then(() => WebAssembly.instantiate(Uint8Array.from(atob(window.RIVER_WASM), c => c.charCodeAt(0))))
+    .then(r => r.instance.exports, e => { ready = null; throw e; }); // a failed load is retried on the next river
   return {
     load,
     async solve(job) {

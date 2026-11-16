@@ -12,10 +12,13 @@ vm.runInContext([cut("const ORDER = ", "\n"), cut("const RAISE_NAME", "\n// ----
   cut("function inPosition", "function actionText"), cut("const NEXT = {", "const nodeKey"),
   `window.POST_INDEX = ${JSON.stringify(Object.fromEntries(Object.keys(sizes).map(k => [k, {}])))};`,
   fs.readFileSync(path.join(D, "postflop.js"), "utf8").split("// ---------- data:")[0],
-  "Object.assign(window, { ways, postScen, parse, sizing, SPOTS })"].join("\n"), ctx);
-const { ways, postScen, parse, sizing, SPOTS } = ctx;
+  "Object.assign(window, { ways, postScen, parse, sizing, SPOTS, to9max })"].join("\n"), ctx);
+const { ways, postScen, parse, sizing, SPOTS, to9max } = ctx;
+// every 8-max scenario is also dealt at 9-max with the seats renamed (postflop.js setIndex): check those spots too
+const all = Object.entries(sizes).flatMap(([scen, size]) => { const p = scen.split("_");
+  return p[0] === "8max" ? [[scen, size], [["9max", p[1], ...p.slice(2).map(to9max)].join("_"), size]] : [[scen, size]]; });
 let bad = 0;
-for (const [scen, size] of Object.entries(sizes)) {
+for (const [scen, size] of all) {
   const w = ways(scen), fail = m => { bad++; console.log(scen, m); };
   if (!w) { fail("unknown kind"); continue; }
   for (const [p, key, col] of w) {
@@ -26,5 +29,5 @@ for (const [scen, size] of Object.entries(sizes)) {
   const line = sizing(parse(w[1][1])).line, put = Math.max(...line.map(x => x[1]));
   if (put !== size) fail(`closer's line ${JSON.stringify(line)} puts in ${put}, solved ${size}`);
 }
-console.log(bad ? `${bad} failures` : `ok: ${Object.keys(sizes).length} scenarios`);
+console.log(bad ? `${bad} failures` : `ok: ${all.length} scenarios (${Object.keys(sizes).length} solved, the rest 9-max copies of 8-max)`);
 process.exit(bad ? 1 : 0);

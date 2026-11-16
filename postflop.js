@@ -2,7 +2,19 @@
 // Flop and turn come from the VM pre-solves (loaded one piece at a time from the VM's Caddy); the river is solved live (river.js).
 // Everything runs in the solver's suits: the solved flop is shown with its suits relabelled (P.sig), and your preflop
 // cards are mapped back into solver suits. Uses index.html's globals ($, st, pick, bb, play, tally, ...) at call time.
-const PI = window.POST_INDEX || {};
+// PI: the VM's index of solved pots, {scenario: {oop, ip, flops, pot, stack}}. Empty until the fetch below lands (or for good, VM down).
+// 9-max shares the 8-max solves once UTG has folded (its ranges there are the 8-max ones, see index.html): the same pot with
+// the seats renamed, and src naming the 8-max scenario whose pieces it loads.
+let PI = {};
+const to9max = p => ({ UTG: "UTG1", UTG1: "UTG2" })[p] || p;
+function setIndex(idx) {
+  PI = { ...idx };
+  for (const [scen, m] of Object.entries(idx)) {
+    const p = scen.split("_");
+    if (p[0] === "8max") PI[["9max", p[1], ...p.slice(2).map(to9max)].join("_")] = { ...m, oop: to9max(m.oop), ip: to9max(m.ip), src: scen };
+  }
+}
+setIndex(window.POST_INDEX || {}); // only set by solver/test_postways.js
 const SUIT = "shdc"; // SUITS order in index.html
 const UP = "23456789TJQKA";
 // The two players' last preflop decisions into a solved pot, as [seat, spot key, column: 1 raise, 2 call]; the second one
@@ -54,10 +66,21 @@ function postReply(c, a) {
 
 // ---------- data: each piece is a gzipped binary file on the VM (format in solver/split.py) ----------
 // swap: [a, b] reads a piece stored for suit a as suit b (turns in suits the flop lacks are stored once, see split.py)
+// The index is fetched as data and parsed, never run: the page is up before it arrives, a VM that is down or slow costs
+// nothing but postflop, and whoever answers at that address can't run code here. index.js is "POST_INDEX={...};" (split.py).
+fetch(POST_BASE + "index.js", { signal: AbortSignal.timeout(15000) }).then(r => r.ok ? r.text() : Promise.reject()).then(t => {
+  setIndex(JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1)));
+  window.drawSettings?.(); // the Streets row can show now
+  // "Postflop only" was saved, and the hand dealt before the index came hasn't been played: deal the hand it asks for
+  if (toPost() && st.cur?.steps && !st.cur.answered && !undos.length) newHand();
+}).catch(() => {});
 async function loadPiece(path, swap) {
-  const url = `${POST_BASE}${path}.bin`, r = await fetch(url).catch(() => null);
-  if (!r || !r.ok) throw new Error(`${url} didn't load (the VM is down, or that flop isn't solved yet)`);
-  return decodePiece(await new Response(r.body.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer(), swap);
+  const url = `${POST_BASE}${path}.bin`;
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(15000) }); // a stalled VM ends the hand with the message below, not a spinner forever
+    if (!r.ok) throw 0;
+    return decodePiece(await new Response(r.body.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer(), swap);
+  } catch { throw new Error(`${url} didn't load (the VM is down, or that flop isn't solved yet)`); }
 }
 function decodePiece(buf, swap) {
   const v = new DataView(buf), hl = v.getUint32(0, true), head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, hl)));
@@ -131,6 +154,7 @@ async function postBegin(c) {
   replayTimers.forEach(clearTimeout);
   const scen = c.post, m = PI[scen], me = m.oop === c.spot.hero ? 0 : 1;
   c.post = null; c.busy = true; // a second Space while the flop loads doesn't deal twice, and undo waits for it
+  RiverSolver.load().catch(() => {}); // fetch the river solver now, so it's there by the river (a failure shows when the river is solved)
   $("feedback").classList.remove("show");
   const from = fromSt();
   $("actions").innerHTML = "";
@@ -147,7 +171,7 @@ async function postBegin(c) {
     flop = shuffle([...m.flops]).find(f => !cardsOf(f).concat(f.slice(4)).some(x => mine.includes(x)));
   }
   let nodes;
-  try { nodes = await loadPiece(`${scen}/${flop}/flop`); } catch (e) { c.busy = false; $("situation").textContent = e.message; return; }
+  try { nodes = await loadPiece(`${m.src || scen}/${flop}/flop`); } catch (e) { c.busy = false; $("situation").textContent = e.message; return; }
   if (st.cur !== c) return; // a new hand was dealt while this flop loaded (a settings change)
   const [p0, key0] = ways(scen)[1], z0 = sizing(parse(key0)), who = (p, v1, v3) => p === c.spot.hero ? "you " + v1 : `${p} ${v3}`;
   const VERB = { Limp: ["limp", "limps"], Call: ["call", "calls"], Check: ["check", "checks"], Fold: ["fold", "folds"], Open: ["open", "opens"] };
@@ -156,7 +180,7 @@ async function postBegin(c) {
     return { t: who(p, v1, v3) + (VERB[tag] && tag !== "Open" ? "" : " " + bb(to)), k: tag === "Fold" ? "Fold" : ["Limp", "Call", "Check"].includes(tag) ? "Call" : "Raise" };
   };
   const hero = holeStr(...mine), vr = nodes[me ? "" : "0"], hr = nodes[me ? "0" : ""]; // villain's / your range at the flop
-  P = { postflop: true, scen, me, sig, seat: [m.oop, m.ip], pot0: m.pot, stack: m.stack, board: [flop.slice(0, 2), flop.slice(2, 4), flop.slice(4)],
+  P = { postflop: true, scen, src: m.src || scen, me, sig, seat: [m.oop, m.ip], pot0: m.pot, stack: m.stack, board: [flop.slice(0, 2), flop.slice(2, 4), flop.slice(4)],
     flop, nodes, vr, k: "", street: 0, spent: [0, 0], put: [0, 0], tag: ["", ""], hist: [], over: false, answered: false, cards: c.cards, isNew: 3,
     // the hand so far: street names ({s}) and actions ({t, k}); a closing message ({t, end}) when it's over
     story: [{ s: "Preflop" }, ...[...z0.line, [p0, 0, key0.endsWith("FACINGLIMP") ? "Check" : "Call"]].map(told)] };
@@ -229,7 +253,7 @@ async function closeStreet() {
   P.story.push({ s: STREET[P.street] });
   if (P.street === 1) {
     const absent = [...SUIT].filter(x => ![1, 3, 5].some(i => P.flop[i] === x)), swap = absent.indexOf(c[1]) > 0 ? [absent[0], c[1]] : null;
-    const turn = await loadPiece(`${P.scen}/${P.flop}/${swap ? c[0] + absent[0] : c}`, swap);
+    const turn = await loadPiece(`${P.src}/${P.flop}/${swap ? c[0] + absent[0] : c}`, swap);
     live(h);
     P.nodes = { ...P.nodes, ...turn }; P.k = nk + "-" + c;
     // TEMPORARY until the 2026-11-15 re-solve finishes: solves since 2026-11-13 keep the turn after a raised flop too;
@@ -406,7 +430,7 @@ async function postAnswer(i) {
   const btns = $("actions").innerHTML; // the graded buttons stay up until you continue, though the hand has moved on
   const names = node.actions.map(actName), hand = cardsOf(P.hands[P.me]).map(cardText).join("");
   $("verdict").className = "verdict " + grade;
-  $("verdict").textContent = { great: "✓ Correct", ok: "≈ Mixed", bad: "✗ Mistake", "": "Ungraded" }[grade];
+  $("verdict").textContent = verdictText(grade, f);
   const pill = (j, v) => `<span class="pill" style="--c:${AC[kind(node.actions[j])]}"><span>${names[j]}</span><b>${Math.round(v)}%</b></span>`;
   // whole range at this node, weighted by reach
   const tot = node.reach.reduce((x, y) => x + y, 0) || 1, rm = node.strat.map(s => s.reduce((t, x, j) => t + x * node.reach[j], 0) / tot);
