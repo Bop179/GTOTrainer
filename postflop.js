@@ -349,53 +349,59 @@ function postDraw(fresh) {
 }
 function postButtons(mine) {
   if (!P.over && (!mine || P.busy)) return document.querySelectorAll("#actions button").forEach(b => b.disabled = true); // their move: keep your last buttons, greyed
-  if (P.over) { P.answered = true; $("actions").innerHTML = P.story.filter(x => x.end).map(x => `<div class="end">${x.t}</div>`).join("") + `<button data-next>Next hand<kbd>Space</kbd></button>`; return; }
+  if (P.over) { P.answered = true; setNext(false); $("actions").innerHTML = P.story.filter(x => x.end).map(x => `<div class="end">${x.t}</div>`).join("") + `<button data-next>Next hand<kbd>Space</kbd></button>`; return; }
   $("actions").innerHTML = cur().actions.map((a, i) => `<button data-a="${i}" style="background:${AC[kind(a)]}">${btnLabel(a, i)}</button>`).join("");
 }
 
-// a short read of the spot: what you hold, the board, the price, where your hand sits in your range,
-// and what the solver does with hands like it (the classification is local rules; the numbers are the solver's)
+// The read of the spot after your decision, as the parts of the feedback panel: what you hold (have) and the board, tiles for
+// your equity, your outs and where the hand sits in your range, how often hands like yours take each action (like), and the
+// working behind "Show the maths". The hand groups and board read are local rules; the numbers are the solver's.
+let mathsOpen = false; // "Show the maths" stays as you left it from one decision to the next
+document.addEventListener("toggle", e => { if (e.target.classList?.contains("maths")) mathsOpen = e.target.open; }, true);
 function postExplain(node, h) {
-  const out = [], board = P.board, me = P.me, hc = handClass(cardsOf(P.hands[me]), board);
-  out.push(`You have ${hc.text}. The board is ${texture(board)}.`);
-  // the maths: equity needed to call, and a draw's outs by the rule of 2 and 4
-  const call = P.put[1 - me] - P.put[me], need = call / (potNow() + call) * 100, f1 = x => +x.toFixed(1);
-  if (call > 0) out.push(`Equity needed to call = call ÷ (pot + call) = ${f1(call)} ÷ (${f1(potNow())} + ${f1(call)}) = ${f1(call)} ÷ ${f1(potNow() + call)} = <b>${f1(need)}%</b>.`);
-  const eq = equity(cardsOf(P.hands[me]), board, villainRange()) * 100;
-  if (!isNaN(eq)) out.push(`Your equity against ${P.seat[1 - me]}'s range here: <b>${f1(eq)}%</b>${call > 0 ? ` (${eq >= need ? "≥" : "<"} the ${f1(need)}% a call needs)` : ""}, `
-    + "if the hand checked down from here; the solver's EV also counts the betting still to come.");
+  const board = P.board, me = P.me, hole = cardsOf(P.hands[me]), hc = handClass(hole, board), f1 = x => +x.toFixed(1), maths = [], tiles = [];
+  const tile = (name, big, bar, ...notes) => `<div class="tile"><small>${name}</small><b>${big}</b>${bar}${notes.filter(Boolean).map(n => `<span>${n}</span>`).join("")}</div>`;
+  // equity against the villain's range now; the mark on the bar is what a call needs
+  const call = P.put[1 - me] - P.put[me], need = call / (potNow() + call) * 100, eq = equity(hole, board, villainRange()) * 100;
+  if (call > 0) maths.push(`Equity needed to call = call ÷ (pot + call) = ${f1(call)} ÷ (${f1(potNow())} + ${f1(call)}) = ${f1(call)} ÷ ${f1(potNow() + call)} = <b>${f1(need)}%</b>.`);
+  if (!isNaN(eq)) {
+    tiles.push(tile("Equity", f1(eq) + "%", `<i><b style="width:${eq}%"></b>${call > 0 ? `<u style="left:${need}%"></u>` : ""}</i>`, call > 0 ? `a call needs ${f1(need)}%` : `against ${P.seat[1 - me]}'s range`));
+    maths.push(`Equity is your share of the pot against ${P.seat[1 - me]}'s range if the hand checked down from here${call > 0 ? `: ${f1(eq)}% ${eq >= need ? "≥" : "<"} the ${f1(need)}% a call needs` : ""}. The solver's EV also counts the betting still to come, so the two can disagree.`);
+  }
+  // a draw's outs: exact in the tile, the rule of 2 and 4 in the maths
   if (hc.draw) {
-    const hole = cardsOf(P.hands[me]), used = new Set([...hole, ...board]), left = 52 - used.size;
+    const used = new Set([...hole, ...board]), left = 52 - used.size, flop = board.length === 3;
     const BIG = ["a straight", "a flush", "a full house", "quads"];
     const outs = [...UP].flatMap(r => [...SUIT].map(s => r + s)).filter(c => !used.has(c) && BIG.includes(handClass(hole, [...board, c]).made)).length;
-    const next = outs * 2, both = outs * 4, allin = call > 0 && call >= P.stack - P.spent[me] - .01;
+    const allin = call > 0 && call >= P.stack - P.spent[me] - .01, one = outs / left * 100, two = (1 - (left - outs) / left * (left - 1 - outs) / (left - 1)) * 100;
     const goal = [hc.draw.includes("flush") && "flush", hc.draw.includes("straight") || hc.draw.includes("gutshot") ? "straight" : ""].filter(Boolean).join(" or ");
-    out.push(`Outs: <b>${outs}</b> cards make your ${goal}. Next card ≈ ${outs} × 2 = <b>${next}%</b> (exactly ${outs} ÷ ${left} = ${f1(outs / left * 100)}%)`
-      + (board.length === 3 ? `; by the river ≈ ${outs} × 4 = <b>${both}%</b>, but only if you get to see both cards.` : "."));
+    tiles.push(tile("Outs", outs, "", `${f1(one)}% next card`, flop && `${f1(two)}% by the river`));
+    maths.push(`Outs: <b>${outs}</b> cards make your ${goal}. Next card ≈ ${outs} × 2 = ${outs * 2}% (exactly ${outs} ÷ ${left} = ${f1(one)}%)`
+      + (flop ? `; by the river ≈ ${outs} × 4 = ${outs * 4}% (exactly ${f1(two)}%), but only if you get to see both cards.` : "."));
     if (call > 0) {
-      // compare exact odds: one card, or both when this call is all-in on the flop
-      const have = 100 * (board.length === 3 && allin ? 1 - (left - outs) / left * (left - 1 - outs) / (left - 1) : outs / left);
-      out.push(have >= need ? `${f1(have)}% ≥ ${f1(need)}%: the draw alone pays for the call.`
-        : `${f1(have)}% < ${f1(need)}%: the draw alone doesn't pay for the call${board.length === 3 && !allin ? " on one card" : ""}; it needs extra from money you win when you hit (implied odds), hitting a pair instead, or a later bluff.`);
+      const have = flop && allin ? two : one; // both cards only when this call is all-in on the flop
+      maths.push(have >= need ? `${f1(have)}% ≥ ${f1(need)}%: the draw alone pays for the call.`
+        : `${f1(have)}% < ${f1(need)}%: the draw alone doesn't pay for the call${flop && !allin ? " on one card" : ""}; it needs extra from money you win when you hit (implied odds), hitting a pair instead, or a later bluff.`);
     }
   }
-  // your range here ranked by the solver's EV for each hand (best action)
-  const best = j => Math.max(...node.ev.map(e => e[j])), mine = best(h);
-  let tot = 0, above = 0;
-  node.hands.forEach((_, j) => { const w = node.reach[j]; if (!w) return; tot += w; if (best(j) > mine) above += w; });
-  const topPct = Math.max(1, Math.round(above / (tot || 1) * 100));
-  if (h >= 0) out.push(`By the solver's EV, about ${topPct}% of the hands you'd have here do better than yours: ${topPct <= 25 ? "near the top of your range" : topPct <= 60 ? "the middle of your range" : "the bottom part of your range"}.`);
-  // hands in the same group: same made hand and draw; if that's thin, same made hand only
+  // where the hand sits in your range here, ranked by the solver's EV for each hand (its best action)
+  if (h >= 0) {
+    const best = j => Math.max(...node.ev.map(e => e[j])), mine = best(h);
+    let tot = 0, above = 0;
+    node.hands.forEach((_, j) => { const w = node.reach[j]; if (!w) return; tot += w; if (best(j) > mine) above += w; });
+    const top = Math.min(99, Math.max(1, Math.round(above / (tot || 1) * 100)));
+    tiles.push(tile("In your range", top <= 50 ? `top ${top}%` : `bottom ${100 - top}%`, `<i><u class="dot" style="left:${100 - top}%"></u></i>`, top <= 25 ? "near the top" : top <= 60 ? "the middle" : "the bottom part"));
+    maths.push(`In your range: by the solver's EV, about ${top}% of the hands you'd have here do better than yours.`);
+  }
+  // hands in the same group (same made hand and draw; if that's thin, same made hand only): how often they take each action
   const cls = node.hands.map(x => handClass(cardsOf(x), board));
   const group = by => node.hands.map((_, j) => j).filter(j => node.reach[j] > 0 && by(cls[j]));
   let g = group(c => c.made === hc.made && c.draw === hc.draw), label = hc.text;
   if (g.length < 6) { g = group(c => c.made === hc.made); label = hc.made; }
-  if (g.length >= 2) {
-    const w = g.reduce((t, j) => t + node.reach[j], 0) || 1;
-    const mix = node.actions.map((a, k) => [actName(a), g.reduce((t, j) => t + node.strat[k][j] * node.reach[j], 0) / w]).filter(([, v]) => v >= .5).sort((x, y) => y[1] - x[1]);
-    out.push(`Hands like yours (${label}, ${g.length} combos): ${mix.map(([n, v]) => `${n} ${Math.round(v)}%`).join(" · ")}.`);
-  }
-  return out;
+  const w = g.reduce((t, j) => t + node.reach[j], 0) || 1, bare = x => x.replace(/\ban? /g, "");
+  return { tiles: tiles.join(""), maths, board: texture(board),
+    have: [hc.made === "no pair" && hc.draw ? "" : hc.made, ...hc.draw.split(" and ")].filter(Boolean).map(bare),
+    like: g.length >= 2 ? node.strat.map(s => g.reduce((t, j) => t + s[j] * node.reach[j], 0) / w) : null, likeNote: `${bare(label)}, ${g.length} combos` };
 }
 
 // graded by frequency first, EV second: EV gaps of a few % of the pot are solver noise (a 35% action can trail by that much),
@@ -426,11 +432,15 @@ async function postAnswer(i) {
   const short = `${STREET[P.board.length - 3][0]} · ${abbr({ Bet: `Bet ${potFrac(amt(node.actions[i])).replace(/ pot$/, "")}`, Allin: "All-in" }[kind(node.actions[i])] || kind(node.actions[i]))}`;
   const plain = $("actions").innerHTML;
   const rsum = node.reach.reduce((x, y) => x + y, 0) || 1, mix = off ? strat(node, "").map(x => x / rsum) : node.strat.map(s => s[h]);
-  stamp(String(i), j => mix[j], !off && (j => ev[j].toFixed(2) + "bb"));
+  stamp(String(i), j => mix[j], !off && (j => sbb(ev[j])));
   const btns = $("actions").innerHTML; // the graded buttons stay up until you continue, though the hand has moved on
   const names = node.actions.map(actName), hand = cardsOf(P.hands[P.me]).map(cardText).join("");
   $("verdict").className = "verdict " + grade;
   $("verdict").textContent = verdictText(grade, f);
+  // the grade is up (buttons, verdict, sound): let it paint before the analysis, whose exact flop equity can take a few hundred ms
+  // on a phone. Not in "Feedback after the hand", where the graded buttons mustn't show yet.
+  const h0 = P;
+  if (!atEnd()) { await new Promise(r => setTimeout(r, 30)); if (st.cur !== h0) return; }
   const pill = (j, v) => `<span class="pill" style="--c:${AC[kind(node.actions[j])]}"><span>${names[j]}</span><b>${Math.round(v)}%</b></span>`;
   // whole range at this node, weighted by reach
   const tot = node.reach.reduce((x, y) => x + y, 0) || 1, rm = node.strat.map(s => s.reduce((t, x, j) => t + x * node.reach[j], 0) / tot);
@@ -443,14 +453,23 @@ async function postAnswer(i) {
   const rare = grade === "great" && mix[top] - f >= 20 && `<b>Why ${Math.round(f)}% is still correct:</b> the solver prefers ${names[top]} (${Math.round(mix[top])}%), `
     + `but the EVs are nearly equal (${ev[i].toFixed(2)} vs ${ev[top].toFixed(2)}bb${i === best ? ", yours higher" : `, ${gap.toFixed(2)}bb apart`}). `
     + "When actions are worth about the same, the solver mixes them to stay unreadable, and either one is a fine play.";
-  const why = [`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}, pot ${bb(pot)}, ${P.me ? "in" : "out of"} position.`, ...(rare ? [rare] : []), ...postExplain(node, h),
-    off && P.inRange ? "Not graded: this flop was solved before every hand was kept, and the solver gets here with your hand so rarely (under 0.1%) that it was left out of this spot. It will be graded once this flop is re-solved. The % on each button is what its whole range does in this spot." // TEMPORARY, see P.inRange
-    : off ? "Not graded: your preflop play with this hand isn't in the solver's range, so it has no strategy for it here. The % on each button is what its whole range does in this spot."
-    : i === best ? "You picked the highest-EV action." : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`,
-    "~Hand groups and board reads come from simple local rules; the percentages and EVs are the solver's."];
+  // the panel: the spot, what you hold, three tiles, one row per action (this hand, hands like it, EV), then the maths folded away
+  const X = postExplain(node, h), para = (t, c) => t ? `<p${c ? ` class="${c}"` : ""}>${t}</p>` : "";
+  const table = `<table class="acts"><tr><th></th><th>This hand</th><th>Hands like it</th><th>EV bb</th><th></th></tr>${node.actions.map((a, j) =>
+    `<tr${j === i ? ' class="you"' : ""}><td><i style="background:${AC[kind(a)]}"></i>${names[j]}</td><td>${off ? "–" : Math.round(mix[j]) + "%"}</td><td>${X.like ? Math.round(X.like[j]) + "%" : "–"}</td>`
+    + `<td>${off ? "–" : sbb(ev[j]).replace("bb", "")}</td><td>${off ? "" : j === best ? "best" : "−" + (ev[best] - ev[j]).toFixed(2)}</td></tr>`).join("")}</table>`
+    + para(X.like && `Hands like it: ${X.likeNote}.`, "muted");
+  const why = para(`<b>${hand}</b> on ${P.board.map(cardText).join(" ")} · pot ${bb(pot)} · ${P.me ? "in" : "out of"} position`)
+    + `<div class="pills">${X.have.map(t => `<span class="pill" style="--c:var(--ok)">${t}</span>`).join("")}<span class="sub">Board: ${X.board}</span></div>`
+    + para(rare) + `<div class="tiles">${X.tiles}</div>` + table
+    + para(off && P.inRange ? "Not graded: this flop was solved before every hand was kept, and the solver gets here with your hand so rarely (under 0.1%) that it was left out of this spot. It will be graded once this flop is re-solved. The % on each button is what its whole range does in this spot." // TEMPORARY, see P.inRange
+      : off ? "Not graded: your preflop play with this hand isn't in the solver's range, so it has no strategy for it here. The % on each button is what its whole range does in this spot."
+      : i === best ? "" : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`)
+    + `<details class="maths"${mathsOpen ? " open" : ""}><summary>Show the maths</summary>${X.maths.map(t => para(t)).join("")}`
+    + `${para("Hand groups and board reads come from simple local rules; the percentages and EVs are the solver's.", "muted")}</details>`;
   try { await step(i, true); } catch (e) { end(e.message); }
   P.busy = false;
-  $("why").innerHTML = why.map(p => `<p${p.startsWith("~") ? ' class="muted"' : ""}>${p.replace(/^~/, "")}</p>`).join("");
+  $("why").innerHTML = why;
   if (atEnd()) { // nothing shown yet: keep the analysis, put back the plain buttons and play on; the review comes when the hand ends
     keep(short, grade, btns);
     $("actions").innerHTML = plain; P.drawnKey = null; postDraw(false);
@@ -459,7 +478,7 @@ async function postAnswer(i) {
   }
   postDraw(false);
   $("actions").innerHTML = btns;
-  $("next").innerHTML = P.over ? "Next hand <kbd>Space</kbd>" : "Continue <kbd>Space</kbd>";
+  setNext(!P.over);
   showFeedback();
 }
 async function postNext() {

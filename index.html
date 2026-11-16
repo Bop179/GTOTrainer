@@ -4,8 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GTO Trainer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314382a'/><text x='50' y='77' font-size='76' text-anchor='middle' fill='%23e8efe9'>%E2%99%A0</text></svg>">
 <style>
 :root {
+  color-scheme: dark; /* scrollbars, the volume slider and the hand filter in dark too */
   --bg: #0d1712; --felt: #14382a; --felt2: #0f2a20; --panel: #16201b; --line: #2a3a31;
   --text: #e8efe9; --muted: #93a79a;
   --fold: #4a7bd0; --call: #3fae6a; --raise: #e0533d; --allin: #8e2a5c;
@@ -179,9 +181,34 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .range h4 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .why p { margin: 8px 0; }
 .why .muted { color: var(--muted); font-size: 13px; }
+/* postflop feedback: what you hold as pills, then tiles (equity, outs, where the hand sits in your range), one row per action,
+   and the working folded under "Show the maths" */
+.pills .sub { align-self: center; color: var(--muted); font-size: 12px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; margin: 10px 0; }
+.tile { border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; font-size: 12px; line-height: 1.35; color: var(--muted); }
+.tile small { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+.tile > b { display: block; font-size: 20px; line-height: 1.3; color: var(--text); }
+.tile span { display: block; }
+.tile i { display: block; position: relative; height: 6px; margin: 3px 0 5px; border-radius: 3px; background: var(--line); }
+.tile i b { display: block; max-width: 100%; height: 100%; border-radius: 3px; background: var(--ok); }
+.tile i u { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--text); } /* what a call needs */
+.tile i u.dot { top: 50%; bottom: auto; width: 10px; height: 10px; margin: 0; border-radius: 50%; background: var(--ok); transform: translate(-50%, -50%); } /* your hand, worst (left) to best */
+.acts { width: 100%; border-collapse: collapse; margin: 6px 0 4px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.acts th { padding: 2px 4px; font-size: 11px; font-weight: 400; color: var(--muted); text-align: right; }
+.acts td { padding: 4px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.acts td:first-child { text-align: left; white-space: normal; }
+.acts td:first-child i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; }
+.acts td:last-child { font-size: 12px; color: var(--muted); }
+.acts .you td { font-weight: 700; background: #ffffff0f; } /* your pick */
+.maths summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.maths p { font-size: 13px; }
 .grid { display: grid; grid-template-columns: repeat(13, 26px); gap: 1px; font-size: 9px; align-self: start; }
 .grid div { height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 2px; color: #fff; text-shadow: 0 0 2px #000; }
 .grid div.me { outline: 2px solid #fff; z-index: 1; }
+.grid div { cursor: pointer; }
+/* the tapped hand's mix, under the chart: the title tooltip needs a mouse */
+.cellinfo { grid-column: 1 / -1; min-height: 18px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+@media (hover: none) { .cellinfo:empty::before { content: "Tap a hand for its mix"; } }
 .legend { display: flex; gap: 10px; font-size: 12px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
 .next { margin: 0 0 4px; }
@@ -193,7 +220,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 button, summary { touch-action: manipulation; }
 /* once you've answered, the table deals the next hand: pointer on desktop, a "Tap for next hand" hint on touch */
 main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
-@media (hover: none) { main:has(.feedback.show, .actions .end) .felt::after { content: "Tap for next hand"; position: absolute; right: 0; bottom: 0; z-index: 2; /* the felt's corner, outside the oval: never a seat, bet or board there */ pointer-events: none;
+@media (hover: none) { main:has(.feedback.show, .actions .end) .felt::after { content: attr(data-tap); position: absolute; right: 0; bottom: 0; z-index: 2; /* the felt's corner, outside the oval: never a seat, bet or board there */ pointer-events: none;
   padding: 3px 12px; border-radius: 999px; font-size: 13px; white-space: nowrap; color: var(--text); background: #0009; animation: hint .4s .3s both; } }
 @keyframes hint { from { opacity: 0; } }
 @media (hover: none) { kbd { display: none; } .chips input { font-size: 16px; } }
@@ -234,7 +261,7 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
   <div class="drillbar" id="drillBar" hidden><span id="drillText"></span><button id="stopDrill">Stop drilling</button></div>
   <section class="table">
     <div class="situation" id="situation"></div>
-    <div class="felt" id="felt"></div>
+    <div class="felt" id="felt" data-tap="Tap for next hand"></div>
     <div class="actions" id="actions"></div>
   </section>
   <section class="feedback" id="feedback">
@@ -405,8 +432,9 @@ function dealSounds(n) {
 // ---------- hand helpers ----------
 const COMBOS = h => h.length === 2 ? 6 : h[2] === "s" ? 4 : 12;
 const rv = c => ({ A: 10, K: 8, Q: 7, J: 6 })[c] ?? (RANKS.length - RANKS.indexOf(c) + 1) / 2;
-// % of the hands in your range here (combos × reach) that rank above a hand of Chen score me
-const topOf = (rows, me) => { let t = 0, a = 0; rows.forEach((r, i) => { const w = COMBOS(HANDS[i]) * r[4]; t += w; if (chen(HANDS[i]) > me) a += w; }); return a / (t || 1) * 100; };
+// % of the hands you continue with here (combos × reach × how often they don't fold) that rank above a hand of Chen score me.
+// Against every hand dealt, T9s or 88 calling an open counted as "the top of your range" and got the slow-play explanation.
+const topOf = (rows, me) => { let t = 0, a = 0; rows.forEach((r, i) => { const w = COMBOS(HANDS[i]) * r[4] * (100 - mixOf(r).Fold); t += w; if (chen(HANDS[i]) > me) a += w; }); return a / (t || 1) * 100; };
 function chen(h) { // Chen formula: a rough static hand-strength score, only used to rank hands
   const [a, b] = [h[0], h[1]], gap = RANKS.indexOf(b) - RANKS.indexOf(a) - 1;
   if (gap < 0) return Math.max(5, rv(a) * 2);
@@ -460,6 +488,8 @@ for (const key of Object.keys(SPOTS)) {
   if (!key.split(/[/+]/).includes("UTG") || SPOTS[to9({})(key)]) continue;
   for (const u of new Set([to9({})(key), to9({ UTG1: "UTG2" })(key)])) { SPOTS[u] = SPOTS[key]; SIZES[u] = SIZES[key]; }
 }
+// spots no hand ever reaches (five of GTO Nexus's 9-max 100bb vs-6-bet files, behind an all-in 5-bet): they were empty charts in Ranges
+for (const key of Object.keys(SPOTS)) if (!SPOTS[key].some(r => r[4])) delete SPOTS[key];
 const ALL = Object.keys(SPOTS).map(parse);
 function situation(s) {
   const v = s.villain, h = s.hero, [o, w] = villains(s);
@@ -558,6 +588,7 @@ const stacksOf = game => [...new Set(ALL.filter(s => s.game === game).map(s => s
 const defCfg = () => ({ game: "6max", stack: "100bb", nodes: [], pos: [], hands: [] });
 let cfg = defCfg();
 try { cfg = { ...cfg, ...JSON.parse(localStorage.getItem("gto-cfg")) }; } catch {}
+for (const k of ["nodes", "pos", "hands"]) cfg[k] = Array.isArray(cfg[k]) ? cfg[k].filter(x => typeof x === "string") : []; // a damaged save must not stop the page
 // "Your hand": AKs, 88, AQo, or AQ for both; 10 for T; anything else is dropped
 const parseHands = t => [...new Set(t.toUpperCase().replace(/10/g, "T").split(/[\s,;]+/).flatMap(x => {
   const h = x.slice(0, 2), sfx = x.slice(2).toLowerCase(), hi = "AKQJT98765432";
@@ -565,6 +596,7 @@ const parseHands = t => [...new Set(t.toUpperCase().replace(/10/g, "T").split(/[
   const n = hi.indexOf(h[0]) <= hi.indexOf(h[1]) ? h : h[1] + h[0]; // higher rank first
   return n[0] === n[1] ? [n] : sfx ? [n + sfx] : [n + "s", n + "o"];
 }).filter(h => HANDS.includes(h)))];
+cfg.hands = parseHands(cfg.hands.join(" "));
 const handOk = h => !cfg.hands.length || cfg.hands.includes(h); // the Your hand filter
 const hasHand = key => SPOTS[key].some((r, k) => r[4] && handOk(HANDS[k])); // a spot your filtered hands reach
 if (!stacksOf(cfg.game).length) cfg = defCfg();
@@ -605,7 +637,18 @@ function drawDrill() {
 
 // ---------- progress: leak log + spaced repetition (saved in this browser) ----------
 let prog = { n: 0, log: [], srs: {}, plog: [] }; // plog: postflop decisions, [street · situation, hand group, grade, picked, best] (no reviews)
-try { prog = { ...prog, ...JSON.parse(localStorage.getItem("gto-progress")) }; } catch {}
+// Saved or imported progress with anything malformed dropped, so a bad file can't stop the page loading, break the Leaks view or
+// put markup in it (its text goes in as HTML). Preflop rows need a spot key of a known type and a real hand.
+function cleanProg(d) {
+  d = d && typeof d === "object" ? d : {};
+  const row = e => Array.isArray(e) && [e[0], e[1], e[3], e[4]].every(x => typeof x === "string" && !/[<>&"]/.test(x));
+  const spot = k => { const p = k.split("/"); return (p.length === 4 || p.length === 5) && LINES[p.at(-1)]; };
+  return { n: Number.isFinite(d.n) ? d.n : 0,
+    log: (Array.isArray(d.log) ? d.log : []).filter(e => row(e) && spot(e[0]) && HANDS.includes(e[1])),
+    srs: Object.fromEntries(Object.entries(d.srs && typeof d.srs === "object" ? d.srs : {}).filter(([, r]) => r && Number.isFinite(r.due) && Number.isFinite(r.box))),
+    plog: (Array.isArray(d.plog) ? d.plog : []).filter(row) };
+}
+try { prog = cleanProg(JSON.parse(localStorage.getItem("gto-progress"))); } catch {}
 const saveProg = () => { try { localStorage.setItem("gto-progress", JSON.stringify(prog)); } catch {} };
 // Leitner boxes counted in hands, not days: a missed spot returns after 3 hands, then 10; right twice in a row and it's learned
 // (it drops out of training reviews but stays in the Leaks drills, which read the hand log).
@@ -1086,6 +1129,8 @@ function showRev(j) {
 }
 // the hand is over: count the grades now, then open the last decision
 // show the analysis; where it sits below the table (phone), bring the verdict row into view ("nearest": no scroll if it's already on screen)
+// the Next button and the touch hint on the felt both say what Space or a tap does now
+const setNext = more => { $("next").innerHTML = `${more ? "Continue" : "Next hand"} <kbd>Space</kbd>`; $("felt").dataset.tap = more ? "Tap to continue" : "Tap for next hand"; };
 function showFeedback() {
   $("feedback").classList.add("show");
   requestAnimationFrame(() => document.querySelector(".vrow").scrollIntoView({ behavior: "smooth", block: "nearest" }));
@@ -1096,7 +1141,7 @@ function review(end = "") {
   rev.forEach(r => r.grade && tally(r.grade, true));
   play(rev.some(r => r.grade === "bad") ? "bad" : rev.some(r => r.grade) ? "great" : "chip");
   showRev(rev.length - 1);
-  $("next").innerHTML = "Next hand <kbd>Space</kbd>";
+  setNext(false);
   showFeedback();
   st.cur.answered = true;
   return true;
@@ -1159,7 +1204,7 @@ function answer(a) {
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
     : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`}${grade === "great" && loss >= 0.05 ? ` The solver still plays it ${Math.round(f)}% of the time here, so that gap is noise in its EVs for a spot this rare.` : ""} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p id="note"><b>▸ ${note}</b></p>`);
-  $("next").innerHTML = more ? "Continue <kbd>Space</kbd>" : "Next hand <kbd>Space</kbd>";
+  setNext(more);
   drawGrid(c);
   if (atEnd()) {
     if (after?.sd) $("note")?.remove();
@@ -1215,7 +1260,7 @@ function explain(c, mix, picked, grade) {
   out.push(`<b>${hand}</b> is ${describe(hand)}.`);
 
   if (second && mix[second] >= 25)
-    out.push(`This is a close spot: the solver splits between ${L(best)} (${Math.round(mix[best])}%) and ${L(second)} (${Math.round(mix[second])}%). Both lines earn about the same, so mixing keeps you hard to read.`);
+    out.push(`Close spot: the solver splits ${L(best)} ${Math.round(mix[best])}% / ${L(second)} ${Math.round(mix[second])}%. Both earn about the same, so mixing keeps you hard to read.`);
 
   const order = ORDER[spot.game] || [], behind = order.length - 1 - order.indexOf(spot.hero);
   if (node === "RFI") {
@@ -1237,7 +1282,7 @@ function explain(c, mix, picked, grade) {
     if (node === "FACINGSQZ_CALLER") out.push(`You flatted the open, so your range is capped: your best hands would have 3-bet. With ${o} out it's you against the squeezer, and calls lean on hands that play well after the flop.`);
     if (node === "FACINGC4B") out.push(`A cold 4-bet over a 3-bet is about as strong as a preflop range gets, and ${o} is still behind you, so only the very top of your range goes on.`);
     if (node === "FACINGC4B_3B") out.push(`${w} cold 4-bet into your 3-bet, which is a very strong range. With ${o} out it's heads-up, and only strong hands continue.`);
-    if (z.toCall) out.push(`Pot odds: calling ${bb(z.toCall)} to win a ${bb(z.pot)} pot means you need about ${odds}% equity, before accounting for position and how much of that equity you actually realize${z.toCall >= z.heroBehind ? " (this call puts you all-in, so there's nothing left to realize: raw equity is what counts)" : ""}.`);
+    if (z.toCall) out.push(`Pot odds: ${bb(z.toCall)} to win ${bb(z.pot)}, so a call needs about <b>${odds}%</b> equity${z.toCall >= z.heroBehind ? " (it puts you all-in, so raw equity is what counts)" : ", before position and how much of it you realize"}.`);
     if (aggressive(best)) {
       const raisers = rows.map((row, i) => [row, i]).filter(([row]) => row[4] && row[0] + row[1] >= 50).map(([, i]) => chen(HANDS[i])).sort((x, y) => x - y);
       const value = me >= (raisers[Math.floor(raisers.length / 2)] ?? 0);
@@ -1282,7 +1327,7 @@ function gridHTML(rows, node, me) {
     const stops = ACTS.map(a => { const s = `${COLOR[a]} ${at}% ${at + m[a]}%`; at += m[a]; return s; }).join(",");
     const op = row[4] ? .35 + .65 * row[4] : .15;
     return `<div class="${i === me ? "me" : ""}" style="background:linear-gradient(to right,${stops});opacity:${op}" title="${h}: ${ACTS.filter(a => m[a] >= .5).map(a => (node === "POST" ? { Allin: "All-in", Raise: "Bet/raise", Call: "Check/call", Fold: "Fold" }[a] : label(a, node)) + " " + Math.round(m[a]) + "%").join(", ")}">${h}</div>`;
-  }).join("");
+  }).join("") + '<span class="cellinfo"></span>';
 }
 function rangeHTML(sp) {
   const rm = rangeMix(SPOTS[sp.key]);
@@ -1324,6 +1369,7 @@ $("actions").addEventListener("click", e => { const b = e.target.closest("button
 $("next").onclick = next;
 $("felt").onclick = () => st.cur?.answered && next(); // tap the table = Space: next hand once you've answered
 document.querySelectorAll(".undo").forEach(b => b.onclick = undo);
+document.addEventListener("click", e => { const c = e.target.closest(".grid > div"); if (c) c.parentElement.querySelector(".cellinfo").textContent = c.title; });
 $("revlist").onclick = e => { const r = e.target.closest("button")?.dataset.r; if (r) showRev(+r); };
 const stopDrill = () => { st.drill = null; drawDrill(); };
 $("chips").onclick = e => {
@@ -1381,12 +1427,13 @@ $("importProg").onclick = () => $("importFile").click();
 $("importFile").onchange = async e => {
   const f = e.target.files[0]; e.target.value = "";
   if (!f) return;
+  const old = prog;
   try {
     const d = JSON.parse(await f.text());
-    if (!Array.isArray(d.log) || typeof d.srs !== "object" || !Number.isFinite(d.n)) throw 0;
-    prog = { n: d.n, log: d.log, srs: d.srs, plog: Array.isArray(d.plog) ? d.plog : [] }; saveProg(); renderLeaks();
+    if (!Array.isArray(d?.log) || !Number.isFinite(d.n)) throw 0;
+    prog = cleanProg(d); renderLeaks(); saveProg(); // drawn before it's saved: a file that can't be shown is never kept
     $("importProg").textContent = `Imported ${prog.log.length + prog.plog.length} decisions`;
-  } catch { $("importProg").textContent = "Not a leaks file"; }
+  } catch { prog = old; $("importProg").textContent = "Not a leaks file"; }
   setTimeout(() => $("importProg").textContent = "Import", 3000);
 };
 $("resetProg").onclick = () => { // two clicks so one stray click can't wipe your history
@@ -1394,8 +1441,11 @@ $("resetProg").onclick = () => { // two clicks so one stray click can't wipe you
   prog = { n: 0, log: [], srs: {}, plog: [] }; saveProg(); renderLeaks(); $("resetProg").textContent = "Reset progress";
 };
 document.addEventListener("keydown", e => {
+  if (e.key === "Escape") $("settings").open = $("sound").open = false;
   if ($("leaks").open || $("browse").open || ["SELECT", "INPUT"].includes(e.target.tagName) || e.metaKey || e.ctrlKey) return;
   const k = e.key.toLowerCase();
+  // Settings open: the keys are its own (Space picks the focused chip), not shortcuts for the hand behind it; same for a focused sound chip
+  if ($("settings").open || (k === " " || k === "enter") && e.target.closest(".menu[open]")) return;
   if ((k === " " || k === "enter") && st.cur?.answered) { e.preventDefault(); next(); return; }
   if (k === "m") { muted = !muted; save("gto-muted", muted ? "1" : "0"); return drawSound(); }
   if (k === "z") return undo();

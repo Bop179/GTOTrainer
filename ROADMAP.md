@@ -93,11 +93,11 @@ Grading now goes by how often the solver plays your action. Grading by EV loss w
   - 8-max 100bb: 196 of 470 (2026-11-14).
   - 6-max 100bb: 100 of 190 (2026-11-15).
 - [ ] Trainer: add the EV to each spot's rows and grade by EV lost against the best action (thresholds to pick).
-  - Live for every node read so far (2026-11-14): `build_ev.py` packs `.claude/gw*_ev.json` into `ev.js` (re-run after each pull), and 9-max shares 8-max's EV. Grade: under 0.05bb lost correct, under 0.5bb acceptable, else mistake; spots without EV still grade by frequency. Each button shows its EV. Known noise: in BB vs the SB's 5-bet to 53 in a limped pot (rarely reached), the solver mixes calls its own EV puts 1-2.8bb behind folding, so those calls grade as mistakes. The feedback lists every action available with its EV in bb, signed (+ is a gain, - a loss, fold is 0), marks the best one, and shows your pick's EV and its gap to the best ("Call +1.2bb, 0.4bb less than 3-bet +1.6bb").
+  - Live for every node read so far (2026-11-14): `build_ev.py` packs `.claude/gw*_ev.json` into `ev.js` (re-run after each pull), and 9-max shares 8-max's EV. Grade (thresholds reset 2026-11-15 against all 296 EV spots): under 0.05bb lost is correct; a mistake starts at 0.1bb lost, or 0.5% of the pot where that's more (it was 0.5bb, at which opening any hand at all was never a mistake); anything the solver plays 15%+ is correct and 5%+ is never a mistake. Spots without EV still grade by frequency (mixed from 5%). Each button shows its EV. The frequency rule covers the known noise: in BB vs the SB's 5-bet to 53 in a limped pot (rarely reached), the solver mixes calls its own EV puts 1-2.8bb behind folding, and those calls now grade as the solver plays them. The feedback lists every action available with its EV in bb, signed (+ is a gain, - a loss, fold is 0), marks the best one, and shows your pick's EV and its gap to the best ("Call +1.2bb, 0.4bb less than 3-bet +1.6bb").
 
 ### 9. Postflop: every heads-up pot at 6-max and 8-max, 100bb and 200bb (started 2026-11-13)
 
-Postflop covers heads-up pots only; 9-max reuses the 8-max solves. The flop and turn are pre-solved on Oracle Cloud; the river is solved live in the browser.
+Postflop covers heads-up pots only; 9-max reuses the 8-max solves once UTG has folded (live in the trainer since 2026-11-15: `postflop.js` `setIndex`). The flop and turn are pre-solved on Oracle Cloud; the river is solved live in the browser.
 
 **Spots** (`solver/make_jobs.py`, header lists names and range sources):
 - Every heads-up pot type at 6-max (`data6.js`, `data200.js`) and 8-max (`data8.js`), at 100bb then 200bb: 570 scenarios.
@@ -166,13 +166,14 @@ Postflop covers heads-up pots only; 9-max reuses the 8-max solves. The flop and 
     - where your hand ranks in your range;
     - the mix for hands like yours;
     - every action's EV, the whole range's mix, and a 13x13 chart.
+    - Laid out (2026-11-15) as three tiles (equity, outs, range rank), one table row per action (this hand, hands like it, EV) and the working under "Show the maths".
   - **Streets**: Preflop only (a hand that reaches the flop ends there) / Both (it plays on into a solved heads-up pot) / Postflop only, which deals only spots that lead into a solved pot and adds a **start deciding on** Preflop / Flop / Turn / River line. From the flop on, preflop is skipped (the hand is dealt one that takes the line); the streets before yours play by the solver's strategy with nobody folding when they have another line, unseen behind a "Finding a hand…" spinner, and a line that still ends early (an all-in) is replayed on the same flop (30 tries, then another flop).
   - A hand off the solver's line plays on ungraded (whole-range mix on the buttons) instead of ending. Once the re-solve is done, only a hand that was never in the flop range stays ungraded until the river.
   - Showdowns name the winner. Every ending other than your fold says why (multiway, unsolved pot, game or stack without postflop).
   - Check: `node solver/test_postways.js` (every scenario's spots exist, are found from the preflop line, and put in the solved pot).
 - [ ] Pre-solve everything (100bb re-solve with every hand from 2026-11-15 01:15Z, then 200bb): 51,158 solves, about 87 h on the worker, done around 2026-11-19. Progress: dashboard `solver/dashboard.py` (`ssh -N -L 8080:localhost:8080 gto-vm`).
 - [ ] Open TCP 443 to other users: ingress rule in the OCI security list, and `iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT` + `netfilter-persistent save` on the VM. Egress is free up to 10 TB a month.
-- [ ] Postflop hands in the leak log and reviews.
+- [ ] Postflop hands in reviews (they are in the leak log already, without drills).
 - [ ] Maybe: grade a hand that was never in the flop range (a preflop misplay) as the closest hand that is, marked approximate.
 
 **Preflop, done alongside (2026-11-14/15):**
