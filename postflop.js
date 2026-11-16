@@ -68,12 +68,19 @@ function postReply(c, a) {
 // swap: [a, b] reads a piece stored for suit a as suit b (turns in suits the flop lacks are stored once, see split.py)
 // The index is fetched as data and parsed, never run: the page is up before it arrives, a VM that is down or slow costs
 // nothing but postflop, and whoever answers at that address can't run code here. index.js is "POST_INDEX={...};" (split.py).
-fetch(POST_BASE + "index.js", { signal: AbortSignal.timeout(15000) }).then(r => r.ok ? r.text() : Promise.reject()).then(t => {
-  setIndex(JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1)));
-  window.drawSettings?.(); // the Streets row can show now
-  // "Postflop only" was saved, and the hand dealt before the index came hasn't been played: deal the hand it asks for
-  if (toPost() && st.cur?.steps && !st.cur.answered && !undos.length) newHand();
-}).catch(() => {});
+// If the VM doesn't answer it's asked again every 5 s, five more times (preflop plays on meanwhile); after that, no postflop this visit.
+(function getIndex(left) {
+  fetch(POST_BASE + "index.js", { signal: AbortSignal.timeout(15000) }).then(r => r.ok ? r.text() : Promise.reject())
+    .then(t => JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1)))
+    .then(idx => {
+      setIndex(idx);
+      try {
+        drawSettings(); // the Streets row can show now
+        // "Postflop only" was saved, and the hand dealt before the index came hasn't been played: deal the hand it asks for
+        if (toPost() && st.cur?.steps && !st.cur.answered && !undos.length) newHand();
+      } catch {} // the page's own script hasn't run yet: it draws with the index when it does
+    }, () => left && setTimeout(getIndex, 5000, left - 1));
+})(5);
 async function loadPiece(path, swap) {
   const url = `${POST_BASE}${path}.bin`;
   try {

@@ -149,9 +149,10 @@ main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
   main { padding: 12px; }
   .situation { min-height: 0; margin-bottom: 4px; } .situation:has(.hist) { min-height: 132px; margin-bottom: 24px; } /* room for the top seat's shown cards */
   .felt { --rx: 37%; --ry: 42%; aspect-ratio: auto; height: clamp(300px, calc(100vh - 360px), 125vw); height: clamp(300px, calc(100dvh - 360px), 125vw); margin: 12px 0 40px; }
-  /* postflop: the hand history above takes ~125px more than the one-line preflop situation, so the felt gives it back and the
-     action buttons stay on screen (at 390x844 they ended 42px under the fold); two seats and a board need less felt anyway */
-  main:has(.hist) .felt { height: clamp(258px, calc(100vh - 420px), 125vw); height: clamp(258px, calc(100dvh - 420px), 125vw); }
+  /* postflop: the hand history above takes ~125px more than the one-line preflop situation (more by the river, when it runs to
+     five rows), so the felt gives it back and the action buttons stay on screen (at 390x844 they ended 42px under the fold);
+     two seats and a board need less felt anyway. 258px is the least that keeps the top seat clear of the board. */
+  main:has(.hist) .felt { height: clamp(258px, calc(100vh - 440px), 125vw); height: clamp(258px, calc(100dvh - 440px), 125vw); }
   .felt::before { inset: 3% 8%; }
   .plate { min-width: 54px; padding: 2px 6px; font-size: 11px; }
   .card { width: 46px; height: 66px; font-size: 20px; } .card span { font-size: 17px; }
