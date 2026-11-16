@@ -411,6 +411,12 @@ function postExplain(node, h) {
     like: g.length >= 2 ? node.strat.map(s => g.reduce((t, j) => t + s[j] * node.reach[j], 0) / w) : null, likeNote: `${bare(label)}, ${g.length} combos` };
 }
 
+// tiedEV(ev, mix %, pot): each action within 1% of the pot of the mixed EV shows the mixed EV, when two or more are
+const tiedEV = (ev, mix, pot) => {
+  if (!mix) return ev;
+  const m = mix.reduce((t, x, j) => t + x * ev[j], 0) / (mix.reduce((t, x) => t + x, 0) || 1), tied = ev.map(e => Math.abs(e - m) <= .01 * pot);
+  return tied.filter(Boolean).length < 2 ? ev : ev.map((e, j) => tied[j] ? m : e);
+};
 // graded by frequency first, EV second: EV gaps of a few % of the pot are solver noise (a 35% action can trail by that much),
 // so a small gap can't rescue an action the solver (almost) never takes.
 // right: played 25%+, or 5%+ and within 2% of the pot. acceptable: played 5%+, or 1%+ and within 5%, or under 1% and within 1%.
@@ -421,9 +427,14 @@ async function postAnswer(i) {
   P.answered = P.busy = true;
   // h < 0: the solve has no strategy or EV for your hand here: it isn't in the preflop range, or (flops solved before
   // 2026-11-15 only) its reach fell under 0.1% and it was trimmed. Play on ungraded; the buttons show the range's average mix instead.
-  const node = cur(), h = node.hands.indexOf(P.hands[P.me]), off = h < 0, f = off ? 0 : node.strat[i][h], ev = node.ev.map(e => e[h]);
-  const best = ev.indexOf(Math.max(...ev)), loss = ev[best] - ev[i], pot = potNow();
-  const grade = off ? "" : f >= 25 || f >= 5 && loss <= .02 * pot ? "great" : f >= 5 || f >= 1 && loss <= .05 * pot || loss <= .01 * pot ? "ok" : "bad";
+  const node = cur(), h = node.hands.indexOf(P.hands[P.me]), off = h < 0, f = off ? 0 : node.strat[i][h], raw = node.ev.map(e => e[h]), pot = potNow();
+  const rawLoss = Math.max(...raw) - raw[i];
+  const grade = off ? "" : f >= 25 || f >= 5 && rawLoss <= .02 * pot ? "great" : f >= 5 || f >= 1 && rawLoss <= .05 * pot || rawLoss <= .01 * pot ? "ok" : "bad";
+  // shown EVs: the solves stop at about 1% of the pot, so actions whose EVs sit within 1% of the pot of the hand's EV under
+  // the solver's mix are tied as far as the solve can tell; they all show that mixed EV (fold 90% at 0 and call 10% at +0.49
+  // both show +0.05), so a 10% action never looks like a free 0.49bb the solver forgot to take
+  const ev = tiedEV(raw, off ? null : node.strat.map(s => s[h]), pot);
+  const best = ev.indexOf(Math.max(...ev)), loss = ev[best] - ev[i];
   if (grade && !atEnd()) tally(grade);
   if (grade) { // the Leaks log, grouped loosely: street, position and what you face; made hand, or the draw when there's nothing better
     const me = P.me, face = P.put[1 - me] > P.put[me] ? (P.put[me] > 0 ? "facing a raise" : "facing a bet") : me ? "checked to you" : "first to act";
@@ -458,21 +469,25 @@ async function postAnswer(i) {
   // correct though the solver mostly plays something else: say why right under the spot line
   const top = mix.indexOf(Math.max(...mix)), gap = Math.abs(ev[top] - ev[i]);
   const rare = grade === "great" && mix[top] - f >= 20 && `<b>Why ${Math.round(f)}% is still correct:</b> the solver prefers ${names[top]} (${Math.round(mix[top])}%), `
-    + `but the EVs are nearly equal (${ev[i].toFixed(2)} vs ${ev[top].toFixed(2)}bb${i === best ? ", yours higher" : `, ${gap.toFixed(2)}bb apart`}). `
+    + (gap < .005 ? `but the EVs are tied (both ${sbb(ev[i])} within the solver's precision). `
+      : `but the EVs are nearly equal (${ev[i].toFixed(2)} vs ${ev[top].toFixed(2)}bb${i === best ? ", yours higher" : `, ${gap.toFixed(2)}bb apart`}). `)
     + "When actions are worth about the same, the solver mixes them to stay unreadable, and either one is a fine play.";
   // the panel: the spot, what you hold, three tiles, one row per action (this hand, hands like it, EV), then the maths folded away
   const X = postExplain(node, h), para = (t, c) => t ? `<p${c ? ` class="${c}"` : ""}>${t}</p>` : "";
   const table = `<table class="acts"><tr><th></th><th>Hand</th><th>Similar</th><th>EV bb</th><th></th></tr>${node.actions.map((a, j) =>
     `<tr${j === i ? ' class="you"' : ""}><td><i style="background:${AC[kind(a)]}"></i>${names[j]}</td><td>${off ? "–" : Math.round(mix[j]) + "%"}</td><td>${X.like ? Math.round(X.like[j]) + "%" : "–"}</td>`
-    + `<td>${off ? "–" : sbb(ev[j]).replace("bb", "")}</td><td>${off ? "" : j === best ? "best" : "−" + (ev[best] - ev[j]).toFixed(2)}</td></tr>`).join("")}</table>`
+    + `<td>${off ? "–" : sbb(ev[j]).replace("bb", "")}</td><td>${off ? "" : ev[best] - ev[j] < .005 ? (ev.filter(e => ev[best] - e < .005).length > 1 ? "tied" : "best") : "−" + (ev[best] - ev[j]).toFixed(2)}</td></tr>`).join("")}</table>`
     + para(X.like && `Similar hands: ${X.likeNote}.`, "muted");
   const why = para(`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}<br>Pot ${bb(pot)} · ${P.me ? "in" : "out of"} position`)
     + `<div class="pills">${X.have.map(t => `<span class="pill" style="--c:var(--ok)">${t}</span>`).join("")}<span class="sub">Board: ${X.board}</span></div>`
     + para(rare) + `<div class="tiles">${X.tiles}</div>` + table
     + para(off && P.inRange ? "Not graded: this flop was solved before every hand was kept, and the solver gets here with your hand so rarely (under 0.1%) that it was left out of this spot. It will be graded once this flop is re-solved. The % on each button is what its whole range does in this spot." // TEMPORARY, see P.inRange
       : off ? "Not graded: your preflop play with this hand isn't in the solver's range, so it has no strategy for it here. The % on each button is what its whole range does in this spot."
-      : i === best ? "" : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`)
+      : loss < .005 ? "" : `Your pick gives up ${loss.toFixed(2)}bb against ${names[best]}${f >= 25 ? ", but the solver plays it often enough here that the gap is noise" : f < 1 ? ", and the solver never plays it here" : ""}.`)
     + `<details class="maths"${mathsOpen ? " open" : ""}><summary>Show the maths</summary>${X.maths.map(t => para(t)).join("")}`
+    + (off || ev.every((e, j) => e === raw[j]) ? "" : para(`Tied EVs: the solver's raw EVs are ${names.map((n, j) => `${n} ${sbb(raw[j])}`).join(", ")}. `
+      + `The solves stop once they're accurate to about 1% of the pot (${bb(.01 * pot)} here), so actions within that of the hand's EV under the solver's mix `
+      + `(${sbb(ev.find((e, j) => e !== raw[j]))}) count as tied and all show it.`))
     + `${para("Hand groups and board reads come from simple local rules; the percentages and EVs are the solver's.", "muted")}</details>`;
   try { await step(i, true); } catch (e) { end(e.message); }
   P.busy = false;
