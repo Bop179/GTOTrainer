@@ -1073,15 +1073,29 @@ function muck(seat) {
   replayTimers.push(setTimeout(() => seat.querySelectorAll(".backs i").forEach(i => i.remove()), 650));
 }
 // the hand ends on the others' replies: muck the seats the reply names ("BB folds", "UTG and HJ fold", "Everyone folds")
-function foldOut(text) {
-  const all = [...document.querySelectorAll("#felt .seat:not(.hero):not(.folded)")];
-  const i = all.length && [...document.querySelectorAll("#felt .seat")].findIndex(x => x.classList.contains("hero"));
-  // "You take the pot" means every other seat folded, named or not (the players behind a squeeze are assumed to fold); they act left of you first
-  const everyone = /^Everyone folds|You take the/.test(text), seats = [...document.querySelectorAll("#felt .seat")].map((x, j, a) => a[(i + 1 + j) % a.length]).filter(x => all.includes(x));
-  const names = everyone ? [] : [...text.matchAll(/\b([A-Z][A-Z0-9+]*)(?: and ([A-Z][A-Z0-9+]*))? folds?\b/g)].flatMap(m => [m[1], m[2]]);
-  const out = seats.filter(x => everyone || names.includes(x.dataset.p));
-  out.forEach((x, j) => replayTimers.push(setTimeout(() => muck(x), 450 + j * 320)));
-  return out.length ? 450 + out.length * 320 + 400 : 300; // how long until the table has settled
+function foldOut(text, spot, put, S) {
+  const felt = $("felt"), all = [...felt.querySelectorAll(".seat")], i = all.findIndex(x => x.classList.contains("hero"));
+  const seats = all.map((x, j) => all[(i + 1 + j) % all.length]).filter(x => !x.classList.contains("hero") && !x.classList.contains("folded")); // they act left of you first
+  const calls = [...text.matchAll(/\b([A-Z][A-Z0-9+]*) calls?\b/g)].map(m => m[1]);
+  // who is still in: the callers named, or (you call and the rest fold) the players you called; everyone else mucks, named or not (the players behind you are assumed to fold)
+  const stay = calls.length ? calls : /the rest fold/.test(text) ? villains(spot) : null, everyone = /^Everyone folds|You take the/.test(text);
+  const names = stay || everyone ? [] : [...text.matchAll(/\b([A-Z][A-Z0-9+]*)(?: and ([A-Z][A-Z0-9+]*))? folds?\b/g)].flatMap(m => [m[1], m[2]]);
+  const out = seats.filter(x => stay ? !stay.includes(x.dataset.p) : everyone || names.includes(x.dataset.p));
+  let t = 450;
+  out.forEach(x => { replayTimers.push(setTimeout(() => muck(x), t)); t += 320; });
+  // a caller matches your raise: tag, chip and stack from the seat, and the pot grows by what it adds
+  if (put && calls.length) for (const p of calls) {
+    const seat = all.find(x => x.dataset.p === p), bet = felt.querySelector(`.bet[data-p="${p}"]`); if (!seat) continue;
+    const add = put - (parseFloat(bet.textContent) || 0);
+    replayTimers.push(setTimeout(() => {
+      Object.assign(seat.querySelector(".tag"), { hidden: false, textContent: "Call" }).style.background = tagBg("Call");
+      play("chip"); fly(Object.assign(bet, { hidden: false, textContent: bb(put) }));
+      seat.querySelector(".plate span").textContent = bb(S - put);
+      $("pot").innerHTML = `Pot <b>${bb(parseFloat($("pot").textContent.replace("Pot", "")) + add)}</b>`;
+    }, t));
+    t += 650;
+  }
+  return out.length || calls.length ? t + 350 : 300; // how long until the table has settled
 }
 const toss = (seat, sel) => seat.querySelectorAll(sel).forEach((x, j) => x.style.animationDelay = j * .07 + "s");
 const fly = b => { b.classList.remove("fly"); void b.offsetWidth; b.classList.add("fly"); }; // restart the slide-in
@@ -1206,7 +1220,7 @@ function answer(a) {
   let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   let settle = 300;
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
-  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); else if (!more) settle = foldOut(after.text); }
+  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); else if (!after.spot) settle = foldOut(after.text, c.spot, a !== "Call" && put, z.S); }
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
     : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`}${grade === "great" && loss >= 0.05 ? ` The solver still plays it ${Math.round(f)}% of the time here, so that gap is noise in its EVs for a spot this rare.` : ""} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p id="note"><b>▸ ${note}</b></p>`);
@@ -1218,7 +1232,7 @@ function answer(a) {
     $("actions").innerHTML = plain; document.querySelectorAll("#actions button").forEach(b => b.disabled = true);
     // a beat for your action to land (the whole runout after a called all-in), then on with the hand, or its review
     c.answered = false; c.busy = true;
-    return replayTimers.push(setTimeout(() => { c.busy = false; c.answered = true; more ? next() : review(); }, more ? 700 : after?.sd ? 4400 : settle));
+    return replayTimers.push(setTimeout(() => { c.busy = false; c.answered = true; more ? next() : review(); }, after?.sd ? 4400 : more && !after?.post ? 700 : settle));
   }
   showFeedback();
 }
