@@ -254,7 +254,7 @@ async function closeStreet() {
     await new Promise(r => setTimeout(r, 600)); live(h);
     return end(`All-in: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. ${winner()}`, true);
   }
-  if (P.street === 2) return end(`Showdown: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. ${winner()}`, true);
+  if (P.street === 2) return end(`${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. ${winner()}`, true);
   const c = dealOne();
   P.board.push(c); P.street++; P.put = [0, 0]; P.tag = ["", ""]; P.isNew = P.board.length - 1;
   P.story.push({ s: STREET[P.street] });
@@ -466,7 +466,7 @@ async function postAnswer(i) {
     `<tr${j === i ? ' class="you"' : ""}><td><i style="background:${AC[kind(a)]}"></i>${names[j]}</td><td>${off ? "–" : Math.round(mix[j]) + "%"}</td><td>${X.like ? Math.round(X.like[j]) + "%" : "–"}</td>`
     + `<td>${off ? "–" : sbb(ev[j]).replace("bb", "")}</td><td>${off ? "" : j === best ? "best" : "−" + (ev[best] - ev[j]).toFixed(2)}</td></tr>`).join("")}</table>`
     + para(X.like && `Similar hands: ${X.likeNote}.`, "muted");
-  const why = para(`<b>${hand}</b> on ${P.board.map(cardText).join(" ")} · pot ${bb(pot)} · ${P.me ? "in" : "out of"} position`)
+  const why = para(`<b>${hand}</b> on ${P.board.map(cardText).join(" ")}<br>Pot ${bb(pot)} · ${P.me ? "in" : "out of"} position`)
     + `<div class="pills">${X.have.map(t => `<span class="pill" style="--c:var(--ok)">${t}</span>`).join("")}<span class="sub">Board: ${X.board}</span></div>`
     + para(rare) + `<div class="tiles">${X.tiles}</div>` + table
     + para(off && P.inRange ? "Not graded: this flop was solved before every hand was kept, and the solver gets here with your hand so rarely (under 0.1%) that it was left out of this spot. It will be graded once this flop is re-solved. The % on each button is what its whole range does in this spot." // TEMPORARY, see P.inRange
