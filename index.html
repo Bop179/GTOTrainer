@@ -733,7 +733,7 @@ function leakSection(log, o) {
   return `<section><h2>${o.name}</h2>
     <div class="lhead"><div class="big">${acc}%</div><div>right, over ${log.length} ${o.unit}${o.extra || ""}</div></div>
     <p class="lsum">${sum}</p>
-    ${costs.length ? `<h3>Cost of your mistakes <small>· ${per100(cost)}bb per 100 ${o.unit} · how often you make each when the spot comes up</small></h3>${costs.map(([t, c, k, n, fav]) =>
+    ${costs.length ? `<h3>Cost of mistakes <small>· ${per100(cost)}bb/100 ${o.unit} · how often each happens</small></h3>${costs.map(([t, c, k, n, fav]) =>
       barRow(`${t} <small>· ${pctOf(k, n)}% of the time</small>`, c / costs[0][1], `${per100(c)}bb`, "var(--bad)",
         `${k} of ${n} ${o.unit} where the solver's play was ${fav}; ${bb(c)}bb lost, ${pctOf(c, cost)}% of the total`)).join("")}` : ""}
     <h3>Your style <small>· how often you do it, against the solver with the same hands${sN < log.length ? ` (${sN} ${o.unit} with the solver's mix saved)` : ""}</small></h3>
