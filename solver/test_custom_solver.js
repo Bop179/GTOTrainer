@@ -1,0 +1,28 @@
+const assert = require('node:assert/strict');
+const S = require('../custom-solver.js');
+assert.equal(S.board('ks 7D 2c'), 'Ks7d2c');
+for (const b of ['AhAh2c','xyz','AhKd','éééé']) assert.throws(() => S.board(b));
+assert.equal(S.handClass('KhAh'),'AKs');
+assert.equal(S.handClass('AcKh'),'AKo');
+assert.equal(S.handClass('AcAh'),'AA');
+const n={player:0,actions:['Check','Bet 15'],hands:['AhKh','AdKd','AsQs'],reach:[3,1,0],strat:[[0,100,100],[100,0,0]],ev:[[1,2,4],[3,4,5]]};
+assert.deepEqual(S.average(n,[0,1]),[25,75]);
+assert.deepEqual(S.average(n,[2]),[0,0]);
+assert.deepEqual(S.group(n,'AKs'),[0,1]);
+assert.equal(S.nextKey('',1),'1');
+assert.equal(S.nextKey('0-1',2),'0-1-2');
+assert.equal(S.ending({nodes:{'':{player:0,actions:['Check']},'0':{player:1,actions:['Check']}},stack:80,board:'Ks7d2c'},[0,0]),'Street complete. Enter a later street as a new spot to solve it.');
+assert.equal(S.ending({nodes:{'':{player:0,actions:['Fold']}},stack:80,board:'Ks7d2c'},[0]),'Hand ends with a fold.');
+assert.equal(S.ending({nodes:{'':{player:0,actions:['Allin 80']},'0':{player:1,actions:['Call']}},stack:80,board:'Ks7d2c'},[0,0]),'All-in called. No betting decisions remain.');
+console.log('ok: custom solver input, weighted strategy, grouping and terminal paths');
+
+const match = S.findFlop('Ah Kd 2c', ['AsKh2d']);
+assert.equal(match.flop,'AsKh2d');
+assert.deepEqual(match.flop.match(/../g).map(c=>c[0]+match.suits[c[1]]).sort(),['Ah','Kd','2c'].sort());
+assert.equal(S.findFlop('Ah Kh 2c',['AsKh2d']),null,'Two-tone must not match rainbow');
+assert.equal(S.findFlop('Ah Kd 3c',['AsKh2d']),null);
+assert.equal(S.findFlop('2d As Kh',['AsKh2d']).flop,'AsKh2d');
+const mapped=S.remapNodes({'':{...n,hands:['AsQs']}},match.suits);
+assert.equal(mapped[''].hands[0],'AhQh');
+assert.equal(n.hands[0],'AhKh');
+console.log('ok: saved-flop lookup, order independence, suit mapping and texture mismatch');

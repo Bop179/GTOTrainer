@@ -1,0 +1,24 @@
+[Unit]
+Description=GTO Trainer custom spot solver
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/custom-solver
+Environment=GTO_SOLVER_BIN=/home/ubuntu/custom-solver/gto-solve
+ExecStart=/usr/bin/python3 /home/ubuntu/custom-solver/serve.py
+Restart=on-failure
+RestartSec=5
+MemoryMax=14G
+MemorySwapMax=0
+CPUQuota=400%
+TasksMax=64
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

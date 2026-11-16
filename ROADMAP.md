@@ -190,6 +190,14 @@ Postflop covers heads-up pots only; 9-max reuses the 8-max solves once UTG has f
 - After the keep-every-hand re-solve finishes: postflop.js `P.inRange` and its "solved before every hand was kept" message, and the "turns after a raised flop aren't solved yet" ending.
 - After gto-worker is terminated (by 2026-11-30): solver/worker_down.sh, the REVERSE option in run_queue.sh, the worker parts of dashboard.py, and ~/worker_sync.sh on gto-vm.
 
+### 10. Custom spot solver (2026-11-16)
+
+- [x] Solver dialog with editable heads-up flop/turn/river, pot, remaining stack, both ranges and bet sizes.
+- [x] Public server API (no key or login), one bounded solve at a time, cancellation and reconnect; separate native binary and temporary results.
+- [x] Instant saved-flop browser: game/stack, matchup, solved-flop list and entered-flop coverage check, including equivalent suits and card order. Refresh revalidates current coverage.
+- [x] Starting-street strategy chart, combination EVs, action exploration and submitted-input snapshot. Results show achieved exploitability and whether the 1% target was met.
+- Limits: 12 GB compressed tree budget, 30-minute deadline and 1,000 iterations. Large trees may need fewer sizes. Public access; random job IDs allow reconnecting and cancellation. Later streets require a new custom spot; no preflop, multiway or rake support.
+
 ## Out of scope for now
 
 Might do these later, might never do these:

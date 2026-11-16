@@ -69,9 +69,12 @@ function postReply(c, a) {
 // The index is fetched as data and parsed, never run: the page is up before it arrives, a VM that is down or slow costs
 // nothing but postflop, and whoever answers at that address can't run code here. index.js is "POST_INDEX={...};" (split.py).
 // If the VM doesn't answer it's asked again every 5 s, five more times (preflop plays on meanwhile); after that, no postflop this visit.
+function fetchPostIndex() {
+  return fetch(POST_BASE + "index.js", { cache: "no-cache", signal: AbortSignal.timeout(15000) }).then(r => r.ok ? r.text() : Promise.reject(new Error("Solved spots are unavailable. Try refreshing.")))
+    .then(t => JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1)));
+}
 (function getIndex(left) {
-  fetch(POST_BASE + "index.js", { signal: AbortSignal.timeout(15000) }).then(r => r.ok ? r.text() : Promise.reject())
-    .then(t => JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1)))
+  fetchPostIndex()
     .then(idx => {
       setIndex(idx);
       try {

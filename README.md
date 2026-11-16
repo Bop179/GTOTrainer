@@ -20,6 +20,7 @@ Or open `index.html` from a download. Preflop works offline; postflop always nee
 - **Action replay:** before each decision the table plays out what happened since your last action, one seat at a time: folders throw their cards in, bets slide out from the seat. The buttons unlock when it's your turn.
 - **Keys:** `1`–`9` pick the action buttons left to right, `Space` or `Enter` for the next step or hand, `Z` takes back your last decision, `M` mutes, `Esc` closes a menu. On a phone, tap the table for the next step.
 - **Leaks:** your accuracy, what your mistakes cost, how your style compares with the solver's, and your worst spot and hand-type combinations, with a **Drill** button for each (preflop). A hand you miss comes back for review after 3 hands, then after 10; answer it right twice in a row and it's learned. **Export** and **Import** move your history between browsers.
+- **Solver:** **Browse solved spots** loads a saved solution from the VM without running the solver. Choose game/stack, matchup and one of its solved flops, or enter a flop and click **Check / view flop**. Equivalent suits and card order are matched; an unavailable flop is clearly marked unsolved for that matchup. Saved strategies use the matchup's built-in ranges. **Custom solve** lets anyone enter both ranges, board, pot, remaining stack and bet sizes—no key or login. Results show action frequencies, combination EVs and a range chart; click actions to explore replies on the starting street. **Cancel solve** stops a custom job; closing the dialog leaves it running. **Reconnect** recovers it after a reload. The solved inputs are shown separately from the editable form.
 - **Ranges:** pick any spot at the current format and stack and see its full chart and action mix, without playing a hand. Tap or hover a hand for its exact mix.
 - **Sound:** nine sound packs and a volume slider.
 
@@ -84,3 +85,26 @@ When a hand reaches a spot that has no data, it ends and says why ("No solver da
 ## Licences
 
 `river_wasm.js` is [postflop-solver](https://github.com/b-inary/postflop-solver) by Wataru Inariba, licensed AGPL-3.0, compiled to WebAssembly through the small wrapper in `solver/src/lib.rs`. Its source is that repository at the revision pinned in `solver/Cargo.lock`, and `solver/build_wasm.sh` rebuilds the file.
+
+## Custom solver server
+
+Custom spots use the existing native engine through `solver/serve.py`, proxied by Caddy at `/solve/`. Access is public: no key or login. The browser saves only a random job ID in session storage for reconnecting. Anyone who knows a job ID can read or cancel that job; IDs are not listed publicly.
+Limits: one job at a time, 12 GB of compressed tree storage, 30 minutes, 1,000 iterations, and a target exploitability of 1% of the pot. Results explicitly say when the iteration limit misses that target. New jobs need 15 GB of available server RAM; the service itself is capped at 14 GB with swap disabled. Large or deep trees can still be rejected: reduce the bet sizes or ranges. Pot and remaining stack accept 0.05–2,000bb. Each street allows 1–3 bets from 10%–200% of the pot and a 2x–4x raise. Both players use those sizes and the existing engine's all-in thresholds; rake is zero.
+
+Exploration covers the starting street only. A fold, called all-in, showdown or transition to the next street ends that path. To study a later street, enter a new spot with the corresponding ranges, pot and remaining stack. Frequencies are rounded to whole percentages and EV to 0.01bb; custom exports preserve small reach weights. Completed jobs expire after two hours (cleaned on the next API request); at most 32 are retained, with the oldest removed early when new jobs arrive. All jobs disappear when the service restarts.
+
+The service runs from `/home/ubuntu/custom-solver/` with its own `gto-solve` binary; it does not modify batch jobs or published postflop results. `solver/custom-solver.service` is the systemd unit. Build the crate in a separate directory and install the binary and `serve.py` there. Install the unit as `gto-custom-solver.service`, then enable it. The API binds only `127.0.0.1:8081`.
+
+Add this before Caddy's static-file fallback (the existing site already sets `Access-Control-Allow-Origin *`):
+
+```caddyfile
+handle /solve/* {
+    reverse_proxy 127.0.0.1:8081 {
+        header_down -Access-Control-Allow-Origin
+    }
+}
+```
+
+The backend supplies the remaining CORS headers and `Cache-Control: no-store`. API: public `POST /solve/jobs`, `GET /solve/jobs/<id>`, `GET /solve/jobs/<id>/result`, and `DELETE /solve/jobs/<id>`. Each submission can include a 32-character lowercase hex `request_id` to recover a lost response without starting a duplicate job.
+
+Checks: `cargo test --offline --manifest-path solver/Cargo.toml`, `python3 -m unittest discover -s solver -p test_serve.py`, `node solver/test_custom_solver.js`, `node solver/test_custom_ui.js`, `node solver/test_postways.js`, and `node handclass.js`.

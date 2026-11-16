@@ -14,8 +14,10 @@ pub const CHIPS: f64 = 20.0; // chips per bb (the solver works in integers)
 
 fn sizes(j: &Value, k: &str) -> Result<BetSizeOptions, String> {
     match j[k].as_array() {
-        Some(a) => BetSizeOptions::try_from((a[0].as_str().unwrap_or(""), a[1].as_str().unwrap_or(""))),
-        None => Ok(BetSizeOptions::default()), // a street this tree never reaches
+        Some(a) if a.len() == 2 && a.iter().all(Value::is_string) =>
+            BetSizeOptions::try_from((a[0].as_str().unwrap(), a[1].as_str().unwrap())),
+        None if j[k].is_null() => Ok(BetSizeOptions::default()), // a street this tree never reaches
+        _ => Err(format!("{k} must be [bets, raises] strings")),
     }
 }
 
@@ -23,17 +25,26 @@ fn range(v: &Value) -> Result<Range, String> {
     if let Some(s) = v.as_str() { return s.parse(); }
     let mut r = Range::new();
     for (combo, w) in v.as_object().ok_or("range must be a string or {combo: weight}")? {
+        if !combo.is_ascii() || combo.len() != 4 { return Err("combo must be two cards, e.g. AhKh".into()); }
         let (a, b) = (card_from_str(&combo[..2])?, card_from_str(&combo[2..])?);
-        r.set_weight_by_cards(a, b, w.as_f64().ok_or("weight must be a number")? as f32);
+        let weight = w.as_f64().ok_or("weight must be a number")?;
+        if a == b || !weight.is_finite() || !(0.0..=1.0).contains(&weight) {
+            return Err("combo cards must differ and weight must be between 0 and 1".into());
+        }
+        r.set_weight_by_cards(a, b, weight as f32);
     }
     Ok(r)
 }
 
 pub fn game(j: &Value) -> Result<PostFlopGame, String> {
     let board = j["board"].as_str().or(j["flop"].as_str()).ok_or("board missing")?;
-    if ![6, 8, 10].contains(&board.len()) { return Err(format!("board {board:?} must be 3, 4 or 5 cards")); }
+    if !board.is_ascii() || ![6, 8, 10].contains(&board.len()) { return Err(format!("board {board:?} must be 3, 4 or 5 cards")); }
     let card = |i: usize| if board.len() > i { card_from_str(&board[i..i + 2]) } else { Ok(NOT_DEALT) };
-    let f = |k: &str| j[k].as_f64().ok_or(format!("{k} missing"));
+    let f = |k: &str| {
+        let v = j[k].as_f64().ok_or(format!("{k} missing"))?;
+        if !v.is_finite() || v <= 0.0 || v > 1_000_000.0 { return Err(format!("{k} must be positive and at most 1000000 bb")); }
+        Ok(v)
+    };
     let card_config = CardConfig {
         range: [range(&j["oop"])?, range(&j["ip"])?],
         flop: flop_from_str(&board[..6])?, turn: card(6)?, river: card(8)?,
@@ -83,18 +94,20 @@ pub fn dump(g: &mut PostFlopGame, j: &Value) -> Map<String, Value> {
     g.back_to_root(); g.cache_normalized_weights();
     let mut out = Map::new();
     let min = j["min_reach"].as_f64().unwrap_or(0.001) as f32;
-    walk(g, &mut vec![], &mut vec![], 0, min, &mut out);
+    // Custom spot inspection only needs this street; batch jobs retain their existing turn exports.
+    let street = if j["starting_street_only"].as_bool().unwrap_or(false) { 1 } else { 0 };
+    walk(g, &mut vec![], &mut vec![], street, min, street == 1, &mut out);
     out
 }
 
-fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, street: u8, min: f32, out: &mut Map<String, Value>) {
+fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, street: u8, min: f32, precise: bool, out: &mut Map<String, Value>) {
     if g.is_terminal_node() { return; }
     if g.is_chance_node() {
         if street > 0 || g.current_board().len() > 3 { return; }
         let cards = g.possible_cards();
         for c in (0..52u8).filter(|c| cards >> c & 1 == 1) {
             g.play(c as usize); g.cache_normalized_weights(); hist.push(c as usize); key.push(card_to_string(c).unwrap());
-            walk(g, hist, key, 1, min, out);
+            walk(g, hist, key, 1, min, precise, out);
             hist.pop(); key.pop(); g.apply_history(hist); g.cache_normalized_weights();
         }
         return;
@@ -111,13 +124,13 @@ fn walk(g: &mut PostFlopGame, hist: &mut Vec<usize>, key: &mut Vec<String>, stre
         "player": p,
         "actions": acts.iter().map(act).collect::<Vec<_>>(),
         "hands": keep.iter().map(|&h| hands[h].clone()).collect::<Vec<_>>(),
-        "reach": keep.iter().map(|&h| r(reach[h], 1000.0)).collect::<Vec<_>>(),
+        "reach": keep.iter().map(|&h| if precise { reach[h] as f64 } else { r(reach[h], 1000.0) }).collect::<Vec<_>>(),
         "strat": per(&st, 1.0, 100.0),
         "ev": per(&ev, 100.0, 1.0 / CHIPS),
     }));
     for i in 0..acts.len() {
         g.play(i); g.cache_normalized_weights(); hist.push(i); key.push(i.to_string());
-        walk(g, hist, key, street, min, out);
+        walk(g, hist, key, street, min, precise, out);
         hist.pop(); key.pop(); g.apply_history(hist); g.cache_normalized_weights();
     }
 }
@@ -155,5 +168,43 @@ mod wasm {
         let out = run(&input).unwrap_or_else(|e| json!({"error": e})).to_string().into_bytes();
         let mut buf = (out.len() as u32).to_le_bytes().to_vec(); buf.extend(out);
         leak(buf.into_boxed_slice())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn job() -> Value { json!({"oop":"AA", "ip":"KK", "board":"2h3d4c", "pot":10, "stack":1, "max_iter":10, "min_reach":0}) }
+    #[test]
+    fn rejects_malformed_inputs_without_panics() {
+        for (key, value) in [
+            ("board", json!("éééé")), ("board", json!("2h2h4c")),
+            ("oop", json!({"éAh":0.5})), ("oop", json!({"AhAh":0.5})),
+            ("oop", json!({"AhKh":1.1})), ("oop", json!({"AhKh":-0.1})),
+            ("flop_sizes", json!([])), ("flop_sizes", json!([3,"2x"])),
+            ("pot", json!(-1)), ("stack", json!(0)), ("pot", json!(1e30)),
+        ] {
+            let mut j = job(); j[key] = value;
+            assert!(game(&j).is_err(), "accepted {j}");
+        }
+    }
+    #[test]
+    fn custom_dump_stays_on_starting_street() {
+        let mut j = job(); j["starting_street_only"] = json!(true);
+        let mut g = game(&j).unwrap(); g.allocate_memory(false); solve(&mut g, &j);
+        let out = dump(&mut g, &j);
+        assert!(out.contains_key(""));
+        assert!(out.keys().all(|k| k.chars().all(|c| c.is_ascii_digit() || c == '-')));
+        j["starting_street_only"] = json!(false);
+        assert!(dump(&mut g, &j).keys().any(|k| k.chars().any(|c| c.is_ascii_alphabetic())));
+    }
+    #[test]
+    fn custom_dump_keeps_small_reach_weights() {
+        let j = json!({"oop":"AhAd:0.01", "ip":"KhKd:0.01", "board":"2c3d4h5s9c",
+            "pot":20, "stack":80, "river_sizes":["75%","2.5x"], "max_iter":10,
+            "min_reach":0, "starting_street_only":true});
+        let mut g = game(&j).unwrap(); g.allocate_memory(false); solve(&mut g, &j);
+        let out = dump(&mut g, &j);
+        assert!(out[""]["reach"][0].as_f64().unwrap() > 0.0);
     }
 }

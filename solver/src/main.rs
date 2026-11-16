@@ -5,10 +5,11 @@ use gto_solve::*;
 use serde_json::{json, Value};
 use std::time::Instant;
 
-fn main() {
+fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    let j: Value = serde_json::from_str(&std::fs::read_to_string(&args[1]).unwrap()).unwrap();
-    let mut g = game(&j).unwrap();
+    if args.len() != 3 { return Err("usage: gto-solve job.json out.json".into()); }
+    let j: Value = serde_json::from_str(&std::fs::read_to_string(&args[1])?)?;
+    let mut g = game(&j)?;
     let mem = g.memory_usage();
     let gb = |x: u64| x as f64 / 1073741824.0;
     // 16-bit storage halves memory (negligible accuracy cost); forced above 16 GB so the 23 GB VM never runs out
@@ -25,8 +26,13 @@ fn main() {
     eprintln!("solved: {it} iterations, exploitability {:.3}% of pot, {secs:.0}s", ex * 100.0);
     let nodes = dump(&mut g, &j);
     let n = nodes.len();
-    let out = json!({"flop": j["flop"], "pot": j["pot"], "stack": j["stack"], "iters": it, "secs": secs.round(),
+    let out = json!({"flop": j["flop"], "board": j["board"].as_str().or(j["flop"].as_str()), "pot": j["pot"], "stack": j["stack"], "iters": it, "secs": secs.round(),
         "mem_gb": (mem_gb * 100.0).round() / 100.0, "exploit": ex, "nodes": nodes});
-    std::fs::write(&args[2], out.to_string()).unwrap();
-    eprintln!("{n} flop+turn nodes -> {}", args[2]);
+    std::fs::write(&args[2], out.to_string())?;
+    eprintln!("{n} decision nodes -> {}", args[2]);
+    Ok(())
+}
+
+fn main() {
+    if let Err(e) = run() { eprintln!("{e}"); std::process::exit(1); }
 }

@@ -236,6 +236,26 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
   .grid { grid-template-columns: repeat(13, 24px); } .grid div { height: 24px; }
 }
 @media (max-width: 760px) { .feedback.show { grid-template-columns: 1fr; } .grid { grid-template-columns: repeat(13, minmax(0, 1fr)); } .stats { margin-left: 0; } }
+/* Custom spot solver shares the trainer's palette and dialog controls. */
+#solverDialog { width: min(1000px, calc(100% - 24px)); max-height: calc(100dvh - 32px); overflow: auto; }
+#solverDialog fieldset { padding: 0; border: 0; margin: 16px 0; min-width: 0; }
+#solverDialog label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+#solverDialog input, #solverDialog textarea, #solverDialog select { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--bg); color: var(--text); font: inherit; }
+#solverDialog textarea { resize: vertical; }
+.solve-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 12px 0; }
+.solve-ranges { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 8px; }
+.solve-label { max-width: 440px; margin: 12px 0 4px; }
+.solve-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.solve-buttons [hidden] { display: none; }
+.solve-buttons [aria-pressed="true"] { border-color: var(--text); background: var(--line); }
+.solve-grid { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 2px; max-width: 650px; margin: 16px 0; }
+.solve-grid button { border: 0; border-radius: 3px; min-width: 0; padding: 0; aspect-ratio: 1.2; font-size: clamp(9px, 2vw, 14px); }
+.solve-grid .selected { outline: 2px solid var(--text); outline-offset: -2px; }
+.solve-scroll { overflow-x: auto; }
+#solvePath, #solveSummary, #solveStatus { overflow-wrap: anywhere; }
+#solveSubmitted { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px; }
+#solverDialog :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+@media (max-width: 600px) { .solve-ranges { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -255,6 +275,7 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
   </details>
   <button id="leakBtn">Leaks</button>
   <button id="browseBtn">Ranges</button>
+  <button id="solverBtn">Solver</button>
   <div class="stats" title="Since you opened the page; Leaks has your whole history"><span>This session:</span><span>Hands <b id="sHands">0</b></span><span>Accuracy <b id="sAcc">–</b></span><span>Streak <b id="sStreak">0</b></span></div>
 </header>
 <main>
@@ -279,6 +300,64 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
     </div>
   </section>
 </main>
+<dialog id="solverDialog" aria-labelledby="solveTitle">
+  <h2 id="solveTitle">Solve a spot</h2><button class="dlg-x" id="closeSolver" autofocus>Close</button>
+  <p class="muted">Heads-up postflop · no rake · both players start with no outstanding bet.</p>
+  <div class="solve-buttons" aria-label="Solver mode"><button id="solveModeStored" type="button" aria-pressed="true">Browse solved spots</button><button id="solveModeCustom" type="button" aria-pressed="false">Custom solve</button></div>
+  <section id="solveStoredPane" aria-label="Saved solutions">
+    <p class="muted">Load a saved flop strategy immediately using the matchup's built-in ranges. Equivalent suits and card order are matched automatically.</p>
+    <div class="solve-fields">
+      <label>Game and stack <select id="storedGame"></select></label>
+      <label>Matchup <select id="storedSpot"></select></label>
+    </div>
+    <div class="solve-fields">
+      <label>Solved flops <select id="storedFlop"></select></label>
+      <label>Or enter a flop <input id="storedBoard" placeholder="Ah Kd 2c" maxlength="20"></label>
+    </div>
+    <div class="solve-buttons"><button type="button" id="storedLoad" disabled>Check / view flop</button><button type="button" id="storedRefresh">Refresh solved spots</button></div>
+    <p id="storedStatus" role="status" aria-live="polite">Loading solved spots…</p>
+  </section>
+  <section id="solveCustomPane" hidden aria-label="Custom solve">
+  <small class="muted">Open to everyone. One custom solve at a time; larger trees can take minutes.</small>
+  <form id="solveForm">
+    <fieldset id="solveInputs">
+      <div class="solve-fields">
+        <label>Board cards <input name="board" required value="Ks 7d 2c 5h 9s" placeholder="Ks 7d 2c" maxlength="30"></label>
+        <label>Pot (bb) <input name="pot" type="number" min="0.05" max="2000" step="0.05" value="20" required></label>
+        <label>Effective stack left (bb) <input name="stack" type="number" min="0.05" max="2000" step="0.05" value="80" required></label>
+      </div>
+      <div class="solve-ranges">
+        <label>Out-of-position range <textarea name="oop" rows="3" maxlength="12000" required spellcheck="false">AA,QQ,JJ,TT,AQs,AJs</textarea></label>
+        <label>In-position range <textarea name="ip" rows="3" maxlength="12000" required spellcheck="false">KK,99,77,22,AKs,KQs,QJs</textarea></label>
+      </div>
+      <small class="muted">Example ranges shown. Use AA, 22+, A2s+, AKo, or AKs:0.5 for 50% weight. The board removes blocked combinations.</small>
+      <details><summary>Bet sizes</summary><p class="muted">Percent of pot; raises are a multiple of the previous bet. Sizes apply to both players. Only the starting street and later streets are used.</p>
+        <div class="solve-fields">
+          <label>Flop bets <input name="flop_bets" value="33%, 75%" required maxlength="40"></label>
+          <label>Turn bets <input name="turn_bets" value="75%, 125%" required maxlength="40"></label>
+          <label>River bets <input name="river_bets" value="75%" required maxlength="40"></label>
+          <label>Raise size <input name="raises" value="2.5x" required maxlength="10"></label>
+        </div>
+        <small class="muted">1–3 bet sizes from 10%–200%; raises from 2x–4x. All-ins are added when the stack is at most 1.5 times the pot.</small>
+      </details>
+    </fieldset>
+    <div class="solve-buttons"><button id="solveSubmit" type="submit">Solve spot</button><button id="solveCancel" type="button" hidden>Cancel solve</button><button id="solveResume" type="button" hidden>Reconnect</button></div>
+  </form>
+  <p id="solveStatus" role="status" aria-live="polite">Edit the example spot, then solve. The target is 1% of the pot; the server stops after 1,000 iterations or 30 minutes.</p>
+  </section>
+  <section id="solveResult" hidden aria-label="Solver results">
+    <p id="solveSummary"></p><details><summary>Solved ranges and sizes</summary><pre id="solveSubmitted"></pre></details><p id="solvePath" class="muted"></p>
+    <div class="solve-buttons"><button id="solveBack" type="button">Back</button><button id="solveRoot" type="button">Start of street</button></div>
+    <p id="solveEnding"></p>
+    <div id="solveNode">
+      <h3 id="solvePlayer"></h3><p class="muted">Whole-range frequencies. Select an action to explore its reply.</p><div id="solveActions" class="solve-buttons"></div>
+      <div id="solveGrid" class="solve-grid" aria-label="Strategy by hand"></div>
+      <label class="solve-label">Inspect a hand <input id="solveHand" placeholder="AKs or AhKh" maxlength="4" autocomplete="off"></label><small id="solveHandNote" role="status"></small>
+      <h3 id="solveHandTitle"></h3><p id="solveHandMix"></p><div class="solve-scroll"><table id="solveCombos"></table></div>
+      <p class="muted">EV is in bb from this decision, fold = 0. Frequencies are rounded to whole percentages. The chart weights combinations by their reach. A 0% reach means this line does not bring that hand here. Exploration covers decisions on the starting street.</p>
+    </div>
+  </section>
+</dialog>
 <dialog id="browse">
   <h2>Ranges<small id="bSub"></small></h2><button class="dlg-x" id="closeBrowse" autofocus>Close</button>
   <div class="bwrap"><div><div id="bPick"></div><p id="bSit"></p></div>
@@ -294,6 +373,7 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
 <script src="data8.js"></script>
 <script src="data6.js"></script>
 <script src="ev.js"></script>
+<script src="custom-solver.js"></script>
 <script src="river.js"></script><!-- loads river_wasm.js (the 1.8 MB solver) itself, on the first postflop hand -->
 <!-- postflop solves live on the VM only; VM down = no postflop. postflop.js fetches the VM's index as data, after the page is up:
      as a script tag it held the whole page back (76 s with the VM unreachable) and ran the VM's code on this site -->
@@ -1471,7 +1551,7 @@ $("resetProg").onclick = () => { // two clicks so one stray click can't wipe you
 };
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") $("settings").open = $("sound").open = false;
-  if ($("leaks").open || $("browse").open || ["SELECT", "INPUT"].includes(e.target.tagName) || e.metaKey || e.ctrlKey) return;
+  if ($("solverDialog").open || $("leaks").open || $("browse").open || ["SELECT", "INPUT", "TEXTAREA"].includes(e.target.tagName) || e.metaKey || e.ctrlKey) return;
   const k = e.key.toLowerCase();
   // Settings open: the keys are its own (Space picks the focused chip), not shortcuts for the hand behind it; same for a focused sound chip
   if ($("settings").open || (k === " " || k === "enter") && e.target.closest(".menu[open]")) return;
