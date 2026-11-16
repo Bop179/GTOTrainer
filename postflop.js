@@ -315,7 +315,7 @@ function postDraw(fresh) {
       : `<div class="backs">${P.tag[p] !== "Fold" || folds(p) ? "<i></i><i></i>" : ""}</div>`)
     + `<div class="plate"><b>${p === me ? "You · " : ""}${P.seat[p]}</b><span>${bb(P.stack - P.spent[p])}</span></div>`
     + `<em class="tag"${P.tag[p] ? ` style="background:${AC[kind(P.tag[p] === "All-in" ? "Allin" : P.tag[p])]}"` : " hidden"}>${P.tag[p]}</em></div>`
-    + (P.put[p] ? `<div class="bet post${moved(p) ? " fly" : ""}" style="--c:${p === me ? .35 : .4};--s:${p === me ? .68 : -.66};--r:1;--y0:${50 + s * 41}%">${bb(P.put[p])}</div>` : "");
+    + (P.put[p] ? `<div class="bet post${p === me ? " me" : ""}${moved(p) ? " fly" : ""}" style="--c:${p === me ? .35 : .4};--s:${p === me ? .68 : -.66};--r:1;--y0:${50 + s * 41}%">${bb(P.put[p])}</div>` : "");
   $("felt").classList.toggle("still", !fresh);
   $("felt").innerHTML = seat(them, -1) + seat(me, 1)
     + `<div class="board">${P.board.map((x, j) => cardHTML(x, j >= P.isNew ? " new" : "")).join("")}</div>`
