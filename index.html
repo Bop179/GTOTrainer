@@ -1074,10 +1074,14 @@ function muck(seat) {
 }
 // the hand ends on the others' replies: muck the seats the reply names ("BB folds", "UTG and HJ fold", "Everyone folds")
 function foldOut(text) {
-  const seats = [...document.querySelectorAll("#felt .seat:not(.hero):not(.folded)")];
-  const names = /^Everyone folds/.test(text) ? seats.map(x => x.dataset.p)
-    : [...text.matchAll(/\b([A-Z][A-Z0-9+]*)(?: and ([A-Z][A-Z0-9+]*))? folds?\b/g)].flatMap(m => [m[1], m[2]]);
-  seats.filter(x => names.includes(x.dataset.p)).forEach((x, j) => replayTimers.push(setTimeout(() => muck(x), 450 + j * 320)));
+  const all = [...document.querySelectorAll("#felt .seat:not(.hero):not(.folded)")];
+  const i = all.length && [...document.querySelectorAll("#felt .seat")].findIndex(x => x.classList.contains("hero"));
+  // "You take the pot" means every other seat folded, named or not (the players behind a squeeze are assumed to fold); they act left of you first
+  const everyone = /^Everyone folds|You take the/.test(text), seats = [...document.querySelectorAll("#felt .seat")].map((x, j, a) => a[(i + 1 + j) % a.length]).filter(x => all.includes(x));
+  const names = everyone ? [] : [...text.matchAll(/\b([A-Z][A-Z0-9+]*)(?: and ([A-Z][A-Z0-9+]*))? folds?\b/g)].flatMap(m => [m[1], m[2]]);
+  const out = seats.filter(x => everyone || names.includes(x.dataset.p));
+  out.forEach((x, j) => replayTimers.push(setTimeout(() => muck(x), 450 + j * 320)));
+  return out.length ? 450 + out.length * 320 + 400 : 300; // how long until the table has settled
 }
 const toss = (seat, sel) => seat.querySelectorAll(sel).forEach((x, j) => x.style.animationDelay = j * .07 + "s");
 const fly = b => { b.classList.remove("fly"); void b.offsetWidth; b.classList.add("fly"); }; // restart the slide-in
@@ -1200,8 +1204,9 @@ function answer(a) {
   let more = c.k + 1 < c.steps.length, nx = more && c.steps[c.k + 1].node;
   let want = more && (c.spot.node === "RFI" && isLimp(nx) || nx === "FACINGSQZ_CALLER") ? "Call" : "Raise";
   let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
+  let settle = 300;
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
-  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); else if (!more) foldOut(after.text); }
+  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); else if (!more) settle = foldOut(after.text); }
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
     : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`}${grade === "great" && loss >= 0.05 ? ` The solver still plays it ${Math.round(f)}% of the time here, so that gap is noise in its EVs for a spot this rare.` : ""} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p id="note"><b>▸ ${note}</b></p>`);
@@ -1213,7 +1218,7 @@ function answer(a) {
     $("actions").innerHTML = plain; document.querySelectorAll("#actions button").forEach(b => b.disabled = true);
     // a beat for your action to land (the whole runout after a called all-in), then on with the hand, or its review
     c.answered = false; c.busy = true;
-    return replayTimers.push(setTimeout(() => { c.busy = false; c.answered = true; more ? next() : review(); }, more ? 700 : after?.sd ? 4400 : 300));
+    return replayTimers.push(setTimeout(() => { c.busy = false; c.answered = true; more ? next() : review(); }, more ? 700 : after?.sd ? 4400 : settle));
   }
   showFeedback();
 }

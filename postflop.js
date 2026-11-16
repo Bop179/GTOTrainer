@@ -135,7 +135,7 @@ const potFrac = x => fracText(x / potNow());
 const AC = { Fold: "var(--fold)", Check: "var(--call)", Call: "var(--call)", Bet: "var(--raise)", Raise: "var(--raise)", Allin: "var(--allin)" };
 function actName(a) { // button text
   const k = kind(a), x = amt(a), p = cur().player, call = P.put[1 - p] - P.put[p];
-  if (k === "Bet") return `Bet ${bb(x)} (${potFrac(x)})`;
+  if (k === "Bet") return `Bet ${potFrac(x)}`;
   if (k === "Raise") return `Raise to ${bb(x)}`;
   if (k === "Allin") return `All-in ${bb(P.stack - P.spent[p] + P.put[p])}`;
   return k === "Call" ? `Call ${bb(call)}` : k;
