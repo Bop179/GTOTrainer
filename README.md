@@ -1,6 +1,6 @@
 # GTO Trainer
 
-A trainer for No-Limit Hold'em cash games. You get dealt a hand at a spot, pick an action, and it grades your choice against solver ranges, showing the strategy mix for that hand and the whole range grid. Preflop covers 6-max, 8-max, 9-max and heads-up; when a 100bb hand ends heads-up in a solved pot it plays on through the flop, turn and river.
+A trainer for No-Limit Hold'em cash games. You get dealt a hand at a spot, pick an action, and it grades your choice against solver ranges, showing the strategy mix for that hand and the whole range grid. Preflop covers 6-max, 8-max and 9-max; when a 100bb hand ends heads-up in a solved pot it plays on through the flop, turn and river.
 
 ## Run it
 
@@ -45,7 +45,7 @@ Or open `index.html` from a download. Preflop works offline; postflop always nee
 | 8-max | 200bb | up to vs 6-bet, plus the same limped pots and multiway spots | not yet |
 | 9-max | 100bb | up to vs 6-bet, plus the same limped pots and multiway spots | heads-up pots once UTG has folded (the 8-max solves) |
 | 9-max | 200bb | up to vs 6-bet, plus the same limped pots and multiway spots | not yet |
-| Heads-up | 100bb | up to vs 5-bet | no |
+| Heads-up | 100bb | hidden for now (the data is still in `data.js`; drop `HU` from `HIDDEN_GAMES` in `index.html` to bring it back) | no |
 
 When a hand reaches a spot that has no data, it ends and says why ("No solver data past this point", three players to the flop, a pot that isn't solved). Planned additions are in [ROADMAP.md](ROADMAP.md).
 

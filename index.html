@@ -491,7 +491,8 @@ for (const key of Object.keys(SPOTS)) {
 }
 // spots no hand ever reaches (five of GTO Nexus's 9-max 100bb vs-6-bet files, behind an all-in 5-bet): they were empty charts in Ranges
 for (const key of Object.keys(SPOTS)) if (!SPOTS[key].some(r => r[4])) delete SPOTS[key];
-const ALL = Object.keys(SPOTS).map(parse);
+const HIDDEN_GAMES = ["HU"]; // heads-up off for now (2026-11-15): its data stays in data.js, just never offered or dealt
+const ALL = Object.keys(SPOTS).map(parse).filter(s => !HIDDEN_GAMES.includes(s.game));
 function situation(s) {
   const v = s.villain, h = s.hero, [o, w] = villains(s);
   return {
