@@ -38,8 +38,6 @@ button { cursor: pointer; }
 .menu h4, #bPick h4 { margin: 6px 0; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
 .menu h4 small, #bPick h4 small { text-transform: none; letter-spacing: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chips + .chips { margin-top: 6px; } /* a second row with no heading (Streets' "start deciding on") */
-.chips .sub { flex-basis: 100%; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; } /* a label on its own line above its chips */
 .chips button { padding: 5px 12px; border-radius: 999px; font-size: 13px; }
 .chips input { width: 100%; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 14px; }
 .chips button.on { background: var(--ok); border-color: var(--ok); color: #111; font-weight: 600; }
@@ -625,8 +623,7 @@ function drawSettings() {
     // (only hands that get there, starting on the street you pick: the @ chips, a sub-line shown with it)
     + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Streets <small>· Play to postflop deals just hands that reach a solved heads-up pot (overrides Spots)</small>",
       [["pre", "Preflop only"], ["", "Both"], ["post", "Play to postflop"]], v => (cfg.toPost ? "post" : cfg.preOnly ? "pre" : "") === v)
-      + (cfg.toPost ? group("post", "", [["@", "Preflop"], ["@flop", "Flop"], ["@turn", "Turn"], ["@river", "River"]], v => "@" + (cfg.postFrom || "") === v)
-        .replace("<h4></h4>", "").replace('data-g="post">', 'data-g="post"><small class="sub">Start deciding on</small>') : "") : "")
+      + (cfg.toPost ? group("post", "<small>Start deciding on</small>", [["@", "Preflop"], ["@flop", "Flop"], ["@turn", "Turn"], ["@river", "River"]], v => "@" + (cfg.postFrom || "") === v) : "") : "")
     + group("later", "Feedback <small>· after the hand: no grades until it's played out, then each decision's analysis</small>", [["", "After each decision"], ["hand", "After the hand"]], v => (cfg.later || "") === v);
   $("setSum").textContent = `⚙ ${GAMES[cfg.game]} · ${cfg.stack} · ${cfg.nodes.map(n => SPOT_TYPES[n]).join(", ") || "All spots"} · ${cfg.pos.join(", ") || "Any seat"}${cfg.hands.length ? " · " + cfg.hands.join(", ") : ""}${toPost() ? " · play to postflop" + (cfg.postFrom ? ", from the " + cfg.postFrom : "") : cfg.preOnly ? " · preflop only" : ""}`;
 }
