@@ -252,7 +252,7 @@ async function closeStreet() {
       P.board.push(dealOne()); P.isNew = P.board.length - 1; postDraw(false);
     }
     await new Promise(r => setTimeout(r, 600)); live(h);
-    return end(`All-in: ${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. ${winner()}`, true);
+    return end(`${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. ${winner()}`, true);
   }
   if (P.street === 2) return end(`${P.seat[1 - P.me]} shows ${cardsOf(P.hands[1 - P.me]).map(cardText).join("")}. ${winner()}`, true);
   const c = dealOne();
