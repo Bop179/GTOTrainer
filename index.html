@@ -225,12 +225,16 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
   padding: 3px 12px; border-radius: 999px; font-size: 13px; white-space: nowrap; color: var(--text); background: #0009; animation: hint .4s .3s both; } }
 @keyframes hint { from { opacity: 0; } }
 @media (hover: none) { kbd { display: none; } .chips input { font-size: 16px; } }
-/* wide screens: range chart | table | analysis side by side, so feedback never needs a scroll */
+/* Desktop columns fit below the header; long feedback scrolls inside its column, not the page. */
 @media (min-width: 1200px) {
-  main { max-width: 1600px; grid-template-columns: 360px minmax(0, 1fr) 360px; grid-template-areas: "drill drill drill" "chart table analysis"; align-items: start; }
+  body { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  body > header { flex-shrink: 0; }
+  .menu > div { max-height: calc(100dvh - 100px); overflow: auto; }
+  main { width: 100%; max-width: 1600px; flex: 1; min-height: 0; overflow: hidden; grid-template-columns: 360px minmax(0, 1fr) 360px; grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "drill drill drill" "chart table analysis"; align-items: start; }
   .drillbar { grid-area: drill; } .table { grid-area: table; } .chart { grid-area: chart; } .analysis { grid-area: analysis; }
+  .table { max-height: 100%; overflow: auto; }
   .feedback, .feedback.show { display: contents; }
-  .feedback > div { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
+  .feedback > div { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; max-height: 100%; overflow: auto; }
   .feedback:not(.show) > div { visibility: hidden; }
   .why { font-size: 14px; }
   .grid { grid-template-columns: repeat(13, 24px); } .grid div { height: 24px; }
