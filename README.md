@@ -88,6 +88,8 @@ When a hand reaches a spot that has no data, it ends and says why ("No solver da
 
 ## Custom solver server
 
+The Custom form includes a live timing reference based on street and remaining stack ÷ pot, plus a collapsible typical-times guide. Flop ranges come from VM batch logs (November 2026), not calibrated custom benchmarks; custom ranges, bet sizes, board texture and load are not modelled. Small river tests took seconds; turns remain unbenchmarked. Estimates can exceed the service's 30-minute cutoff and do not guarantee completion.
+
 Custom spots use the existing native engine through `solver/serve.py`, proxied by Caddy at `/solve/`. Access is public: no key or login. The browser saves only a random job ID in session storage for reconnecting. Anyone who knows a job ID can read or cancel that job; IDs are not listed publicly.
 Limits: one job at a time, 12 GB of compressed tree storage, 30 minutes, 1,000 iterations, and a target exploitability of 1% of the pot. Results explicitly say when the iteration limit misses that target. New jobs need 15 GB of available server RAM; the service itself is capped at 14 GB with swap disabled. Large or deep trees can still be rejected: reduce the bet sizes or ranges. Pot and remaining stack accept 0.05–2,000bb. Each street allows 1–3 bets from 10%–200% of the pot and a 2x–4x raise. Both players use those sizes and the existing engine's all-in thresholds; rake is zero.
 

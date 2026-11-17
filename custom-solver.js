@@ -17,6 +17,18 @@ const CustomSolver = (() => {
     const a = h.slice(0, 2), b = h.slice(2);
     return a[0] === b[0] ? a[0] + b[0] : [a[0], b[0]].sort((x, y) => ranks.indexOf(x) - ranks.indexOf(y)).join('') + (a[1] === b[1] ? 's' : 'o');
   }
+  function estimateTime(value, pot, stack) {
+    let cards;
+    try { cards = board(value).length / 2; } catch { return { time: '—', detail: 'Enter 3–5 distinct board cards.' }; }
+    if (![pot, stack].every(n => Number.isFinite(n) && n >= .05 && n <= 2000))
+      return { time: '—', detail: 'Enter pot and stack between 0.05 and 2,000 bb.' };
+    const spr = stack / pot, detail = `${['Flop', 'Turn', 'River'][cards - 3]} · SPR ${spr.toFixed(1)}`;
+    if (cards === 5) return { time: 'Seconds for small ranges', detail: detail + ' · Wider ranges may take longer.' };
+    if (cards === 4) return { time: 'Not yet benchmarked', detail: detail + ' · Usually faster than a comparable flop solve.' };
+    // shortcut: SPR buckets use batch timings, not custom-tree calibration; replace when custom timing samples exist.
+    const time = spr <= 2 ? '2–7 sec' : spr <= 6 ? '20–75 sec' : spr <= 22 ? '4–12 min' : spr <= 40 ? '7–21 min' : spr <= 60 ? '12–24 min' : '20–35+ min';
+    return { time: '≈ ' + time, detail: detail + (spr > 60 ? ' · May hit the 30 min limit.' : ' · Flop reference') };
+  }
   const group = (n, h) => n.hands.flatMap((c, i) => handClass(c) === h ? [i] : []);
   function average(n, indices) {
     const total = indices.reduce((s, i) => s + n.reach[i], 0);
@@ -51,7 +63,7 @@ const CustomSolver = (() => {
     if (put.every(v => v >= result.stack - .01)) return 'All-in called. No betting decisions remain.';
     return result.board.length === 10 ? 'River complete: showdown.' : 'Street complete. Enter a later street as a new spot to solve it.';
   }
-  return { board, handClass, group, average, nextKey, ending, findFlop, remapNodes, cardText, cardsHTML };
+  return { board, handClass, group, average, nextKey, ending, findFlop, remapNodes, cardText, cardsHTML, estimateTime };
 })();
 if (typeof module !== 'undefined') module.exports = CustomSolver;
 if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => {
@@ -63,6 +75,14 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
   try { state.id = sessionStorage.getItem('gto-custom-job'); } catch {}
   const remember = () => { try { state.id ? sessionStorage.setItem('gto-custom-job', state.id) : sessionStorage.removeItem('gto-custom-job'); } catch {} };
   const message = text => { el('solveStatus').textContent = text; };
+  function updateEstimate() {
+    const value = name => form.elements.namedItem(name).value;
+    const estimate = CustomSolver.estimateTime(value('board'), +value('pot'), +value('stack'));
+    el('solveEstimate').textContent = estimate.time;
+    el('solveEstimateDetail').textContent = estimate.detail;
+  }
+  form.oninput = updateEstimate;
+  updateEstimate();
   function busy(on) {
     state.busy = on;
     const unresolved = !!state.id && !state.jobDone;

@@ -271,6 +271,11 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
 .solve-details { font-size: 12px; margin: 10px 0; color: var(--muted); }
 .solve-details summary { cursor: pointer; width: fit-content; }
 .solve-details p { max-width: 70ch; margin: 8px 0; }
+.solve-timing { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.solve-timing p { margin: 5px 0; font-size: 12px; }
+.solve-timing strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.solve-timing table { width: 100%; max-width: 400px; font-size: 12px; }
+.solve-timing th { text-align: left; } .solve-timing td:last-child { text-align: right; }
 #solveResult { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 20px; }
 .solve-overview { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 .solve-board { display: flex; gap: 5px; }
@@ -386,6 +391,17 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
           <small class="muted">Bets: 10–200% pot, up to 3 sizes. Raises: 2–4×. Same sizes for both players.</small>
         </details>
       </fieldset>
+      <div class="solve-timing">
+        <div role="status" aria-live="polite" aria-atomic="true"><small class="muted">◷ Timing reference</small><p><strong id="solveEstimate">—</strong></p><p id="solveEstimateDetail" class="muted"></p></div>
+        <details class="solve-details"><summary>ⓘ Typical times</summary>
+          <table aria-label="Observed VM flop solve times"><thead><tr><th scope="col">Flop spot</th><th scope="col">Typical time</th></tr></thead><tbody>
+            <tr><td>100bb · 4-bet</td><td>2–7 sec</td></tr><tr><td>100bb · 3-bet</td><td>20–75 sec</td></tr><tr><td>100bb · Single-raised</td><td>4–12 min</td></tr><tr><td>200bb · Single-raised</td><td>7–21 min</td></tr><tr><td>100bb · Limped</td><td>12–24 min</td></tr>
+          </tbody></table>
+          <p>VM batch timings, not custom benchmarks. The flop reference uses stack ÷ pot (SPR). Ranges, bet sizes, board texture and server load can change runtime substantially.</p>
+          <p>Small river tests finished in seconds; turns have not been benchmarked. The 30 min limit stops a solve, even if unfinished.</p>
+        </details>
+        <p class="muted">Rough guide · Ranges &amp; bet sizes can change runtime.</p>
+      </div>
       <div class="solve-buttons"><button id="solveSubmit" class="solve-primary" type="submit">▶ Solve</button><button id="solveCancel" type="button" hidden>■ Cancel</button><button id="solveResume" type="button" hidden>↻ Reconnect</button><small class="muted">1% target · 30 min max</small></div>
     </form>
     <p id="solveStatus" class="solve-status" role="status" aria-live="polite">Example spot · Edit to solve your own.</p>

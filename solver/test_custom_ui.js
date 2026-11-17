@@ -5,6 +5,8 @@ const result = {board:input.board,pot:5.5,stack:97.5,iters:10,exploit:.005,mem_g
 function setup(respond) {
   const elements = new Map();
   const get = id => { if (!elements.has(id)) elements.set(id,{value:'',textContent:'',hidden:false,disabled:false,showModal(){},close(){},setAttribute(){}}); return elements.get(id); };
+  const fields = { board: {value: 'Ah Kd 2c'}, pot: {value: '5.5'}, stack: {value: '97.5'} };
+  get('solveForm').elements = {namedItem: name => fields[name]};
   const storage = new Map([['gto-custom-job','a'.repeat(32)]]);
   const ctx = {document:{getElementById:get,addEventListener(_,f){f();}},window:{POST_BASE:'https://example.test/'},
     sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
@@ -15,6 +17,13 @@ function setup(respond) {
 const flush = async () => { for (let i=0;i<10;i++) await new Promise(setImmediate); };
 (async () => {
   const get = setup(async url => new Response(JSON.stringify(url.endsWith('/result') ? result : {state:'done',input,id:'a'.repeat(32)})));
+  assert.match(get('solveEstimate').textContent, /4–12 min/);
+  get('solveForm').elements.namedItem('pot').value = '50';
+  get('solveForm').oninput();
+  assert.match(get('solveEstimate').textContent, /2–7 sec/);
+  get('solveForm').elements.namedItem('board').value = 'Ah Ah 2c';
+  get('solveForm').oninput();
+  assert.equal(get('solveEstimate').textContent, '—', 'Invalid edits must clear the old estimate');
   assert.equal(get('solveSubmit').disabled,true,'Unresolved restored job must not allow another submission');
   get('solveModeCustom').onclick();
   get('solveResume').onclick(); await flush();

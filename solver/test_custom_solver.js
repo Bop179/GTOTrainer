@@ -31,3 +31,11 @@ assert.match(S.cardsHTML('AhKs'), /aria-label="A hearts"/);
 assert.match(S.cardsHTML('AhKs'), /solve-card red/);
 assert.throws(() => S.cardsHTML('<img src=x>'));
 console.log('ok: suit labels and safe card rendering');
+for (const [stack, time] of [[10,'2–7 sec'],[30,'20–75 sec'],[100,'4–12 min'],[200,'7–21 min'],[300,'12–24 min'],[500,'20–35+ min']])
+  assert.equal(S.estimateTime('Ah Kd 2c',5,stack).time, '≈ ' + time);
+assert.match(S.estimateTime('AhKd2c',5,500).detail,/30 min limit/);
+assert.match(S.estimateTime('AhKd2c3s',20,80).time,/Not yet benchmarked/);
+assert.match(S.estimateTime('AhKd2c3s4h',20,80).time,/Seconds for small ranges/);
+for (const [board,pot,stack] of [['AhAh2c',20,80],['AhKd2c',0,80],['AhKd2c',20,NaN],['AhKd2c',Infinity,80],['AhKd2c',20,2001]])
+  assert.equal(S.estimateTime(board,pot,stack).time,'—');
+console.log('ok: timing reference buckets, street limitations and invalid input');
