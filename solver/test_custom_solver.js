@@ -26,3 +26,8 @@ const mapped=S.remapNodes({'':{...n,hands:['AsQs']}},match.suits);
 assert.equal(mapped[''].hands[0],'AhQh');
 assert.equal(n.hands[0],'AhKh');
 console.log('ok: saved-flop lookup, order independence, suit mapping and texture mismatch');
+assert.equal(S.cardText('AhKd2c'), 'A♥K♦2♣');
+assert.match(S.cardsHTML('AhKs'), /aria-label="A hearts"/);
+assert.match(S.cardsHTML('AhKs'), /solve-card red/);
+assert.throws(() => S.cardsHTML('<img src=x>'));
+console.log('ok: suit labels and safe card rendering');

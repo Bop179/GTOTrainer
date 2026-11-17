@@ -236,26 +236,71 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
   .grid { grid-template-columns: repeat(13, 24px); } .grid div { height: 24px; }
 }
 @media (max-width: 760px) { .feedback.show { grid-template-columns: 1fr; } .grid { grid-template-columns: repeat(13, minmax(0, 1fr)); } .stats { margin-left: 0; } }
-/* Custom spot solver shares the trainer's palette and dialog controls. */
+/* Solver: compact controls, suit-marked cards, details on demand. */
 #solverDialog { width: min(1000px, calc(100% - 24px)); max-height: calc(100dvh - 32px); overflow: auto; }
-#solverDialog fieldset { padding: 0; border: 0; margin: 16px 0; min-width: 0; }
-#solverDialog label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-#solverDialog input, #solverDialog textarea, #solverDialog select { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--bg); color: var(--text); font: inherit; }
-#solverDialog textarea { resize: vertical; }
-.solve-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 12px 0; }
-.solve-ranges { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 8px; }
-.solve-label { max-width: 440px; margin: 12px 0 4px; }
-.solve-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.solve-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#solverDialog h2 { margin: 0; } #solverDialog h2 small { display: inline-block; font-size: 12px; }
+#solverDialog fieldset { padding: 0; border: 0; margin: 0; min-width: 0; }
+#solverDialog label { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: 12px; color: var(--muted); }
+#solverDialog label small { font-size: 11px; font-weight: 400; }
+#solverDialog input, #solverDialog textarea, #solverDialog select { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 9px 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 14px; line-height: 1.4; }
+#solverDialog input::placeholder, #solverDialog textarea::placeholder { color: var(--muted); opacity: 1; }
+#solverDialog textarea { resize: vertical; min-height: 65px; }
+#solverDialog button:disabled { opacity: .4; cursor: default; }
+#solverDialog .solve-icon { width: 36px; height: 36px; padding: 0; font-size: 22px; flex-shrink: 0; }
+#solverDialog .solve-primary { background: var(--text); border-color: var(--text); color: var(--bg); font-weight: 650; padding-inline: 18px; }
+.solve-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 14px 0 16px; }
+.solve-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 16px; color: var(--muted); }
+.solve-tabs [aria-pressed="true"] { color: var(--text); border-bottom-color: var(--text); }
+.solve-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.solve-matchup { grid-template-columns: minmax(130px, 1fr) minmax(0, 2fr); }
+.solve-numbers { grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); }
+.solve-sizes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.solve-ranges { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.solve-unit { display: flex; position: relative; align-items: center; }
+#solverDialog .solve-unit input { padding-right: 36px; }
+.solve-unit > span { position: absolute; right: 12px; pointer-events: none; }
+.solve-label { max-width: 220px; margin-bottom: 8px; }
+.solve-buttons { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .solve-buttons [hidden] { display: none; }
-.solve-buttons [aria-pressed="true"] { border-color: var(--text); background: var(--line); }
-.solve-grid { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 2px; max-width: 650px; margin: 16px 0; }
-.solve-grid button { border: 0; border-radius: 3px; min-width: 0; padding: 0; aspect-ratio: 1.2; font-size: clamp(9px, 2vw, 14px); }
+.solve-status { font-size: 13px; margin: 8px 0 12px; min-height: 20px; color: var(--muted); }
+.solve-details { font-size: 12px; margin: 10px 0; color: var(--muted); }
+.solve-details summary { cursor: pointer; width: fit-content; }
+.solve-details p { max-width: 70ch; margin: 8px 0; }
+#solveResult { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 20px; }
+.solve-overview { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.solve-board { display: flex; gap: 5px; }
+.solve-card { display: inline-flex; align-items: center; justify-content: center; background: var(--text); color: var(--bg); border-radius: 5px; width: 42px; height: 53px; font-size: 19px; font-weight: 650; }
+.solve-card.red { color: #a52829; }
+.solve-metrics { display: flex; flex-wrap: wrap; gap: 18px; }
+.solve-metric { display: flex; flex-direction: column; } .solve-metric small { font-size: 11px; color: var(--muted); } .solve-metric b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.solve-nav { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.solve-nav p { margin: 0; font-size: 12px; }
+.solve-node-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#solverDialog .solve-node-heading h3 { margin: 6px 0; color: var(--text); font-size: 14px; }
+.solve-node-heading small { font-size: 11px; }
+#solveActions { margin-top: 6px; } #solveActions button { display: flex; gap: 12px; align-items: center; }
+.solve-analysis { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; align-items: start; margin-top: 16px; }
+.solve-grid { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 2px; max-width: 650px; }
+.solve-grid button { border: 0; border-radius: 3px; min-width: 0; padding: 0; aspect-ratio: 1.1; font-size: 11px; }
 .solve-grid .selected { outline: 2px solid var(--text); outline-offset: -2px; }
-.solve-scroll { overflow-x: auto; }
-#solvePath, #solveSummary, #solveStatus { overflow-wrap: anywhere; }
-#solveSubmitted { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px; }
+.solve-hand-panel { min-width: 0; } #solverDialog .solve-hand-panel h3 { margin: 12px 0 4px; color: var(--text); font-size: 14px; }
+#solveHandMix { font-size: 12px; margin: 0 0 12px; color: var(--muted); }
+.solve-scroll { overflow-x: auto; } #solverDialog #solveCombos { font-size: 12px; }
+#solveCombos th, #solveCombos td { white-space: nowrap; }
+#solveCombos .solve-card { width: auto; height: auto; padding: 2px 3px; border-radius: 3px; font-size: 11px; margin-right: 2px; }
+#solvePath, #solveSummary, #solveStatus, #storedStatus { overflow-wrap: anywhere; }
+#solveSubmitted { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 #solverDialog :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-@media (max-width: 600px) { .solve-ranges { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .solve-analysis { grid-template-columns: 1fr; gap: 18px; } }
+@media (max-width: 480px) {
+  #solverDialog { padding: 14px; } #solverDialog h2 small { display: block; margin-left: 0; }
+  .solve-numbers { grid-template-columns: repeat(2, minmax(0, 1fr)); } .solve-numbers > label:first-child { grid-column: 1 / -1; }
+  .solve-matchup { grid-template-columns: 1fr; } .solve-sizes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .solve-overview { gap: 12px; } .solve-card { width: 37px; height: 46px; font-size: 17px; }
+  .solve-metrics { gap: 16px; } .solve-grid button { font-size: 9px; }
+  #solverDialog input, #solverDialog textarea, #solverDialog select { font-size: 16px; }
+}
 </style>
 </head>
 <body>
@@ -301,60 +346,67 @@ main:has(.feedback.show, .actions .end) .felt { cursor: pointer; }
   </section>
 </main>
 <dialog id="solverDialog" aria-labelledby="solveTitle">
-  <h2 id="solveTitle">Solve a spot</h2><button class="dlg-x" id="closeSolver" autofocus>Close</button>
-  <p class="muted">Heads-up postflop · no rake · both players start with no outstanding bet.</p>
-  <div class="solve-buttons" aria-label="Solver mode"><button id="solveModeStored" type="button" aria-pressed="true">Browse solved spots</button><button id="solveModeCustom" type="button" aria-pressed="false">Custom solve</button></div>
+  <div class="solve-heading"><h2 id="solveTitle">Solver <small>Heads-up · No rake</small></h2><button id="closeSolver" class="solve-icon" aria-label="Close solver" title="Close (Esc)" autofocus>×</button></div>
+  <div class="solve-tabs" aria-label="Solver mode"><button id="solveModeStored" type="button" aria-pressed="true"><span aria-hidden="true">⚡</span> Saved</button><button id="solveModeCustom" type="button" aria-pressed="false"><span aria-hidden="true">⚙</span> Custom</button></div>
   <section id="solveStoredPane" aria-label="Saved solutions">
-    <p class="muted">Load a saved flop strategy immediately using the matchup's built-in ranges. Equivalent suits and card order are matched automatically.</p>
-    <div class="solve-fields">
-      <label>Game and stack <select id="storedGame"></select></label>
+    <div class="solve-fields solve-matchup">
+      <label>Game / stack <select id="storedGame"></select></label>
       <label>Matchup <select id="storedSpot"></select></label>
     </div>
     <div class="solve-fields">
-      <label>Solved flops <select id="storedFlop"></select></label>
-      <label>Or enter a flop <input id="storedBoard" placeholder="Ah Kd 2c" maxlength="20"></label>
+      <label>Saved flop <select id="storedFlop"></select></label>
+      <label>Find a flop <input id="storedBoard" placeholder="Ah Kd 2c" maxlength="20"></label>
     </div>
-    <div class="solve-buttons"><button type="button" id="storedLoad" disabled>Check / view flop</button><button type="button" id="storedRefresh">Refresh solved spots</button></div>
-    <p id="storedStatus" role="status" aria-live="polite">Loading solved spots…</p>
+    <div class="solve-buttons"><button type="button" id="storedLoad" class="solve-primary" disabled>View flop <span aria-hidden="true">→</span></button><button type="button" id="storedRefresh" class="solve-icon" title="Refresh solved spots" aria-label="Refresh solved spots">↻</button><small class="muted">Preset ranges · Suits matched</small></div>
+    <p id="storedStatus" class="solve-status" role="status" aria-live="polite">Loading flops…</p>
   </section>
   <section id="solveCustomPane" hidden aria-label="Custom solve">
-  <small class="muted">Open to everyone. One custom solve at a time; larger trees can take minutes.</small>
-  <form id="solveForm">
-    <fieldset id="solveInputs">
-      <div class="solve-fields">
-        <label>Board cards <input name="board" required value="Ks 7d 2c 5h 9s" placeholder="Ks 7d 2c" maxlength="30"></label>
-        <label>Pot (bb) <input name="pot" type="number" min="0.05" max="2000" step="0.05" value="20" required></label>
-        <label>Effective stack left (bb) <input name="stack" type="number" min="0.05" max="2000" step="0.05" value="80" required></label>
-      </div>
-      <div class="solve-ranges">
-        <label>Out-of-position range <textarea name="oop" rows="3" maxlength="12000" required spellcheck="false">AA,QQ,JJ,TT,AQs,AJs</textarea></label>
-        <label>In-position range <textarea name="ip" rows="3" maxlength="12000" required spellcheck="false">KK,99,77,22,AKs,KQs,QJs</textarea></label>
-      </div>
-      <small class="muted">Example ranges shown. Use AA, 22+, A2s+, AKo, or AKs:0.5 for 50% weight. The board removes blocked combinations.</small>
-      <details><summary>Bet sizes</summary><p class="muted">Percent of pot; raises are a multiple of the previous bet. Sizes apply to both players. Only the starting street and later streets are used.</p>
-        <div class="solve-fields">
-          <label>Flop bets <input name="flop_bets" value="33%, 75%" required maxlength="40"></label>
-          <label>Turn bets <input name="turn_bets" value="75%, 125%" required maxlength="40"></label>
-          <label>River bets <input name="river_bets" value="75%" required maxlength="40"></label>
-          <label>Raise size <input name="raises" value="2.5x" required maxlength="10"></label>
+    <form id="solveForm">
+      <fieldset id="solveInputs">
+        <div class="solve-fields solve-numbers">
+          <label>Board <input name="board" required value="Ks 7d 2c 5h 9s" placeholder="Ks 7d 2c" maxlength="30"></label>
+          <label>Pot <span class="solve-unit"><input name="pot" aria-label="Pot in big blinds" type="number" min="0.05" max="2000" step="0.05" value="20" required><span>bb</span></span></label>
+          <label>Stack left <span class="solve-unit"><input name="stack" aria-label="Effective remaining stack in big blinds" type="number" min="0.05" max="2000" step="0.05" value="80" required><span>bb</span></span></label>
         </div>
-        <small class="muted">1–3 bet sizes from 10%–200%; raises from 2x–4x. All-ins are added when the stack is at most 1.5 times the pot.</small>
-      </details>
-    </fieldset>
-    <div class="solve-buttons"><button id="solveSubmit" type="submit">Solve spot</button><button id="solveCancel" type="button" hidden>Cancel solve</button><button id="solveResume" type="button" hidden>Reconnect</button></div>
-  </form>
-  <p id="solveStatus" role="status" aria-live="polite">Edit the example spot, then solve. The target is 1% of the pot; the server stops after 1,000 iterations or 30 minutes.</p>
+        <div class="solve-ranges">
+          <label><span>OOP <small>· acts first</small></span><textarea name="oop" aria-label="Out-of-position range" rows="2" maxlength="12000" required spellcheck="false">AA,QQ,JJ,TT,AQs,AJs</textarea></label>
+          <label><span>IP <small>· acts last</small></span><textarea name="ip" aria-label="In-position range" rows="2" maxlength="12000" required spellcheck="false">KK,99,77,22,AKs,KQs,QJs</textarea></label>
+        </div>
+        <details class="solve-details"><summary>⚙ Bet sizes</summary>
+          <div class="solve-fields solve-sizes">
+            <label>Flop <input name="flop_bets" value="33%, 75%" required maxlength="40"></label>
+            <label>Turn <input name="turn_bets" value="75%, 125%" required maxlength="40"></label>
+            <label>River <input name="river_bets" value="75%" required maxlength="40"></label>
+            <label>Raise <input name="raises" value="2.5x" required maxlength="10"></label>
+          </div>
+          <small class="muted">Bets: 10–200% pot, up to 3 sizes. Raises: 2–4×. Same sizes for both players.</small>
+        </details>
+      </fieldset>
+      <div class="solve-buttons"><button id="solveSubmit" class="solve-primary" type="submit">▶ Solve</button><button id="solveCancel" type="button" hidden>■ Cancel</button><button id="solveResume" type="button" hidden>↻ Reconnect</button><small class="muted">1% target · 30 min max</small></div>
+    </form>
+    <p id="solveStatus" class="solve-status" role="status" aria-live="polite">Example spot · Edit to solve your own.</p>
   </section>
+  <details class="solve-details solve-help"><summary>ⓘ Help</summary>
+    <p><b>Saved:</b> instant lookup using the matchup’s preset ranges. Suit-equivalent flops count as solved.</p>
+    <p><b>Custom:</b> enter 3–5 board cards, the pot and effective stack left. Both players start with no outstanding bet. One shared server slot; closing this window keeps the solve running.</p>
+    <p><b>Ranges:</b> AA, 22+, A2s+, AKo. AKs:0.5 = 50% weight. Board blockers are removed automatically. The filled ranges are examples.</p>
+    <p><b>Limits:</b> 1% pot exploitability target; 1,000 iterations or 30 minutes. All-ins are added at a stack-to-pot ratio ≤ 1.5. Explore the starting street; enter a new spot for a later street.</p>
+  </details>
   <section id="solveResult" hidden aria-label="Solver results">
-    <p id="solveSummary"></p><details><summary>Solved ranges and sizes</summary><pre id="solveSubmitted"></pre></details><p id="solvePath" class="muted"></p>
-    <div class="solve-buttons"><button id="solveBack" type="button">Back</button><button id="solveRoot" type="button">Start of street</button></div>
+    <div class="solve-overview"><div id="solveBoard" class="solve-board" role="group" aria-label="Solved board"></div><div id="solveSummary" class="solve-metrics"></div></div>
+    <details class="solve-details"><summary>ⓘ Solve details</summary><p id="solveRun" class="muted"></p><pre id="solveSubmitted"></pre></details>
+    <div class="solve-nav"><div class="solve-buttons"><button id="solveBack" type="button" title="Previous decision">← Back</button><button id="solveRoot" type="button" title="Start of street">↤ Start</button></div><p id="solvePath" class="muted"></p></div>
     <p id="solveEnding"></p>
     <div id="solveNode">
-      <h3 id="solvePlayer"></h3><p class="muted">Whole-range frequencies. Select an action to explore its reply.</p><div id="solveActions" class="solve-buttons"></div>
-      <div id="solveGrid" class="solve-grid" aria-label="Strategy by hand"></div>
-      <label class="solve-label">Inspect a hand <input id="solveHand" placeholder="AKs or AhKh" maxlength="4" autocomplete="off"></label><small id="solveHandNote" role="status"></small>
-      <h3 id="solveHandTitle"></h3><p id="solveHandMix"></p><div class="solve-scroll"><table id="solveCombos"></table></div>
-      <p class="muted">EV is in bb from this decision, fold = 0. Frequencies are rounded to whole percentages. The chart weights combinations by their reach. A 0% reach means this line does not bring that hand here. Exploration covers decisions on the starting street.</p>
+      <div class="solve-node-heading"><h3 id="solvePlayer"></h3><small class="muted">Range mix · Select an action ↓</small></div><div id="solveActions" class="solve-buttons"></div>
+      <div class="solve-analysis">
+        <div id="solveGrid" class="solve-grid" aria-label="Strategy by hand"></div>
+        <div class="solve-hand-panel">
+          <label class="solve-label">Hand <input id="solveHand" placeholder="AKs / AhKh" maxlength="4" autocomplete="off"></label><small id="solveHandNote" role="status"></small>
+          <h3 id="solveHandTitle"></h3><p id="solveHandMix"></p><div class="solve-scroll"><table id="solveCombos"></table></div>
+          <details class="solve-details"><summary>ⓘ Reading results</summary><p>EV is in bb from this decision; fold = 0. Frequencies are rounded to whole %. The chart weights combos by reach. “Off-path” means this line does not reach that hand.</p><p>Exploitability is measured as % of the starting pot; lower is better. A result above 1% missed the accuracy target.</p></details>
+        </div>
+      </div>
     </div>
   </section>
 </dialog>

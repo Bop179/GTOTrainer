@@ -195,6 +195,7 @@ Postflop covers heads-up pots only; 9-max reuses the 8-max solves once UTG has f
 - [x] Solver dialog with editable heads-up flop/turn/river, pot, remaining stack, both ranges and bet sizes.
 - [x] Public server API (no key or login), one bounded solve at a time, cancellation and reconnect; separate native binary and temporary results.
 - [x] Instant saved-flop browser: game/stack, matchup, solved-flop list and entered-flop coverage check, including equivalent suits and card order. Refresh revalidates current coverage.
+- [x] Compact solver UI: Saved/Custom tabs, suit-marked cards, concise labels, expandable help/details and a side-by-side range/EV layout on desktop (2026-11-16).
 - [x] Starting-street strategy chart, combination EVs, action exploration and submitted-input snapshot. Results show achieved exploitability and whether the 1% target was met.
 - Limits: 12 GB compressed tree budget, 30-minute deadline and 1,000 iterations. Large trees may need fewer sizes. Public access; random job IDs allow reconnecting and cancellation. Later streets require a new custom spot; no preflop, multiway or rake support.
 
