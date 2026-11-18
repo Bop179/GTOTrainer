@@ -374,9 +374,12 @@ function postExplain(node, h) {
   // equity against the villain's range now; the mark on the bar is what a call needs
   const call = P.put[1 - me] - P.put[me], need = call / (potNow() + call) * 100, eq = equity(hole, board, villainRange()) * 100;
   if (call > 0) maths.push(`Equity needed to call = call ÷ (pot + call) = ${f1(call)} ÷ (${f1(potNow())} + ${f1(call)}) = ${f1(call)} ÷ ${f1(potNow() + call)} = <b>${f1(need)}%</b>.`);
+  // equity beats the price but the solver mostly folds: the betting still to come lowers what the hand realizes
+  const folds = h >= 0 && call > 0 && kind(node.actions[node.strat.reduce((b, s, j) => s[h] > node.strat[b][h] ? j : b, 0)]) === "Fold";
   if (!isNaN(eq)) {
-    tiles.push(tile("Equity", f1(eq) + "%", `<i><b style="width:${eq}%"></b>${call > 0 ? `<u style="left:${need}%"></u>` : ""}</i>`, call > 0 && `a call needs ${f1(need)}%`, `showdown equity vs ${P.seat[1 - me]}'s range, not outs`));
+    tiles.push(tile("Equity", f1(eq) + "%", `<i><b style="width:${eq}%"></b>${call > 0 ? `<u style="left:${need}%"></u>` : ""}</i>`, call > 0 && `a call needs ${f1(need)}%`, folds && eq >= need && "yet the solver mostly folds", `showdown equity vs ${P.seat[1 - me]}'s range, not outs`));
     maths.push(`Equity is your share of the pot against ${P.seat[1 - me]}'s range if the hand checked down from here${call > 0 ? `: ${f1(eq)}% ${eq >= need ? "≥" : "<"} the ${f1(need)}% a call needs` : ""}. The solver's EV also counts the betting still to come, so the two can disagree.`);
+    if (folds && eq >= need) maths.push(`Why fold with ${f1(eq)}% against ${f1(need)}%? The ${f1(need)}% is the price if the betting ended with this call. It doesn't: you can still face a bet, and the cards that make you fold or pay off a better hand cost you part of that equity. The call only breaks even if you realize about ${Math.round(need / eq * 100)}% of that equity, and the solver folds because this hand realizes less.`);
   }
   // a draw's outs: exact in the tile, the rule of 2 and 4 in the maths
   if (hc.draw) {
