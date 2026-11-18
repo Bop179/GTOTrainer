@@ -92,11 +92,29 @@ async function loadPiece(path, swap) {
     return decodePiece(await new Response(r.body.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer(), swap);
   } catch { throw new Error(`${url} didn't load (the VM is down, or that flop isn't solved yet)`); }
 }
+// v2 piece body (split.py pack2: hand lists stored once, numbers as byte planes) -> the v1 body decodePiece reads
+function unpack2(src, { lists, nodes }) {
+  let o = 0;
+  const unplane = (n, w) => { const b = new Uint8Array(n * w); for (let j = 0; j < w; j++) for (let i = 0; i < n; i++) b[i * w + j] = src[o++]; return b; };
+  const hl = lists.map(n => unplane(n, 2));
+  let H = 0, E = 0;
+  for (const [, , a, h] of nodes) { H += h; E += a.length * h; }
+  const reach = unplane(H, 4), strat = src.subarray(o, o += E), ev = unplane(E, 4), out = new Uint8Array(6 * H + 5 * E);
+  let w = 0, r = 0, s = 0, e = 0;
+  for (const [, , a, h, li] of nodes) {
+    const n = a.length * h;
+    out.set(hl[li], w); w += 2 * h;
+    out.set(reach.subarray(r, r += 4 * h), w); w += 4 * h;
+    out.set(strat.subarray(s, s += n), w); w += n;
+    out.set(ev.subarray(e, e += 4 * n), w); w += 4 * n;
+  }
+  return out.buffer;
+}
 function decodePiece(buf, swap) {
-  const v = new DataView(buf), hl = v.getUint32(0, true), head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, hl)));
+  let v = new DataView(buf), hl = v.getUint32(0, true), head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, hl))), o = 4 + hl;
+  if (head.v === 2) { buf = unpack2(new Uint8Array(buf, o), head); v = new DataView(buf); head = head.nodes; o = 0; }
   const sx = x => !swap ? x : x[0] + (x[1] === swap[0] ? swap[1] : x[1] === swap[1] ? swap[0] : x[1]);
   const c52 = i => sx(UP[i >> 2] + SUIT[i & 3]), out = {};
-  let o = 4 + hl;
   for (const [k, player, actions, h] of head) {
     const hands = [], reach = [], strat = [], ev = [];
     for (let i = 0; i < h; i++, o += 2) { const c = v.getUint16(o, true); hands.push(holeStr(c52(Math.floor(c / 52)), c52(c % 52))); }

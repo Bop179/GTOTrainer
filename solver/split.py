@@ -6,6 +6,8 @@
 #   u32 header length, header JSON [[key, player, [actions], hands], ...] per node, then per node in the same order:
 #   u16 hand[hands] (card a * 52 + card b, card = rank "23456789TJQKA" * 4 + suit "shdc"), u32 reach x1000 [hands],
 #   u8 strategy % [actions][hands], i32 EV x100 bb [actions][hands]. All little-endian. postflop.js loadPiece reads it.
+# Since 2026-11-18 pieces are written as v2 (pack2 below: the same numbers rearranged, ~19% smaller gzipped); postflop.js
+# reads both. convert_v2.py rewrote the v1 pieces already on disk.
 # Turns that play the same are stored once: with suits the flop doesn't have, a turn in any of them is the first one's
 # piece with the two suits swapped (postflop.js does the swap).
 # Once split, a result is truncated to an empty marker with its mtime kept (run_queue.sh only looks at mtimes; worker_sync.sh
@@ -30,8 +32,26 @@ def write(path, nodes):
         body += [bytes(map(int, row)) for row in n["strat"]]
         body += [array("i", [round(x * 100) for x in row]).tobytes() for row in n["ev"]]
     hj = json.dumps(head, separators=(",", ":")).encode()
-    with open(path + ".tmp", "wb") as f: f.write(gzip.compress(struct.pack("<I", len(hj)) + hj + b"".join(body), 6))
+    with open(path + ".tmp", "wb") as f: f.write(gzip.compress(pack2(struct.pack("<I", len(hj)) + hj + b"".join(body)), 6))
     os.replace(path + ".tmp", path)
+
+def pack2(raw):
+    """v1 piece bytes -> v2, the same numbers: {"v":2,"lists":[hands per list],"nodes":[[key, player, [actions], hands,
+    list]]} header, then each distinct hand list once, every node's reach, every node's strategy, every node's EV, the
+    u16/u32/i32 arrays stored as byte planes (all low bytes, then the next byte...). Gzips ~19% smaller than v1."""
+    n = struct.unpack_from("<I", raw)[0]; p = 4 + n
+    lists, nodes, reach, strat, ev = [], [], [], [], []
+    for k, pl, acts, h in json.loads(raw[4:p]):
+        a = len(acts); hs = raw[p:p + 2 * h]; p += 2 * h
+        if hs not in lists: lists.append(hs)
+        nodes.append([k, pl, acts, h, lists.index(hs)])
+        reach.append(raw[p:p + 4 * h]); p += 4 * h
+        strat.append(raw[p:p + a * h]); p += a * h
+        ev.append(raw[p:p + 4 * a * h]); p += 4 * a * h
+    planes = lambda b, w: b"".join(b[i::w] for i in range(w))
+    hj = json.dumps({"v": 2, "lists": [len(x) // 2 for x in lists], "nodes": nodes}, separators=(",", ":")).encode()
+    return (struct.pack("<I", len(hj)) + hj + b"".join(planes(x, 2) for x in lists) + planes(b"".join(reach), 4)
+            + b"".join(strat) + planes(b"".join(ev), 4))
 
 def split(scen, flop, gz, d):
     r = json.load(gzip.open(gz))
