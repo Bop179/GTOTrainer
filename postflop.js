@@ -375,7 +375,7 @@ function postExplain(node, h) {
   const call = P.put[1 - me] - P.put[me], need = call / (potNow() + call) * 100, eq = equity(hole, board, villainRange()) * 100;
   if (call > 0) maths.push(`Equity needed to call = call ÷ (pot + call) = ${f1(call)} ÷ (${f1(potNow())} + ${f1(call)}) = ${f1(call)} ÷ ${f1(potNow() + call)} = <b>${f1(need)}%</b>.`);
   if (!isNaN(eq)) {
-    tiles.push(tile("Equity", f1(eq) + "%", `<i><b style="width:${eq}%"></b>${call > 0 ? `<u style="left:${need}%"></u>` : ""}</i>`, call > 0 ? `a call needs ${f1(need)}%` : `against ${P.seat[1 - me]}'s range`));
+    tiles.push(tile("Equity", f1(eq) + "%", `<i><b style="width:${eq}%"></b>${call > 0 ? `<u style="left:${need}%"></u>` : ""}</i>`, call > 0 && `a call needs ${f1(need)}%`, `showdown equity vs ${P.seat[1 - me]}'s range, not outs`));
     maths.push(`Equity is your share of the pot against ${P.seat[1 - me]}'s range if the hand checked down from here${call > 0 ? `: ${f1(eq)}% ${eq >= need ? "≥" : "<"} the ${f1(need)}% a call needs` : ""}. The solver's EV also counts the betting still to come, so the two can disagree.`);
   }
   // a draw's outs: exact in the tile, the rule of 2 and 4 in the maths
