@@ -83,7 +83,7 @@ The same nodes give the villains' answers when you squeeze or cold 4-bet: the op
 
 - [x] A **Ranges** button opens any spot's chart and whole-range mix at the current game and stack, without playing a hand.
 
-### 8. Show every action's EV (gain or loss) and grade by it (done 2026-11-18)
+### 8. ✅ Show every action's EV (gain or loss) and grade by it (done 2026-11-18)
 
 Grading used to go by how often the solver plays your action. Grading by EV loss would mark a 0% action that loses almost nothing as close, and a cheap-looking fold that throws away a lot as a big mistake.
 
@@ -191,7 +191,7 @@ Postflop covers heads-up pots only; 9-max reuses the 8-max solves once UTG has f
 - After the keep-every-hand re-solve finishes: postflop.js `P.inRange` and its "solved before every hand was kept" message, and the "turns after a raised flop aren't solved yet" ending.
 - After gto-worker is terminated (by 2026-11-30): solver/worker_down.sh, the REVERSE option in run_queue.sh, the worker parts of dashboard.py, and ~/worker_sync.sh on gto-vm.
 
-### 10. Custom spot solver (2026-11-16)
+### 10. ✅ Custom spot solver (2026-11-16)
 
 - [x] Solver dialog with editable heads-up flop/turn/river, pot, remaining stack, both ranges and bet sizes.
 - [x] Public server API (no key or login), one bounded solve at a time, cancellation and reconnect; separate native binary and temporary results.
