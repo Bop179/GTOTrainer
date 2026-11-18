@@ -83,18 +83,18 @@ The same nodes give the villains' answers when you squeeze or cold 4-bet: the op
 
 - [x] A **Ranges** button opens any spot's chart and whole-range mix at the current game and stack, without playing a hand.
 
-### 8. Show every action's EV (gain or loss) and grade by it
+### 8. Show every action's EV (gain or loss) and grade by it (done 2026-11-18)
 
-Grading now goes by how often the solver plays your action. Grading by EV loss would mark a 0% action that loses almost nothing as close, and a cheap-looking fold that throws away a lot as a big mistake.
+Grading used to go by how often the solver plays your action. Grading by EV loss would mark a 0% action that loses almost nothing as close, and a cheap-looking fold that throws away a lot as a big mistake.
 
 - GTO Wizard's free tier shows EV (checked 2026-11-06): the grid's display menu has Strategy, Strategy + EV, EV, Compare EV, Range and All, and the Hands panel lists each action's EV per combo.
 - [x] Find the cheapest way to read per-action EV for all 169 hands. Done 2026-11-13: the page's own store already holds every action's strategy and EV for all 169 hands, one view per node, whatever the grid display mode. It matched the Hands panel and the old grid reads (within 0.05pp).
-- [ ] Re-read every node with EV: 1,352 nodes (8-max 100bb 470, 8-max 200bb 488, 6-max 100bb 190, 6-max 200bb 204), about 15 days of the free quota. Daily pull started 2026-11-12. Reordered 2026-11-14: 6-max 100bb and 200bb next, then the rest of 8-max 100bb (196 of 470 read), then 8-max 200bb.
+- [x] Re-read every node with EV: 1,352 nodes (8-max 100bb 470, 8-max 200bb 488, 6-max 100bb 190, 6-max 200bb 204), about 15 days of the free quota. Daily pull started 2026-11-12. Reordered 2026-11-14: 6-max 100bb and 200bb next, then the rest of 8-max 100bb (196 of 470 read), then 8-max 200bb.
   - 8-max 100bb: all 470 (2026-11-17).
-  - 8-max 200bb: 420 of 488 (2026-11-17), also 9-max 200bb through the mapping.
+  - 8-max 200bb: all 488 (2026-11-18), also 9-max 200bb through the mapping. Every stack matched the old grid reads within 3pp; `ev.js` has all 1,352 spots.
   - 6-max 100bb: all 190 (2026-11-16).
   - 6-max 200bb: all 204 (2026-11-16). GTO Wizard's Open Week (from 2026-11-16, about 7 days) lifts the 100-view limit; every read matched the old grid reads within 3pp.
-- [ ] Trainer: add the EV to each spot's rows and grade by EV lost against the best action (thresholds to pick).
+- [x] Trainer: add the EV to each spot's rows and grade by EV lost against the best action (thresholds to pick).
   - Live for every node read so far (2026-11-14): `build_ev.py` packs `.claude/gw*_ev.json` into `ev.js` (re-run after each pull), and 9-max shares 8-max's EV. Grade (thresholds reset 2026-11-15 against all 296 EV spots): under 0.05bb lost is correct; a mistake starts at 0.1bb lost, or 0.5% of the pot where that's more (it was 0.5bb, at which opening any hand at all was never a mistake); anything the solver plays 15%+ is correct and 5%+ is never a mistake. Spots without EV still grade by frequency (mixed from 5%). Each button shows its EV. The frequency rule covers the known noise: in BB vs the SB's 5-bet to 53 in a limped pot (rarely reached), the solver mixes calls its own EV puts 1-2.8bb behind folding, and those calls now grade as the solver plays them. The feedback lists every action available with its EV in bb, signed (+ is a gain, - a loss, fold is 0), marks the best one, and shows your pick's EV and its gap to the best ("Call +1.2bb, 0.4bb less than 3-bet +1.6bb").
 
 ### 9. Postflop: every heads-up pot at 6-max and 8-max, 100bb and 200bb (started 2026-11-13)

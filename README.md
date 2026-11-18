@@ -33,7 +33,7 @@ Or open `index.html` from a download. Preflop works offline; postflop always nee
 | **Postflop** | Played 25% or more, or 5% or more and within 2% of the pot of the best action | Played 5% or more; or 1% or more and within 5% of the pot; or within 1% of the pot | Anything else |
 
 - The middle grade reads **Mixed** when the solver plays your action 5% of the time or more, and **Close** when it doesn't but the action costs little.
-- EV is being added to the preflop spots day by day (ROADMAP item 8), so some spots still grade by frequency.
+- Every GTO Wizard preflop spot (6-max and 8-max at 100 and 200bb, and 9-max where it maps to 8-max) has EV, 1,352 spots in all. The rest grade by frequency.
 - Postflop solves stop at about 1% of the pot, so when two or more actions' EVs fall within 1% of the pot of the hand's EV under the solver's mix, they count as tied and all show that mixed EV (Fold 90% at 0 and Call 10% at +0.49bb both show +0.05bb). The raw EVs are under **Show the maths**.
 - After a postflop decision you also see your equity against the villain's range, your outs, where your hand sits in your range, what similar hands do, and the EV of every option. **Show the maths** opens the working.
 
