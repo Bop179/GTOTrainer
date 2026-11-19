@@ -212,6 +212,7 @@ async function postBegin(c) {
     flop, nodes, vr, k: "", street: 0, spent: [0, 0], put: [0, 0], tag: ["", ""], hist: [], over: false, answered: false, cards: c.cards, isNew: 3,
     // the hand so far: street names ({s}) and actions ({t, k}); a closing message ({t, end}) when it's over
     story: [{ s: "Preflop" }, ...[...z0.line, [p0, 0, key0.endsWith("FACINGLIMP") ? "Check" : "Call"]].map(told)] };
+  if (c.forced) P.story.push({ t: c.forced, k: "Fold" }); // a 3-way pot played heads-up (forceHU in index.html)
   P.hands = [];
   P.hands[me] = hero;
   // TEMPORARY until the keep-every-hand re-solve (results/.since, 2026-11-15) finishes; then delete this and the "off && P.inRange" message in postAnswer.
