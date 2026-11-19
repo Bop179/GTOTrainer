@@ -196,7 +196,7 @@ async function postBegin(c) {
     const perm = shuffle([...SUIT]); sig = Object.fromEntries([...SUIT].map((s, i) => [s, perm[i]]));
     const back = Object.fromEntries(Object.entries(sig).map(([s, d]) => [d, s]));
     mine = c.cards.map(([r, sy]) => r + back[SUIT[SUITS.indexOf(sy)]]);
-    flop = shuffle([...m.flops]).find(f => !cardsOf(f).concat(f.slice(4)).some(x => mine.includes(x)));
+    flop = shuffle([...m.flops]).find(f => ![f.slice(0, 2), f.slice(2, 4), f.slice(4)].some(x => mine.includes(x))); // cardsOf is for 2-card hands
   }
   let nodes;
   try { nodes = await loadPiece(`${m.src || scen}/${flop}/flop`); } catch (e) { c.busy = false; $("situation").textContent = e.message; return; }
