@@ -1049,6 +1049,15 @@ function noFlop(s, players) {
     : "this pot isn't solved (only the common heads-up lines are)";
   return `on to the flop, where the hand stops: ${why}.`;
 }
+// More than two players see the flop, but postflop is only solved heads-up: the players in `out` are folded out and you play
+// the other one heads-up in pot `sc` (the pot as if they had never come in). null where that pot isn't solved, or preflop only.
+// stay: who keeps their cards (see foldOut); forced: the line the postflop hand history shows for it.
+function forceHU(head, out, sc) {
+  if (!sc || cfg.preOnly) return null;
+  const n = out.length + 2, them = out.join(" and "), vs = ways(sc).map(([p]) => p).find(p => !out.includes(p) && p !== st.cur.spot.hero);
+  return { text: `${head}: ${n} players see the flop. Postflop is only solved heads-up, so ${them} ${out.length > 1 ? "fold" : "folds"} and you play ${vs} heads-up: on to the flop!`,
+    post: sc, stay: [vs], forced: `${them} ${out.length > 1 ? "fold" : "folds"} (postflop is only solved heads-up)` };
+}
 // What the others do after your action: the next spot you face, or how the hand ends
 function simNext(c, a, pot) {
   const s = c.spot, limp = s.node === "RFI" && a === "Call", node = limp ? "FACINGLIMP" : NEXT[s.node];
@@ -1079,6 +1088,11 @@ function simNext(c, a, pot) {
   }
   // you squeezed or cold 4-bet: the opener answers first, then (if the opener folds) the caller or 3-bettor
   // ponytail: the players behind you are assumed to fold (the data covers only that line), and an all-in gets the same answers as the solver's raise
+  // you call an open and a call: three of you see the flop (the players behind you are assumed to fold); calling a 3-bet cold, the opener still acts
+  if (REPLY[s.node] && a === "Call") {
+    if (s.node === "FACING3B_COLD") return { text: `You call, and ${o} still has to act. ${END}` };
+    return forceHU("You call", [w], postScen(parse(K(o, s.hero, "FACINGRFI")), a)) || { text: `You call: ${noFlop(s, 3)}` };
+  }
   if (REPLY[s.node]) {
     const [n1, n2] = REPLY[s.node], k1 = K(`${w}+${s.hero}`, o, n1), k2 = K(`${o}+${s.hero}`, w, n2);
     if (!SPOTS[k1]) return { text: NOREPLY };
@@ -1106,12 +1120,14 @@ function simNext(c, a, pot) {
   }
   // your call (or check) closes preflop heads-up in a solved pot: the hand goes on to the flop
   const sc = a === "Call" && !j && postScen(s, a);
+  const hu = a === "Call" && j && forceHU(`You call, ${joinText(j)}`, [j[0]], postScen(s, a));
+  if (hu) return hu;
   if (sc) return { text: `You ${s.node === "FACINGLIMP" ? "check" : "call"}${s.node === "FACINGRFI" ? " and the rest fold" : ""}: on to the flop!`, post: sc };
   if (a === "Call" && !limp) return { text: `${j ? joinText(j) + ". " : ""}You ${s.node === "FACINGLIMP" ? "check" : "call"}: ${noFlop(s, j ? 3 : 2)}` };
   if (villains(s).length > 1) return { text: "Two players are still in behind your raise, and the solver data only has replies to a raise from one player, so the hand ends here." };
   // a villain with no spot to respond from would otherwise "fold"
   if (!node || s.villain && !SPOTS[nodeKey(s, s.villain, s.hero, node)]) return { text: "No solver data past this point, so the hand ends here." };
-  let caller, callers = 0;
+  let caller, callers = 0; const called = [];
   for (const p of limp ? ["BB"] : s.node === "RFI" ? ORDER[s.game].slice(ORDER[s.game].indexOf(s.hero) + 1) : [s.villain]) {
     // after a call of your open, the rest face the open plus that call
     const mw = caller && [s.game, s.stack, `${s.hero}+${caller}`, p, "FACINGRFI_CALL"].join("/");
@@ -1119,7 +1135,7 @@ function simNext(c, a, pot) {
     const b = shove && b0 === "Call" && wideFlats(key) ? "Fold" : b0; // see allinCalled
     if (b === "Fold") continue;
     if (shove) return allinCalled(c, p, key);
-    if (b === "Call") { caller ??= p; callers++; continue; }
+    if (b === "Call") { caller ??= p; callers++; called.push(p); continue; }
     if (key === mw) return reach(`${caller} calls, ${joinText([p, b], "FACINGRFI_CALL")}`, K(`${caller}+${p}`, s.hero, "FACINGSQZ"));
     // a 3-bet of your open: the players behind the 3-bettor get a cold 4-bet spot before it's back to you
     const cold = s.node === "RFI" && b !== "Allin" && joiner(s, s.hero, p, "FACING3B_COLD");
@@ -1129,6 +1145,8 @@ function simNext(c, a, pot) {
   // you bet (or limp) and one player calls (or checks), heads-up in a solved pot
   const sc2 = callers === 1 && !j && !shove && postScen(s, a, caller);
   if (sc2) return { text: `${caller} ${limp ? "checks" : "calls"}: on to the flop!`, post: sc2 };
+  const hu2 = callers > 1 && !j && !shove && forceHU(`${called.slice(0, -1).join(", ")} and ${called.at(-1)} call`, called.slice(1), postScen(s, a, caller));
+  if (hu2) return hu2;
   return { text: caller ? `${callers > 1 ? `${callers} players call` : `${caller} ${limp ? "checks" : "calls"}`}: ${noFlop(s, callers + 1)}` : `Everyone folds. You take the ${bb(pot)} pot.` };
 }
 
@@ -1225,18 +1243,19 @@ function muck(seat) {
   replayTimers.push(setTimeout(() => seat.querySelectorAll(".backs i").forEach(i => i.remove()), 650));
 }
 // the hand ends on the others' replies: muck the seats the reply names ("BB folds", "UTG and HJ fold", "Everyone folds")
-function foldOut(text, spot, put, S) {
+// keepIn: who stays in, where the text alone doesn't say (a 3-way pot played heads-up, see forceHU)
+function foldOut(text, spot, put, S, keepIn) {
   const felt = $("felt"), all = [...felt.querySelectorAll(".seat")], i = all.findIndex(x => x.classList.contains("hero"));
   const seats = all.map((x, j) => all[(i + 1 + j) % all.length]).filter(x => !x.classList.contains("hero") && !x.classList.contains("folded")); // they act left of you first
   const calls = [...text.matchAll(/\b([A-Z][A-Z0-9+]*) calls?\b/g)].map(m => m[1]);
   // who is still in: the callers named, or (you call and the rest fold) the players you called; everyone else mucks, named or not (the players behind you are assumed to fold)
-  const stay = calls.length ? calls : /the rest fold/.test(text) ? villains(spot) : null, everyone = /^Everyone folds|You take the/.test(text);
+  const stay = keepIn || (calls.length ? calls : /the rest fold/.test(text) ? villains(spot) : null), everyone = /^Everyone folds|You take the/.test(text);
   const names = stay || everyone ? [] : [...text.matchAll(/\b([A-Z][A-Z0-9+]*)(?: and ([A-Z][A-Z0-9+]*))? folds?\b/g)].flatMap(m => [m[1], m[2]]);
   const out = seats.filter(x => stay ? !stay.includes(x.dataset.p) : everyone || names.includes(x.dataset.p));
   let t = 450;
   out.forEach(x => { replayTimers.push(setTimeout(() => muck(x), t)); t += 320; });
   // a caller matches your raise: tag, chip and stack from the seat, and the pot grows by what it adds
-  if (put && calls.length) for (const p of calls) {
+  if (put && (keepIn || calls).length) for (const p of keepIn || calls) {
     const seat = all.find(x => x.dataset.p === p), bet = felt.querySelector(`.bet[data-p="${p}"]`); if (!seat) continue;
     const add = put - (parseFloat(bet.textContent) || 0);
     replayTimers.push(setTimeout(() => {
@@ -1374,7 +1393,7 @@ function answer(a) {
   let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   let settle = 300;
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
-  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); else if (!after.spot) settle = foldOut(after.text, c.spot, a !== "Call" && put, z.S); }
+  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; c.forced = after.forced; more = true; } if (after.sd) runout(after.sd, z.S); else if (!after.spot) settle = foldOut(after.text, c.spot, a !== "Call" && put, z.S, after.stay); }
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
     : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`}${grade === "great" && loss >= 0.05 ? ` The solver still plays it ${Math.round(f)}% of the time here, so that gap is noise in its EVs for a spot this rare.` : ""} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p id="note"><b>▸ ${note}</b></p>`);

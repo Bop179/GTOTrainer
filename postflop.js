@@ -196,7 +196,7 @@ async function postBegin(c) {
     const perm = shuffle([...SUIT]); sig = Object.fromEntries([...SUIT].map((s, i) => [s, perm[i]]));
     const back = Object.fromEntries(Object.entries(sig).map(([s, d]) => [d, s]));
     mine = c.cards.map(([r, sy]) => r + back[SUIT[SUITS.indexOf(sy)]]);
-    flop = shuffle([...m.flops]).find(f => !cardsOf(f).concat(f.slice(4)).some(x => mine.includes(x)));
+    flop = shuffle([...m.flops]).find(f => ![f.slice(0, 2), f.slice(2, 4), f.slice(4)].some(x => mine.includes(x))); // cardsOf is for 2-card hands
   }
   let nodes;
   try { nodes = await loadPiece(`${m.src || scen}/${flop}/flop`); } catch (e) { c.busy = false; $("situation").textContent = e.message; return; }
@@ -212,6 +212,7 @@ async function postBegin(c) {
     flop, nodes, vr, k: "", street: 0, spent: [0, 0], put: [0, 0], tag: ["", ""], hist: [], over: false, answered: false, cards: c.cards, isNew: 3,
     // the hand so far: street names ({s}) and actions ({t, k}); a closing message ({t, end}) when it's over
     story: [{ s: "Preflop" }, ...[...z0.line, [p0, 0, key0.endsWith("FACINGLIMP") ? "Check" : "Call"]].map(told)] };
+  if (c.forced) P.story.push({ t: c.forced, k: "Fold" }); // a 3-way pot played heads-up (forceHU in index.html)
   P.hands = [];
   P.hands[me] = hero;
   // TEMPORARY until the keep-every-hand re-solve (results/.since, 2026-11-15) finishes; then delete this and the "off && P.inRange" message in postAnswer.
