@@ -1390,7 +1390,11 @@ function answer(a) {
   // the scripted line raises at every step, except the SB's limp that starts a limped pot and the call that gets squeezed
   let more = c.k + 1 < c.steps.length, nx = more && c.steps[c.k + 1].node;
   let want = more && (c.spot.node === "RFI" && isLimp(nx) || nx === "FACINGSQZ_CALLER") ? "Call" : "Raise";
-  let note = more && a !== want ? `The hand continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
+  // off the scripted line: a review or a Spots filter is there to reach the spot at its end, so the hand still goes there;
+  // otherwise (Play to postflop, or a line replayed from your first decision) your own action is played out live from here
+  const pinned = c.rid || cfg.nodes.length;
+  if (more && a !== want && !pinned) { c.steps.length = c.k + 1; c.scen = null; more = false; }
+  let note = more && a !== want ? `You ${a === "Allin" ? "go all-in" : label(a, c.spot.node).toLowerCase()}, but this hand is ${c.rid ? "a review of" : "drilling"} a later spot in the line, so it continues as if you ${label(want, c.spot.node).toLowerCase()}.` : "";
   let settle = 300;
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
   if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; c.forced = after.forced; more = true; } if (after.sd) runout(after.sd, z.S); else if (!after.spot) settle = foldOut(after.text, c.spot, a !== "Call" && put, z.S, after.stay); }
