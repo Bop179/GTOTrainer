@@ -110,10 +110,47 @@ function unpack2(src, { lists, nodes }) {
   }
   return out.buffer;
 }
+// v3 piece (split.py pack3): suit-mirrored hands stored once, and EVs as differences from a guess made from their neighbours
+function decode3(src, { sym, lists, nodes }, sx) {
+  let o = 0;
+  const take = (n, w) => { const x = new Int32Array(n); for (let j = 0; j < w; j++) for (let i = 0; i < n; i++) x[i] |= src[o++] << 8 * j; return x; };
+  const perms = g => g.length < 2 ? [g] : g.flatMap((x, i) => perms(g.filter((_, j) => j !== i)).map(r => [x, ...r]));
+  // every way to swap the mirrored suits: suit -> suit
+  const swaps = sym.reduce((all, g) => all.flatMap(m => perms(g).map(p => m.map((x, s) => g.includes(s) ? p[g.indexOf(s)] : x))), [[0, 1, 2, 3]]);
+  const name = (c, m) => sx(UP[c >> 2] + SUIT[m[c & 3]]);
+  // each stored list -> every hand it stands for, and the stored hand each one takes its numbers from
+  const full = lists.map(([n, mirrors]) => {
+    const hands = [], from = [];
+    take(n, 2).forEach((h, i) => {
+      const seen = new Set(), a = Math.floor(h / 52), b = h % 52;
+      for (const m of mirrors ? swaps : swaps.slice(0, 1)) seen.add(holeStr(name(a, m), name(b, m)));
+      for (const x of seen) { hands.push(x); from.push(i); }
+    });
+    return { n, hands, from };
+  });
+  let H = 0, R = 0, E = 0;
+  for (const [, , a, li] of nodes) { const n = full[li].n; H += n; R += (a.length - 1) * n; E += a.length * n; }
+  const reach = take(H, 4), rest = src.subarray(o, o += R), first = src.subarray(o, o += H), ev = take(E, 4), out = {};
+  let r = 0, s = 0, e = 0;
+  for (const [k, player, actions, li] of nodes) {
+    const { n, hands, from } = full[li], A = actions.length, x = ev.subarray(e, e += A * n), st = [], top = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { top[i] = first[r + i] + 100; for (let a = 0; a < A - 1; a++) top[i] -= rest[s + a * n + i]; }
+    for (let a = 0; a < A; a++) st.push(a ? rest.subarray(s, s += n) : top);
+    for (let a = 0, j = 0; a < A; a++) for (let i = 0; i < n; i++, j++) {
+      const w = i ? x[j - 1] : 0, up = a ? x[j - n] : 0, ul = a && i ? x[j - n - 1] : 0, hi = Math.max(w, up), lo = Math.min(w, up);
+      x[j] = (x[j] >>> 1 ^ -(x[j] & 1)) + (!a ? w : ul >= hi ? lo : ul <= lo ? hi : w + up - ul);
+    }
+    out[k.split("-").map(t => t.length === 2 && SUIT.includes(t[1]) ? sx(t) : t).join("-")] = { player, actions, hands,
+      reach: from.map(i => reach[r + i] / 1000), strat: st.map(y => from.map(i => y[i])), ev: actions.map((_, a) => from.map(i => x[a * n + i] / 100)) };
+    r += n;
+  }
+  return out;
+}
 function decodePiece(buf, swap) {
   let v = new DataView(buf), hl = v.getUint32(0, true), head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, hl))), o = 4 + hl;
-  if (head.v === 2) { buf = unpack2(new Uint8Array(buf, o), head); v = new DataView(buf); head = head.nodes; o = 0; }
   const sx = x => !swap ? x : x[0] + (x[1] === swap[0] ? swap[1] : x[1] === swap[1] ? swap[0] : x[1]);
+  if (head.v === 3) return decode3(new Uint8Array(buf, o), head, sx);
+  if (head.v === 2) { buf = unpack2(new Uint8Array(buf, o), head); v = new DataView(buf); head = head.nodes; o = 0; }
   const c52 = i => sx(UP[i >> 2] + SUIT[i & 3]), out = {};
   for (const [k, player, actions, h] of head) {
     const hands = [], reach = [], strat = [], ev = [];

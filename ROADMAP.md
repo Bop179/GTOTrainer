@@ -148,8 +148,8 @@ Postflop covers heads-up pots only; 9-max reuses the 8-max solves once UTG has f
 - Each flop is cut into a flop piece and one piece per turn card. Pieces are gzipped binary: strategy 1 byte, EV 4 bytes, hands as card indices.
 - Turns in suits the flop doesn't have are stored once and suit-swapped on load (verified identical).
 - Raw results are truncated to empty markers, with their mtime kept, once split.
-- A single-raised flop takes about 12 MB with every hand kept, down from 36 MB (raw copy plus base64 pieces).
-- Expected total: about 123 GB of the 147 GB volume.
+- A single-raised flop takes about 8 MB with every hand kept, down from 36 MB (raw copy plus base64 pieces).
+- Pieces are v3 since 2026-11-22: suit-mirrored hands stored once, hands sorted by EV, EVs stored as differences. About a third smaller than v2, with every number unchanged (`convert_v3.py` rewrote the old ones, `test_split.py` checks the format).
 
 - [x] Solver wrapper, job builder, queue runner (parallel claims, `REVERSE=1` on gto-vm so both machines follow the order from opposite ends), restart after a reboot.
 - [x] River solver in the browser (2026-11-13): `river.js` and `river_wasm.js`, the same solver in WebAssembly. Under 0.1 s and 150 MB for a worst-case river; matches the native solver. Rebuild with `solver/build_wasm.sh`.
