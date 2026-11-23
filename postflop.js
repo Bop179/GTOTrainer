@@ -41,7 +41,7 @@ const postScen = (s, a, closer = s.hero) => Object.keys(PI).find(scen => {
 const postGames = () => Object.keys(PI).map(s => s.split("_").slice(0, 2).join("/"));
 
 // "Play to postflop": a preflop spot that leads into a solved pot, with a hand that takes the line there (see ways).
-// The others are scripted to let it through (see postReply).
+// Nothing is scripted after that: the others play their own strategies, so the hand reaches the flop only when they let it.
 function postDeal(g, pos) {
   const [game, stack] = g.split("/"), opts = [];
   for (const scen of Object.keys(PI)) {
@@ -53,15 +53,6 @@ function postDeal(g, pos) {
   if (!opts.length) return null;
   const o = opts[Math.floor(Math.random() * opts.length)], rows = SPOTS[o.key];
   return { spot: parse(o.key), i: pick(rows.map((r, k) => COMBOS(HANDS[k]) * r[4] * r[o.col] * handOk(HANDS[k]))), scen: o.scen };
-}
-// with "Play to postflop" on: you made the move that leads to the flop, so the scripted closer calls and the rest fold
-function postReply(c, a) {
-  if (!c.scen) return null;
-  const w = ways(c.scen), mine = w.find(([, key]) => key === c.spot.key);
-  if (!mine || colOf(a) !== mine[2] || a === "Raise" && c.z.raise >= c.z.S) return null;
-  const o = c.scen.split("_")[6], [p, key] = w[1], v = key.endsWith("FACINGLIMP") ? "check" : "call";
-  const text = mine === w[1] ? `You ${v}: on to the flop!` : `${o ? o + " folds, " : "The rest fold, "}${p} ${v}s: on to the flop!`;
-  return { text, post: c.scen };
 }
 
 // ---------- data: each piece is a gzipped binary file on the VM (format in solver/split.py) ----------

@@ -774,7 +774,7 @@ function drawSettings() {
     + `<h4>Your hand <small>· e.g. AKs, 88, AQ (both suited and offsuit); empty = any</small></h4><div class="chips"><input id="handsIn" placeholder="Any hand" spellcheck="false" value="${cfg.hands.join(", ")}"></div>`
     // Streets: preflop only (a hand stops at the flop), both (on into a solved heads-up pot when it gets there), or play to postflop
     // (only hands that get there, starting on the street you pick: the @ chips, a sub-line shown with it)
-    + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Streets <small>· Play to postflop deals just hands that reach a solved heads-up pot (overrides Spots)</small>",
+    + (postGames().includes(cfg.game + "/" + cfg.stack) ? group("post", "Streets <small>· Play to postflop deals spots that can lead into a solved heads-up pot; the others still play their own strategies, so not every hand gets there (overrides Spots)</small>",
       [["pre", "Preflop only"], ["", "Both"], ["post", "Play to postflop"]], v => (cfg.toPost ? "post" : cfg.preOnly ? "pre" : "") === v)
       + (cfg.toPost ? group("post", "<small>Start deciding on</small>", [["@", "Preflop"], ["@flop", "Flop"], ["@turn", "Turn"], ["@river", "River"]], v => "@" + (cfg.postFrom || "") === v) : "") : "")
     + group("later", "Feedback <small>· after the hand: no grades until it's played out, then each decision's analysis</small>", [["", "After each decision"], ["hand", "After the hand"]], v => (cfg.later || "") === v);
@@ -947,7 +947,7 @@ function newHand() {
   }
   // drills stay on the drilled spot; otherwise replay the hand from your first decision on this line
   const steps = st.drill ? [spot] : chainOf(spot, i);
-  st.cur = { steps, k: 0, i, hand: HANDS[i], cards: dealCards(HANDS[i]), rid, scen: pd && pd.scen };
+  st.cur = { steps, k: 0, i, hand: HANDS[i], cards: dealCards(HANDS[i]), rid };
   // starting on the flop or later: preflop is already played (postDeal picked a hand that takes the line), straight to the flop
   if (pd && cfg.postFrom) { Object.assign(st.cur, { spot, post: pd.scen }); play("deal"); return postBegin(st.cur); }
   showStep(true);
@@ -1053,7 +1053,6 @@ function noFlop(s, players) {
 function simNext(c, a, pot) {
   const s = c.spot, limp = s.node === "RFI" && a === "Call", node = limp ? "FACINGLIMP" : NEXT[s.node];
   if (a === "Fold") return null;
-  const pr = postReply(c, a); if (pr) return pr;
   if (limp && !SPOTS[nodeKey(s, "BB", s.hero, node)]) return { text: "You limp. The solver data has no limped pot here (only the SB's limp is in it), so the hand ends." };
   const shove = a === "Allin" || c.z.raise >= c.z.S, [o, w] = villains(s), K = (v, p, n) => [s.game, s.stack, v, p, n].join("/");
   const what = (b, n) => b === "Allin" ? "shoves all-in" : b === "Call" ? "calls" : RAISE_NAME[n].toLowerCase() + "s";
@@ -1116,7 +1115,7 @@ function simNext(c, a, pot) {
   if (villains(s).length > 1) return { text: "Two players are still in behind your raise, and the solver data only has replies to a raise from one player, so the hand ends here." };
   // a villain with no spot to respond from would otherwise "fold"
   if (!node || s.villain && !SPOTS[nodeKey(s, s.villain, s.hero, node)]) return { text: "No solver data past this point, so the hand ends here." };
-  let caller, callers = 0;
+  let caller, callers = [];
   for (const p of limp ? ["BB"] : s.node === "RFI" ? ORDER[s.game].slice(ORDER[s.game].indexOf(s.hero) + 1) : [s.villain]) {
     // after a call of your open, the rest face the open plus that call
     const mw = caller && [s.game, s.stack, `${s.hero}+${caller}`, p, "FACINGRFI_CALL"].join("/");
@@ -1124,7 +1123,7 @@ function simNext(c, a, pot) {
     const b = shove && b0 === "Call" && wideFlats(key) ? "Fold" : b0; // see allinCalled
     if (b === "Fold") continue;
     if (shove) return allinCalled(c, p, key);
-    if (b === "Call") { caller ??= p; callers++; continue; }
+    if (b === "Call") { caller ??= p; callers.push(p); continue; }
     if (key === mw) return reach(`${caller} calls, ${joinText([p, b], "FACINGRFI_CALL")}`, K(`${caller}+${p}`, s.hero, "FACINGSQZ"));
     // a 3-bet of your open: the players behind the 3-bettor get a cold 4-bet spot before it's back to you
     const cold = s.node === "RFI" && b !== "Allin" && joiner(s, s.hero, p, "FACING3B_COLD");
@@ -1132,9 +1131,9 @@ function simNext(c, a, pot) {
     return reach(`${p} ${what(b, node)}`, nodeKey(s, s.hero, p, NEXT[node]));
   }
   // you bet (or limp) and one player calls (or checks), heads-up in a solved pot
-  const sc2 = callers === 1 && !j && !shove && postScen(s, a, caller);
+  const sc2 = callers.length === 1 && !j && !shove && postScen(s, a, caller);
   if (sc2) return { text: `${caller} ${limp ? "checks" : "calls"}: on to the flop!`, post: sc2 };
-  return { text: caller ? `${callers > 1 ? `${callers} players call` : `${caller} ${limp ? "checks" : "calls"}`}: ${noFlop(s, callers + 1)}` : `Everyone folds. You take the ${bb(pot)} pot.` };
+  return { text: caller ? `${callers.length > 1 ? `${seatList(callers)} call` : `${caller} ${limp ? "checks" : "calls"}`}: ${noFlop(s, callers.length + 1)}` : `Everyone folds. You take the ${bb(pot)} pot.` };
 }
 
 // Earlier decisions that lead to a spot, oldest first: e.g. "HJ opens, you 3-bet from SB, HJ 4-bets"
@@ -1229,15 +1228,18 @@ function muck(seat) {
   seat.classList.add("toss", "folded"); play("deal"); toss(seat, ".backs i");
   replayTimers.push(setTimeout(() => seat.querySelectorAll(".backs i").forEach(i => i.remove()), 650));
 }
+const SEAT = "[A-Z][A-Z0-9+]*", seatList = a => a.length > 1 ? a.slice(0, -1).join(", ") + " and " + a.at(-1) : a[0];
 // the hand ends on the others' replies: muck the seats the reply names ("BB folds", "UTG and HJ fold", "Everyone folds")
 function foldOut(text, spot, put, S) {
   const felt = $("felt"), all = [...felt.querySelectorAll(".seat")], i = all.findIndex(x => x.classList.contains("hero"));
   const seats = all.map((x, j) => all[(i + 1 + j) % all.length]).filter(x => !x.classList.contains("hero") && !x.classList.contains("folded")); // they act left of you first
-  const calls = [...text.matchAll(/\b([A-Z][A-Z0-9+]*) calls?\b/g)].map(m => m[1]);
-  // who is still in: the callers named, or (you call and the rest fold) the players you called; everyone else mucks, named or not (the players behind you are assumed to fold)
-  const stay = (calls.length ? calls : /the rest fold/.test(text) ? villains(spot) : null), everyone = /^Everyone folds|You take the/.test(text);
-  const names = stay || everyone ? [] : [...text.matchAll(/\b([A-Z][A-Z0-9+]*)(?: and ([A-Z][A-Z0-9+]*))? folds?\b/g)].flatMap(m => [m[1], m[2]]);
-  const out = seats.filter(x => stay ? !stay.includes(x.dataset.p) : everyone || names.includes(x.dataset.p));
+  // seats the text names as calling / folding: "SB calls too", "CO and BTN call", "UTG, HJ and CO fold"
+  const named = verb => [...text.matchAll(new RegExp(`\\b((?:${SEAT}(?:, | and ))*${SEAT}) ${verb}s?\\b`, "g"))].flatMap(m => m[1].split(/, | and /));
+  const calls = named("call"), folds = named("fold"), everyone = /^Everyone folds|You take the/.test(text);
+  // once the action closes (someone calls, or it's on to the flop) whoever is already in the pot stays in unless the text folds them,
+  // along with the callers; everyone else mucks, named or not (the players behind you are assumed to fold)
+  const stay = calls.length || /on to the flop/.test(text) ? [...calls, ...villains(spot).filter(p => !folds.includes(p))] : null;
+  const out = seats.filter(x => stay ? !stay.includes(x.dataset.p) : everyone || folds.includes(x.dataset.p));
   let t = 450;
   out.forEach(x => { replayTimers.push(setTimeout(() => muck(x), t)); t += 320; });
   // a caller matches your raise: tag, chip and stack from the seat, and the pot grows by what it adds
@@ -1377,11 +1379,11 @@ function answer(a) {
   let more = c.k + 1 < c.steps.length, nx = more && c.steps[c.k + 1].node;
   let want = more && (c.spot.node === "RFI" && isLimp(nx) || nx === "FACINGSQZ_CALLER") ? "Call" : "Raise";
   // off the scripted line, the rest of it is dropped: your own action is played out live from here (never played for you)
-  if (more && a !== want) { c.steps.length = c.k + 1; c.scen = null; more = false; }
+  if (more && a !== want) { c.steps.length = c.k + 1; more = false; }
   let note = "";
   let settle = 300;
   const after = !more && !st.drill && simNext(c, a, z.pot - z.heroIn + put);
-  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); else if (!after.spot) settle = foldOut(after.text, c.spot, a !== "Call" && put, z.S); }
+  if (after) { note = after.text; if (after.spot) { c.steps.push(after.spot); more = true; } if (after.post && cfg.preOnly) note = note.replace("on to the flop!", "the hand ends at the flop (preflop only)."); else if (after.post) { c.post = after.post; more = true; } if (after.sd) runout(after.sd, z.S); else if (!after.spot) settle = foldOut(after.text, c.spot, put, z.S); }
   if (evs) $("why").insertAdjacentHTML("afterbegin", `<p>${a === top || loss < 0.005 ? `${evEl(a, c, evs)} is the highest-EV action.`
     : `${evEl(a, c, evs)}, ${loss.toFixed(2)}bb less than ${evEl(top, c, evs)}.`}${grade === "great" && loss >= 0.05 ? ` The solver still plays it ${Math.round(f)}% of the time here, so that gap is noise in its EVs for a spot this rare.` : ""} <span class="muted">EV per hand in bb from here, fold = 0.</span></p>`);
   if (note) $("why").insertAdjacentHTML("afterbegin", `<p id="note"><b>▸ ${note}</b></p>`);
