@@ -54,13 +54,19 @@ function postDeal(g, pos) {
   const o = opts[Math.floor(Math.random() * opts.length)], rows = SPOTS[o.key];
   return { spot: parse(o.key), i: pick(rows.map((r, k) => COMBOS(HANDS[k]) * r[4] * r[o.col] * handOk(HANDS[k]))), scen: o.scen };
 }
-// with "Play to postflop" on: you made the move that leads to the flop, so the scripted closer calls and the rest fold
+// with "Play to postflop" on: you made the move that leads to the flop, so the scripted closer calls and the rest fold.
+// Only moves that make sense: a player folds only to a raise (the opener to your squeeze or cold 4-bet, the players behind you
+// to your open or raise), and the fold names just the players still in the hand.
 function postReply(c, a) {
   if (!c.scen) return null;
   const w = ways(c.scen), mine = w.find(([, key]) => key === c.spot.key);
   if (!mine || colOf(a) !== mine[2] || a === "Raise" && c.z.raise >= c.z.S) return null;
   const o = c.scen.split("_")[6], [p, key] = w[1], v = key.endsWith("FACINGLIMP") ? "check" : "call";
-  const text = mine === w[1] ? `You ${v}: on to the flop!` : `${o ? o + " folds, " : "The rest fold, "}${p} ${v}s: on to the flop!`;
+  // closing it yourself, only the players behind you are left (a squeeze's opener folded before you acted); otherwise they act
+  // in this order: the players behind you, then the opener facing your squeeze or cold 4-bet
+  const out = mine === w[1] ? behind(c.spot) : [...behind(c.spot).filter(x => x !== p), ...o ? [o] : []];
+  const text = mine === w[1] ? `You ${v}${out.length ? ", " + foldsText(out) : ""}: on to the flop!`
+    : `${out.length ? foldsText(out) + ", " : ""}${p} ${v}s: on to the flop!`;
   return { text, post: c.scen };
 }
 
